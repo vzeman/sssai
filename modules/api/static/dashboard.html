@@ -526,11 +526,19 @@ async function loadTools() {
     const res = await fetch(API+'/api/tools/');
     if (!res.ok) return;
     const data = await res.json();
-    let html='';
-    for (const [cat,tools] of Object.entries(data)) {
-      if (!Array.isArray(tools)) continue;
-      html+=`<div style="margin-bottom:0.75rem"><strong style="font-size:0.85rem;color:var(--muted)">${cat}</strong><div>`;
-      html+=tools.map(t=>`<span class="tool-tag" title="${(t.description||'').replace(/"/g,'&quot;')}">${t.name}</span>`).join('');
+    var cats = data.categories || data;
+    if (!Array.isArray(cats)) return;
+    var html='';
+    for (var i=0; i<cats.length; i++) {
+      var cat = cats[i];
+      var catName = cat.category_name || cat.category || 'Unknown';
+      var tools = cat.tools || [];
+      html+='<div style="margin-bottom:0.75rem"><strong style="font-size:0.85rem;color:var(--muted)">'+catName+'</strong><div>';
+      for (var j=0; j<tools.length; j++) {
+        var t = tools[j];
+        var desc = (t.description||'').replace(/"/g,'&quot;');
+        html+='<span class="tool-tag" title="'+desc+'">'+t.name+'</span>';
+      }
       html+='</div></div>';
     }
     document.getElementById('tools-area').innerHTML = html;
