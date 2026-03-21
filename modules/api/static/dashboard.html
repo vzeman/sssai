@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Scanner — Dashboard</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6; --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316; --purple: #a855f7; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ─── Login overlay ─── */
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .login-overlay.hidden { display: none; }
+  .login-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 2.5rem; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-box .logo { text-align: center; margin-bottom: 1.5rem; }
+  .login-box .logo h1 { font-size: 1.5rem; font-weight: 700; }
+  .login-box .logo h1 span { color: var(--accent); }
+  .login-box .logo p { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+  .login-box .shield { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
+  .login-box label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 1rem; }
+  .login-box input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.65rem 0.75rem; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+  }
+  .login-box input:focus { border-color: var(--accent); }
+  .login-box .login-btn {
+    width: 100%; margin-top: 1.5rem; background: var(--accent); color: white; border: none;
+    border-radius: 8px; padding: 0.7rem; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .login-box .login-btn:hover { opacity: 0.85; }
+  .login-box .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-box .login-error { color: var(--red); font-size: 0.8rem; text-align: center; margin-top: 0.75rem; min-height: 1.2em; }
+
+  /* ─── Header ─── */
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 1.4rem; font-weight: 600; }
+  .header h1 span { color: var(--accent); }
+  .header .right { display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.red { background: var(--red); }
+  .user-badge { background: rgba(59,130,246,0.15); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; }
+  .logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
+  .logout-btn:hover { color: var(--red); border-color: var(--red); }
+
+  /* ─── Layout ─── */
+  .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .full-width { grid-column: 1 / -1; }
+
+  /* ─── Buttons ─── */
+  .btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: opacity 0.2s; }
+  .btn:hover { opacity: 0.85; }
+  .btn.sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  .btn.green { background: var(--green); }
+  .btn.red { background: var(--red); }
+  .btn.orange { background: var(--orange); }
+
+  /* ─── Scan form ─── */
+  .scan-form { display: flex; gap: 0.5rem; }
+  .scan-form input, .scan-form select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; color: var(--text); font-size: 0.85rem; }
+  .scan-form input { flex: 1; }
+
+  /* ─── Tables ─── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); vertical-align: top; }
+
+  /* ─── Badges ─── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge.queued { background: rgba(59,130,246,0.2); color: var(--accent); }
+  .badge.running { background: rgba(234,179,8,0.2); color: var(--yellow); animation: pulse 1.5s infinite; }
+  .badge.completed, .badge.done { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge.failed { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.critical { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.high { background: rgba(249,115,22,0.2); color: var(--orange); }
+  .badge.medium { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .badge.low { background: rgba(59,130,246,0.2); color: var(--accent); }
+  .badge.info { background: rgba(148,163,184,0.2); color: var(--muted); }
+  .badge.active { background: rgba(168,85,247,0.2); color: var(--purple); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  /* ─── Risk ─── */
+  .risk-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; margin: 0 auto; }
+  .risk-low { border: 4px solid var(--green); color: var(--green); }
+  .risk-medium { border: 4px solid var(--yellow); color: var(--yellow); }
+  .risk-high { border: 4px solid var(--orange); color: var(--orange); }
+  .risk-critical { border: 4px solid var(--red); color: var(--red); }
+
+  /* ─── Logs ─── */
+  .log-area { background: #0c0c0c; border-radius: 8px; padding: 0.75rem; font-family: 'SF Mono', Consolas, monospace; font-size: 0.78rem; line-height: 1.6; max-height: 350px; overflow-y: auto; color: #a3e635; white-space: pre-wrap; word-break: break-all; }
+  .log-area .ts { color: #64748b; } .log-area .err { color: var(--red); } .log-area .warn { color: var(--yellow); } .log-area .http { color: var(--accent); }
+
+  /* ─── Findings ─── */
+  .finding { background: var(--bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; border-left: 3px solid var(--muted); }
+  .finding.critical { border-left-color: var(--red); } .finding.high { border-left-color: var(--orange); }
+  .finding.medium { border-left-color: var(--yellow); } .finding.low { border-left-color: var(--accent); }
+  .finding .f-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+  .finding .f-desc { font-size: 0.8rem; color: var(--muted); }
+
+  /* ─── Stats ─── */
+  .stats { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .stat { flex: 1; background: var(--bg); border-radius: 8px; padding: 0.75rem; text-align: center; }
+  .stat .val { font-size: 1.5rem; font-weight: 700; }
+  .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+
+  /* ─── Tags ─── */
+  .tool-tag { display: inline-block; background: rgba(59,130,246,0.15); color: var(--accent); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; margin: 2px; }
+  .tech-tag { display: inline-block; background: rgba(34,197,94,0.15); color: var(--green); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; margin: 2px; }
+  .empty { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+
+  /* ─── Tabs ─── */
+  .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .tab { padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; color: var(--muted); transition: all 0.2s; margin-bottom: -1px; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); } .tab:hover { color: var(--text); }
+  .tab-content { display: none; } .tab-content.active { display: block; }
+
+  /* ─── Check items ─── */
+  .check-item { background: var(--bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; display: flex; gap: 0.75rem; align-items: flex-start; border: 1px solid rgba(51,65,85,0.5); }
+  .check-item:hover { border-color: var(--border); }
+  .check-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; margin-top: 2px; }
+  .check-icon.pass { background: rgba(34,197,94,0.15); color: var(--green); }
+  .check-icon.running { background: rgba(168,85,247,0.15); color: var(--purple); animation: pulse 1.5s infinite; }
+  .check-body { flex: 1; min-width: 0; }
+  .check-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+  .check-name { font-weight: 600; font-size: 0.85rem; }
+  .check-time { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
+  .check-cmd { font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem; color: var(--muted); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .progress-bar { height: 4px; background: var(--bg); border-radius: 2px; margin: 0.5rem 0; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 2px; transition: width 0.5s ease; }
+  .phase-header { font-size: 0.8rem; font-weight: 600; color: var(--purple); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.75rem 0 0.25rem; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+  .phase-header:first-child { border-top: none; margin-top: 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN OVERLAY ═══ -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="logo">
+      <span class="shield">&#128737;</span>
+      <h1>Security <span>Scanner</span></h1>
+      <p>AI-powered autonomous security analysis</p>
+    </div>
+    <label for="login-email">Email</label>
+    <input type="email" id="login-email" placeholder="you@company.com" autofocus>
+    <label for="login-password">Password</label>
+    <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ═══ MAIN APP (hidden until logged in) ═══ -->
+<div id="app" style="display:none">
+
+<div class="header">
+  <h1>&#128737; Security Scanner <span>Dashboard</span></h1>
+  <div class="right">
+    <span id="api-status"><span class="dot red"></span> API</span>
+    <span class="user-badge" id="user-badge"></span>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card" style="margin-bottom:1.5rem">
+    <h2>+ New Scan</h2>
+    <div class="scan-form">
+      <input type="text" id="target" placeholder="https://example.com" value="https://hzcontainersaleseurope.com">
+      <select id="scan-type">
+        <option value="full">Full Audit</option>
+        <option value="security">Security</option>
+        <option value="pentest">Pentest</option>
+        <option value="seo">SEO</option>
+        <option value="performance">Performance</option>
+        <option value="compliance">Compliance</option>
+        <option value="api_security">API Security</option>
+        <option value="cloud">Cloud</option>
+        <option value="recon">Recon</option>
+        <option value="privacy">Privacy</option>
+        <option value="uptime">Uptime</option>
+      </select>
+      <button class="btn green" onclick="startScan()">Start Scan</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="val" id="stat-total">0</div><div class="label">Total Scans</div></div>
+    <div class="stat"><div class="val" id="stat-running" style="color:var(--yellow)">0</div><div class="label">Running</div></div>
+    <div class="stat"><div class="val" id="stat-checks" style="color:var(--accent)">0</div><div class="label">Checks Executed</div></div>
+    <div class="stat"><div class="val" id="stat-findings" style="color:var(--orange)">0</div><div class="label">Findings</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>&#128270; Scans</h2>
+      <table>
+        <thead><tr><th>Target</th><th>Type</th><th>Status</th><th>Risk</th><th>Created</th><th></th></tr></thead>
+        <tbody id="scans-table"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>&#128196; Worker Logs</h2>
+      <div class="log-area" id="log-area">Connecting...</div>
+    </div>
+
+    <div class="card full-width" id="checks-card" style="display:none">
+      <h2>
+        <span style="animation:pulse 1.5s infinite">&#9889;</span>
+        Live Scan: <span id="checks-target"></span>
+        <span class="badge running" id="checks-status">running</span>
+        <span style="margin-left:auto;font-size:0.8rem;color:var(--muted)" id="checks-count"></span>
+      </h2>
+      <div class="progress-bar"><div class="progress-fill" id="checks-progress" style="width:0%"></div></div>
+      <div id="checks-area"></div>
+    </div>
+
+    <div class="card full-width" id="scan-detail" style="display:none">
+      <h2>&#128202; Scan Report: <span id="detail-target"></span></h2>
+      <div class="tabs">
+        <div class="tab active" data-tab="findings-tab" onclick="switchTab(this)">Findings</div>
+        <div class="tab" data-tab="summary-tab" onclick="switchTab(this)">Summary</div>
+        <div class="tab" data-tab="tech-tab" onclick="switchTab(this)">Technologies</div>
+        <div class="tab" data-tab="surface-tab" onclick="switchTab(this)">Attack Surface</div>
+        <div class="tab" data-tab="agent-tab" onclick="switchTab(this)">AI Agent Log</div>
+      </div>
+      <div class="tab-content active" id="findings-tab"></div>
+      <div class="tab-content" id="summary-tab"></div>
+      <div class="tab-content" id="tech-tab"></div>
+      <div class="tab-content" id="surface-tab"></div>
+      <div class="tab-content" id="agent-tab"></div>
+    </div>
+
+    <div class="card full-width">
+      <h2>&#128295; Available Tools (by category)</h2>
+      <div id="tools-area"><div class="empty">Loading tools...</div></div>
+    </div>
+  </div>
+</div>
+</div><!-- /app -->
+
+<script>
+const API = '';
+let token = '';
+let userEmail = '';
+let refreshTimer = null;
+let selectedScan = null;
+let lastActivities = [];
+
+const TOOL_NAMES = {
+  'nmap':'Nmap Port Scanner','nuclei':'Nuclei Vulnerability Scanner','whatweb':'WhatWeb Tech Detection',
+  'subfinder':'Subfinder Subdomains','amass':'OWASP Amass OSINT','wafw00f':'WAF Detection',
+  'testssl':'testssl.sh TLS Analysis','sslyze':'SSLyze Deep SSL Scan','nikto':'Nikto Web Scanner',
+  'drheader':'DrHeader Security Headers','gobuster':'Gobuster Dir Discovery','dirb':'DIRB Dir Brute',
+  'wpscan':'WPScan WordPress Scanner','lighthouse':'Lighthouse Performance/SEO','pa11y':'Pa11y Accessibility',
+  'checkdmarc':'CheckDMARC Email Security','dnstwist':'DNSTwist Typosquatting','subjack':'Subjack Takeover',
+  'trufflehog':'TruffleHog Secrets','semgrep':'Semgrep SAST','sqlmap':'SQLMap Injection',
+  'curl':'cURL HTTP Test','dig':'DNS Lookup','whois':'WHOIS Domain Info','openssl':'OpenSSL Cert Check',
+  'trivy':'Trivy Container Scan','grype':'Grype Vulnerability DB','hydra':'Hydra Auth Tester',
+  'wapiti':'Wapiti Web Fuzzer','ffuf':'FFUF Fuzzer','masscan':'Masscan Port Scanner',
+  'hey':'Hey Load Tester','wrk':'WRK Benchmark','timeout':'Timeout Wrapper',
+};
+const PHASES = {
+  'dns_lookup':'Reconnaissance','nmap':'Reconnaissance','whatweb':'Reconnaissance','subfinder':'Reconnaissance',
+  'amass':'Reconnaissance','wafw00f':'Reconnaissance','whois':'Reconnaissance','http_request':'Reconnaissance',
+  'nuclei':'Security Assessment','testssl':'Security Assessment','sslyze':'Security Assessment',
+  'nikto':'Security Assessment','drheader':'Security Assessment','openssl':'Security Assessment',
+  'gobuster':'Web Application Testing','dirb':'Web Application Testing','wpscan':'Web Application Testing',
+  'sqlmap':'Web Application Testing','wapiti':'Web Application Testing','ffuf':'Web Application Testing',
+  'trufflehog':'Secret & Supply Chain','semgrep':'Secret & Supply Chain','gitleaks':'Secret & Supply Chain',
+  'subjack':'Subdomain Takeover & Phishing','dnstwist':'Subdomain Takeover & Phishing',
+  'lighthouse':'Performance & SEO','pa11y':'Accessibility','curl':'HTTP Analysis',
+  'dig':'DNS & Email Security','checkdmarc':'DNS & Email Security',
+};
+function getToolName(cmd) { if(!cmd) return 'unknown'; const p=cmd.trim().split(/\s+/); let n=p[0]; if(n==='timeout'&&p.length>2) n=p[2]; return n.replace(/^.*\//,''); }
+function getPhase(t) { return PHASES[t]||'Other'; }
+function getFriendlyName(t) { return TOOL_NAMES[t]||t; }
+
+// ═══ AUTH ═══
+async function doLogin() {
+  const email = document.getElementById('login-email').value;
+  const pw = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  if (!email || !pw) { errEl.textContent = 'Please enter email and password'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...'; errEl.textContent = '';
+  try {
+    const res = await fetch(API + '/api/auth/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pw }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      token = data.access_token;
+      userEmail = email;
+      localStorage.setItem('scanner_token', token);
+      localStorage.setItem('scanner_email', email);
+      showApp();
+    } else {
+      const err = await res.json().catch(()=>({}));
+      errEl.textContent = err.detail || 'Invalid email or password';
+    }
+  } catch(e) {
+    errEl.textContent = 'Cannot connect to server';
+  }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+
+function doLogout() {
+  token = ''; userEmail = '';
+  localStorage.removeItem('scanner_token');
+  localStorage.removeItem('scanner_email');
+  if (refreshTimer) clearInterval(refreshTimer);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+}
+
+function showApp() {
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-badge').textContent = userEmail;
+  loadTools();
+  refresh();
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refresh, 5000);
+}
+
+async function apiCall(path, opts = {}) {
+  const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  let res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) { doLogout(); }
+  return res;
+}
+
+// ═══ HEALTH ═══
+async function checkHealth() {
+  try {
+    const res = await fetch(API + '/health');
+    if (res.ok) { document.getElementById('api-status').innerHTML = '<span class="dot green"></span> API'; return; }
+  } catch(e) {}
+  document.getElementById('api-status').innerHTML = '<span class="dot red"></span> API';
+}
+
+// ═══ SCANS ═══
+async function loadScans() {
+  try {
+    const res = await apiCall('/api/scans/');
+    if (!res.ok) return;
+    const scans = await res.json();
+    const tbody = document.getElementById('scans-table');
+    if (!scans.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No scans yet. Start one above!</td></tr>'; return; }
+    let running=0, totalFindings=0;
+    tbody.innerHTML = scans.map(s => {
+      if (s.status==='queued'||s.status==='running') running++;
+      totalFindings += s.findings_count||0;
+      const risk = s.risk_score!=null ? s.risk_score : '-';
+      return `<tr style="cursor:pointer" onclick="selectScan('${s.id}')">
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.target}">${s.target}</td>
+        <td>${s.scan_type}</td>
+        <td><span class="badge ${s.status}">${s.status}</span></td>
+        <td>${risk}</td>
+        <td style="font-size:0.8rem;color:var(--muted)">${new Date(s.created_at).toLocaleTimeString()}</td>
+        <td>${s.status==='completed'?'<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>':''}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('stat-total').textContent = scans.length;
+    document.getElementById('stat-running').textContent = running;
+    document.getElementById('stat-findings').textContent = totalFindings;
+  } catch(e) {}
+}
+
+async function startScan() {
+  const target = document.getElementById('target').value;
+  const scanType = document.getElementById('scan-type').value;
+  if (!target) return;
+  const res = await apiCall('/api/scans/', { method:'POST', body: JSON.stringify({target,scan_type:scanType}) });
+  if (res.ok) refresh();
+}
+
+// ═══ LIVE CHECKS ═══
+async function loadChecks() {
+  try {
+    const res = await apiCall('/api/scans/');
+    if (!res.ok) return;
+    const scans = await res.json();
+    const runningScan = scans.find(s => s.status==='running'||s.status==='queued');
+    if (!runningScan) {
+      const recent = scans[0];
+      if (recent && lastActivities.length > 0) {
+        document.getElementById('checks-card').style.display = 'block';
+        document.getElementById('checks-target').textContent = recent.target;
+        document.getElementById('checks-status').textContent = recent.status;
+        document.getElementById('checks-status').className = 'badge '+recent.status;
+        document.getElementById('checks-progress').style.width = '100%';
+      } else {
+        document.getElementById('checks-card').style.display = 'none';
+      }
+      return;
+    }
+    document.getElementById('checks-card').style.display = 'block';
+    document.getElementById('checks-target').textContent = runningScan.target;
+    document.getElementById('checks-status').textContent = runningScan.status;
+    document.getElementById('checks-status').className = 'badge '+runningScan.status;
+
+    const actRes = await fetch(API+`/api/scans/${runningScan.id}/activity`);
+    if (!actRes.ok) return;
+    const data = await actRes.json();
+    const activities = data.activities || [];
+    lastActivities = activities;
+    const cmdCount = activities.filter(a=>a.type==='command').length;
+    document.getElementById('stat-checks').textContent = cmdCount;
+    document.getElementById('checks-count').textContent = cmdCount+' checks executed';
+    document.getElementById('checks-progress').style.width = Math.min(95,Math.round(cmdCount/30*100))+'%';
+    renderChecks(activities);
+  } catch(e) {}
+}
+
+function renderChecks(activities) {
+  const el = document.getElementById('checks-area');
+  if (!activities.length) { el.innerHTML = '<div class="empty">Waiting for scan to begin...</div>'; return; }
+  let html='', currentPhase='';
+  activities.forEach((a,idx) => {
+    const isLast = idx===activities.length-1;
+    let toolName,phase,friendlyName,cmd;
+    if (a.type==='command') { toolName=getToolName(a.command); cmd=a.command; }
+    else { toolName=a.tool; cmd=a.input||''; }
+    phase=getPhase(toolName); friendlyName=getFriendlyName(toolName);
+    if (phase!==currentPhase) { currentPhase=phase; html+=`<div class="phase-header">${phase}</div>`; }
+    const iconCls=isLast?'running':'pass', icon=isLast?'&#9658;':'&#10003;';
+    const badge=isLast?'<span class="badge active">running</span>':'<span class="badge done">done</span>';
+    html+=`<div class="check-item"><div class="check-icon ${iconCls}">${icon}</div><div class="check-body">
+      <div class="check-header"><span class="check-name">${friendlyName}</span>${badge}<span class="check-time">${a.timestamp||''}</span></div>
+      <div class="check-cmd" title="${(cmd||'').replace(/"/g,'&quot;')}">${cmd||''}</div>
+    </div></div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ═══ REPORT DETAIL ═══
+async function selectScan(scanId) {
+  selectedScan = scanId;
+  document.getElementById('scan-detail').style.display = 'block';
+  try {
+    const res = await apiCall(`/api/scans/${scanId}/report`);
+    if (res.ok) { renderReport(await res.json(), scanId); }
+    else {
+      document.getElementById('detail-target').textContent = scanId.slice(0,8)+'...';
+      document.getElementById('findings-tab').innerHTML = '<div class="empty">Report not ready yet. Scan may still be running.</div>';
+      ['summary-tab','tech-tab','surface-tab','agent-tab'].forEach(id=>document.getElementById(id).innerHTML='');
+    }
+  } catch(e) {}
+}
+
+function renderReport(r, scanId) {
+  document.getElementById('detail-target').textContent = r.target||r.scan_metadata?.target||'';
+  const riskClass = (r.risk_score||0)>=75?'risk-critical':(r.risk_score||0)>=50?'risk-high':(r.risk_score||0)>=25?'risk-medium':'risk-low';
+  const findings = r.findings||[];
+  document.getElementById('findings-tab').innerHTML = findings.length ? findings.map(f=>`
+    <div class="finding ${(f.severity||'info').toLowerCase()}">
+      <div class="f-title"><span class="badge ${(f.severity||'info').toLowerCase()}">${f.severity||'info'}</span> ${f.title||f.name||'Finding'}</div>
+      <div class="f-desc">${f.description||''}</div>
+      ${f.remediation?'<div style="margin-top:0.25rem;font-size:0.8rem;color:var(--green)">Remediation: '+f.remediation+'</div>':''}
+      ${f.cwes?.length?'<div style="margin-top:0.25rem;font-size:0.75rem;color:var(--muted)">CWE: '+f.cwes.join(', ')+'</div>':''}
+      ${f.owasp_category?'<div style="font-size:0.75rem;color:var(--muted)">OWASP: '+f.owasp_category+'</div>':''}
+      ${f.affected_urls?.length?'<div style="font-size:0.75rem;color:var(--accent);margin-top:0.25rem">Affected: '+f.affected_urls.join(', ')+'</div>':''}
+    </div>`).join('') : '<div class="empty">No findings</div>';
+
+  var summaryHtml = '<div style="text-align:center;margin:1rem 0"><div class="risk-circle '+riskClass+'">'+(r.risk_score!=null?r.risk_score:'-')+'</div><div style="margin-top:0.5rem;color:var(--muted);font-size:0.85rem">Risk Score (0-100)</div></div>';
+  summaryHtml += '<div style="padding:1rem;background:var(--bg);border-radius:8px;font-size:0.85rem;line-height:1.7">'+(r.summary||'No summary')+'</div>';
+  if (r.scan_metadata) {
+    summaryHtml += '<div style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.8rem">';
+    summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+(r.scan_metadata.duration_seconds||0)+'s</strong><br><span style="color:var(--muted)">Duration</span></div>';
+    summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+(r.scan_metadata.commands_executed||0)+'</strong><br><span style="color:var(--muted)">Commands</span></div>';
+    summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+findings.length+'</strong><br><span style="color:var(--muted)">Findings</span></div></div>';
+  }
+  if (r.compliance_summary) {
+    summaryHtml += '<div style="margin-top:1rem"><strong>Compliance:</strong><pre style="background:var(--bg);padding:0.75rem;border-radius:8px;font-size:0.8rem;overflow-x:auto;color:var(--muted)">'+JSON.stringify(r.compliance_summary,null,2)+'</pre></div>';
+  }
+  if (r.improvement_roadmap) {
+    summaryHtml += '<div style="margin-top:1rem"><strong>Improvement Roadmap:</strong><pre style="background:var(--bg);padding:0.75rem;border-radius:8px;font-size:0.8rem;overflow-x:auto;color:var(--muted)">'+JSON.stringify(r.improvement_roadmap,null,2)+'</pre></div>';
+  }
+  document.getElementById('summary-tab').innerHTML = summaryHtml;
+
+  var techs = r.technologies_detected||r.technologies||[];
+  document.getElementById('tech-tab').innerHTML = techs.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:4px">'+techs.map(function(t){return '<span class="tech-tag">'+(typeof t==='string'?t:t.name||JSON.stringify(t))+'</span>';}).join('')+'</div>'
+    : '<div class="empty">No technologies detected</div>';
+
+  var as = r.attack_surface;
+  document.getElementById('surface-tab').innerHTML = as
+    ? '<pre style="background:var(--bg);padding:1rem;border-radius:8px;font-size:0.8rem;overflow-x:auto;color:var(--muted)">'+JSON.stringify(as,null,2)+'</pre>'
+    : '<div class="empty">No attack surface data</div>';
+
+  var agentHtml = '<div style="font-size:0.85rem;line-height:1.7">';
+  agentHtml += '<p style="color:var(--purple);font-weight:600;margin-bottom:0.5rem">AI Agent Analysis</p>';
+  agentHtml += '<div style="background:var(--bg);padding:1rem;border-radius:8px;margin-bottom:0.75rem">'+(r.summary||'No analysis')+'</div>';
+  if (r.seo_scores) {
+    agentHtml += '<p style="color:var(--purple);font-weight:600;margin:0.75rem 0 0.5rem">SEO Scores</p><pre style="background:var(--bg);padding:0.75rem;border-radius:8px;font-size:0.8rem;color:var(--muted)">'+JSON.stringify(r.seo_scores,null,2)+'</pre>';
+  }
+  agentHtml += '</div>';
+  document.getElementById('agent-tab').innerHTML = agentHtml;
+}
+
+async function viewReport(scanId) { window.open('/api/reports/'+scanId+'/html?token='+encodeURIComponent(token),'_blank'); }
+
+// ═══ TOOLS ═══
+async function loadTools() {
+  try {
+    const res = await fetch(API+'/api/tools/');
+    if (!res.ok) return;
+    const data = await res.json();
+    let html='';
+    for (const [cat,tools] of Object.entries(data)) {
+      if (!Array.isArray(tools)) continue;
+      html+=`<div style="margin-bottom:0.75rem"><strong style="font-size:0.85rem;color:var(--muted)">${cat}</strong><div>`;
+      html+=tools.map(t=>`<span class="tool-tag" title="${(t.description||'').replace(/"/g,'&quot;')}">${t.name}</span>`).join('');
+      html+='</div></div>';
+    }
+    document.getElementById('tools-area').innerHTML = html;
+  } catch(e) {}
+}
+
+// ═══ LOGS ═══
+let lastLogLen=0;
+async function loadLogs() {
+  try {
+    const res = await fetch(API+'/api/logs/worker');
+    if (!res.ok) return;
+    const data = await res.json();
+    const el = document.getElementById('log-area');
+    const lines = (data.logs||'').split('\n').filter(l=>l.trim());
+    if (!lines.length) { el.textContent='No logs yet.'; return; }
+    el.innerHTML = lines.map(line => {
+      let cls='';
+      if (line.includes('ERROR')||line.includes('Exception')) cls='err';
+      else if (line.includes('WARNING')) cls='warn';
+      else if (line.includes('HTTP Request')) cls='http';
+      const ts=line.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+      if (ts) line=`<span class="ts">${ts[0]}</span>`+line.slice(ts[0].length);
+      return cls?`<span class="${cls}">${line}</span>`:line;
+    }).join('\n');
+    if (lines.length!==lastLogLen) { el.scrollTop=el.scrollHeight; lastLogLen=lines.length; }
+  } catch(e) {}
+}
+
+// ═══ TABS ═══
+function switchTab(el) {
+  el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const parent=el.closest('.card');
+  parent.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  parent.querySelector('#'+el.dataset.tab).classList.add('active');
+}
+
+// ═══ REFRESH ═══
+async function refresh() {
+  await checkHealth();
+  await loadScans();
+  await loadLogs();
+  await loadChecks();
+}
+
+// ═══ INIT ═══
+(async function init() {
+  // Try restore session
+  token = localStorage.getItem('scanner_token') || '';
+  userEmail = localStorage.getItem('scanner_email') || '';
+  if (token) {
+    // Verify token is still valid
+    try {
+      const res = await fetch(API+'/api/scans/', { headers: { 'Authorization':'Bearer '+token } });
+      if (res.ok) { showApp(); return; }
+    } catch(e) {}
+    // Token expired
+    token=''; userEmail='';
+    localStorage.removeItem('scanner_token');
+    localStorage.removeItem('scanner_email');
+  }
+  // Show login
+  document.getElementById('login-overlay').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>

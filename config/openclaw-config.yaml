@@ -1,0 +1,68 @@
+# OpenClaw gateway configuration for multi-channel notifications and chat commands.
+# OpenClaw is a personal AI assistant that runs on your own devices.
+# See: https://github.com/openclaw/openclaw
+
+gateway:
+  url: http://localhost:3080
+  api_key: null
+
+agent:
+  name: Security Scanner
+  description: Autonomous security scanning, SEO analysis, and compliance monitoring agent
+  type: scanner
+
+# Configure channels for notifications and interaction
+channels:
+  # Slack integration
+  - name: slack-alerts
+    type: slack
+    config:
+      webhook_url: ${SLACK_WEBHOOK_URL}
+    # Only send warnings and critical alerts to Slack
+    min_severity: warning
+
+  # Discord integration
+  - name: discord-security
+    type: discord
+    config:
+      webhook_url: ${DISCORD_WEBHOOK_URL}
+    min_severity: info
+
+  # Email alerts
+  - name: email-critical
+    type: email
+    config:
+      to_email: ${ALERT_EMAIL}
+      smtp_host: smtp.gmail.com
+      smtp_port: 587
+      smtp_user: ${SMTP_USER}
+      smtp_password: ${SMTP_PASSWORD}
+      from_email: scanner@yourdomain.com
+    min_severity: critical
+
+  # Generic webhook for CI/CD pipelines
+  - name: ci-webhook
+    type: webhook
+    config:
+      url: ${CI_WEBHOOK_URL}
+      headers:
+        Authorization: Bearer ${CI_WEBHOOK_TOKEN}
+    min_severity: warning
+
+# Chat commands (when using OpenClaw as interaction layer)
+commands:
+  - name: scan
+    description: Trigger a security scan
+    usage: /scan <target_url> [scan_type]
+  - name: status
+    description: Check scan status
+    usage: /status [scan_id]
+  - name: report
+    description: Get latest scan report
+    usage: /report [scan_id]
+
+# Scheduled tasks via OpenClaw cron
+cron:
+  - name: health_check
+    schedule: "*/5 * * * *"
+    action: check_monitored_targets

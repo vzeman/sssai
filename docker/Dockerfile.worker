@@ -1,0 +1,141 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV GOPATH=/root/go
+ENV PATH="$PATH:/usr/local/go/bin:/root/go/bin:/opt/testssl:/opt/spiderfoot"
+
+# ─── System packages + base scanning tools ─────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nmap nikto whatweb dnsutils whois curl wget git \
+    python3 python3-pip python3-venv \
+    chromium-browser nodejs npm \
+    masscan dirb sslscan net-tools iputils-ping jq unzip \
+    libxml2-utils ca-certificates gnupg \
+    traceroute dnsrecon wapiti wafw00f \
+    ruby ruby-dev build-essential \
+    libffi-dev libssl-dev \
+    hydra \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── Install Go 1.24 (required by nuclei v3, etc.) ────────────────────
+RUN ARCH=$(dpkg --print-architecture) \
+    && wget -q "https://go.dev/dl/go1.24.1.linux-${ARCH}.tar.gz" -O /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+ENV GOTOOLCHAIN=auto
+
+# ─── Go-based scanners ─────────────────────────────────────────────────
+RUN go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest \
+    && go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest \
+    && go install github.com/projectdiscovery/httpx/cmd/httpx@latest \
+    && go install github.com/ffuf/ffuf/v2@latest \
+    && nuclei -update-templates \
+    && rm -rf /root/go/pkg /root/.cache/go-build
+
+# ─── Go-based security tools ───────────────────────────────────────────
+RUN go install github.com/haccer/subjack@latest \
+    && go install github.com/tsenart/vegeta@v12.12.0 2>/dev/null || true \
+    && go install github.com/rakyll/hey@latest \
+    && rm -rf /root/go/pkg /root/.cache/go-build
+
+# ─── OWASP Amass ───────────────────────────────────────────────────────
+RUN go install github.com/owasp-amass/amass/v4/...@master 2>/dev/null || true \
+    && rm -rf /root/go/pkg /root/.cache/go-build
+
+# ─── Trivy (container/IaC scanner) ─────────────────────────────────────
+RUN wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - \
+    && echo "deb https://aquasecurity.github.io/trivy-repo/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" > /etc/apt/sources.list.d/trivy.list \
+    && apt-get update && apt-get install -y trivy \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── Grype + Syft (vulnerability + SBOM) ───────────────────────────────
+RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true \
+    && curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true
+
+# ─── TruffleHog (secret scanner) ───────────────────────────────────────
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin 2>/dev/null || true
+
+# ─── Gitleaks (secret scanner) ─────────────────────────────────────────
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "$ARCH" = "arm64" ]; then GL_ARCH="arm64"; else GL_ARCH="x64"; fi \
+    && wget -qO /tmp/gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_${GL_ARCH}.tar.gz" 2>/dev/null \
+    && tar xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks 2>/dev/null || true \
+    && rm -f /tmp/gitleaks.tar.gz
+
+# ─── h2spec (HTTP/2 testing) ───────────────────────────────────────────
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "$ARCH" = "arm64" ]; then H2_ARCH="arm64"; else H2_ARCH="amd64"; fi \
+    && wget -qO /usr/local/bin/h2spec "https://github.com/summerwind/h2spec/releases/latest/download/h2spec_linux_${H2_ARCH}" 2>/dev/null \
+    && chmod +x /usr/local/bin/h2spec || true
+
+# ─── testssl.sh ─────────────────────────────────────────────────────────
+RUN git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl \
+    && ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl
+
+# ─── OWASP ZAP (optional — may not be available for all architectures) ─
+RUN mkdir -p /opt/zap && cd /opt/zap \
+    && wget -q https://github.com/zaproxy/zaproxy/releases/download/v2.15.0/ZAP_2.15.0_Linux.tar.gz \
+    && tar xzf ZAP_2.15.0_Linux.tar.gz && rm ZAP_2.15.0_Linux.tar.gz \
+    && ln -s /opt/zap/ZAP_2.15.0/zap.sh /usr/local/bin/zap \
+    || echo "ZAP not available for this architecture, skipping"
+
+# ─── k6 load testing ───────────────────────────────────────────────────
+RUN ARCH=$(dpkg --print-architecture) \
+    && wget -q "https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-${ARCH}.deb" \
+    && dpkg -i "k6-v0.55.0-linux-${ARCH}.deb" && rm "k6-v0.55.0-linux-${ARCH}.deb" \
+    || echo "k6 not available for this architecture, skipping"
+
+# ─── wrk (HTTP benchmarking) ───────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends wrk 2>/dev/null || true \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── Upgrade Node.js to v20 LTS for modern npm packages ───────────────
+RUN npm install -g n && n 20 && hash -r
+
+# ─── Node tools (Lighthouse, SEO, Accessibility, Load Testing, Visual) ─
+RUN npm install -g lighthouse broken-link-checker pa11y @axe-core/cli wscat retire stepci || true
+RUN npm install -g yellowlabtools artillery backstopjs sitespeed.io 2>/dev/null || true
+
+# ─── Core Python dependencies (must succeed) ──────────────────────────
+RUN pip3 install --no-cache-dir \
+    anthropic boto3 redis httpx pydantic jinja2 weasyprint pyyaml \
+    sqlalchemy psycopg2-binary
+
+# ─── Python security tools (best-effort) ──────────────────────────────
+RUN pip3 install --no-cache-dir \
+    sslyze drheader checkdmarc dnstwist semgrep 2>/dev/null || true
+RUN pip3 install --no-cache-dir \
+    droopescan locust checkov corscanner shcheck 2>/dev/null || true
+
+# ─── Corsy (CORS scanner) ──────────────────────────────────────────────
+RUN git clone --depth 1 https://github.com/s0md3v/Corsy.git /opt/corsy \
+    && ln -s /opt/corsy/corsy.py /usr/local/bin/corsy
+
+# ─── dnsReaper (subdomain takeover) ────────────────────────────────────
+RUN pip3 install --no-cache-dir dnsreaper 2>/dev/null || true
+
+# ─── theHarvester (OSINT) ──────────────────────────────────────────────
+RUN pip3 install --no-cache-dir theHarvester 2>/dev/null || true
+
+# ─── SpiderFoot (OSINT) ────────────────────────────────────────────────
+RUN git clone --depth 1 https://github.com/smicallef/spiderfoot.git /opt/spiderfoot \
+    && cd /opt/spiderfoot && pip3 install --no-cache-dir -r requirements.txt 2>/dev/null || true
+
+# ─── Ruby tools (WPScan) ───────────────────────────────────────────────
+RUN gem install wpscan --no-document 2>/dev/null || true
+
+# ─── Wordlists ─────────────────────────────────────────────────────────
+RUN mkdir -p /usr/share/wordlists/dirb \
+    && wget -q -O /usr/share/wordlists/dirb/common.txt \
+       https://raw.githubusercontent.com/v0re/dirb/master/wordlists/common.txt 2>/dev/null || true \
+    && mkdir -p /usr/share/wordlists && wget -q -O /usr/share/wordlists/common-passwords.txt \
+       https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt 2>/dev/null || true
+
+COPY modules/ /app/modules/
+COPY config/ /app/config/
+WORKDIR /app
+
+ENV RUNTIME=local
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python3", "-m", "modules.worker.consumer"]

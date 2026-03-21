@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir redis boto3 httpx psycopg2-binary sqlalchemy pydantic
+
+COPY modules/ /app/modules/
+WORKDIR /app
+
+ENV RUNTIME=local
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python3", "-m", "modules.monitor.uptime"]

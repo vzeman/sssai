@@ -1,0 +1,112 @@
+# OpenShell sandbox policy for security scanner agents.
+# This file is used when running agents via NemoClaw/OpenShell.
+# See: https://github.com/NVIDIA/OpenShell
+
+apiVersion: openshell.nvidia.com/v1alpha1
+kind: SandboxPolicy
+metadata:
+  name: security-scanner
+  version: '1.0'
+spec:
+  timeout: 3600s
+  gpu:
+    enabled: false
+  network:
+    outbound:
+      # Target will be dynamically set per scan
+      allow: []
+      # Block internal networks
+      block:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+      ports:
+        - 80
+        - 443
+        - 53
+        - 8080
+        - 8443
+      maxConnections: 100
+    dns:
+      enabled: true
+  filesystem:
+    readOnly:
+      - /output
+      - /tmp
+      - /usr/share/wordlists
+    readWrite:
+      - /output
+      - /tmp
+    blocked:
+      - /etc/shadow
+      - /root/.ssh
+      - /proc
+      - /sys
+  process:
+    allowedBinaries:
+      # Network scanning
+      - nmap
+      - masscan
+      - ping
+      - traceroute
+      # Vulnerability scanning
+      - nuclei
+      - nikto
+      - zap-cli
+      - zap-baseline.py
+      - wapiti
+      - sqlmap
+      # SSL/TLS
+      - testssl
+      - sslscan
+      - sslyze
+      - openssl
+      # Reconnaissance
+      - whatweb
+      - subfinder
+      - httpx
+      - gobuster
+      - dirb
+      - ffuf
+      - wafw00f
+      # Security headers
+      - drheader
+      - shcheck.py
+      # SEO & accessibility
+      - lighthouse
+      - pa11y
+      - blc
+      - axe
+      - yellowlabtools
+      # CMS scanners
+      - wpscan
+      - droopescan
+      # DNS
+      - dig
+      - whois
+      - dnsrecon
+      # Performance
+      - k6
+      # Utilities
+      - curl
+      - wget
+      - jq
+      - python3
+      - node
+    blockedBinaries:
+      - rm
+      - mkfs
+      - dd
+      - mount
+      - umount
+      - chmod
+      - chown
+      - useradd
+      - userdel
+      - passwd
+      - su
+      - sudo
+    limits:
+      maxProcesses: 50
+      maxMemoryMB: 4096
+      maxCPUPercent: 80

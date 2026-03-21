@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Scan Report — {{ scan.get('target', 'Unknown Target') }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header .meta { opacity: 0.8; font-size: 14px; }
+        .risk-score {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            float: right;
+            margin-top: -10px;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card h3 { font-size: 14px; color: #666; text-transform: uppercase; margin-bottom: 8px; }
+        .card .value { font-size: 32px; font-weight: bold; }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .finding {
+            border-left: 4px solid #ddd;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: #fafafa;
+            border-radius: 0 8px 8px 0;
+        }
+        .finding.critical { border-left-color: #dc3545; }
+        .finding.high { border-left-color: #fd7e14; }
+        .finding.medium { border-left-color: #ffc107; }
+        .finding.low { border-left-color: #17a2b8; }
+        .finding.info { border-left-color: #6c757d; }
+        .finding h4 { font-size: 16px; margin-bottom: 8px; }
+        .badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+        }
+        .badge-critical { background: #dc3545; }
+        .badge-high { background: #fd7e14; }
+        .badge-medium { background: #ffc107; color: #333; }
+        .badge-low { background: #17a2b8; }
+        .badge-info { background: #6c757d; }
+        .evidence {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 8px 0;
+            white-space: pre-wrap;
+        }
+        .remediation {
+            background: #e8f5e9;
+            border-left: 4px solid #28a745;
+            padding: 12px;
+            border-radius: 0 4px 4px 0;
+            margin-top: 8px;
+        }
+        .remediation code {
+            display: block;
+            background: #1a1a2e;
+            color: #a5d6a7;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+            font-size: 13px;
+        }
+        .tech-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tech-tag {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 13px;
+        }
+        .cve-tag {
+            background: #fff3e0;
+            color: #e65100;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 4px;
+        }
+        .footer {
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+            margin-top: 24px;
+            padding: 16px;
+        }
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .metadata-grid dt { font-weight: bold; font-size: 13px; color: #666; }
+        .metadata-grid dd { font-size: 15px; margin-bottom: 8px; }
+        @media print {
+            body { background: white; max-width: 100%; }
+            .finding { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="risk-score" style="background: {{ report.get('risk_score', 0) | risk_color }}">
+            {{ report.get('risk_score', 0) | int }}
+        </div>
+        <h1>Security Scan Report</h1>
+        <div class="meta">
+            <strong>Target:</strong> {{ scan.get('target', 'N/A') }}<br>
+            <strong>Scan Type:</strong> {{ scan.get('scan_type', 'N/A') | upper }}<br>
+            <strong>Generated:</strong> {{ generated_at }}<br>
+            {% if report.get('scan_metadata', {}).get('duration_seconds') %}
+            <strong>Duration:</strong> {{ report.scan_metadata.duration_seconds }}s
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+        <div class="card">
+            <h3>Risk Score</h3>
+            <div class="value" style="color: {{ report.get('risk_score', 0) | risk_color }}">
+                {{ report.get('risk_score', 0) | int }}/100
+            </div>
+        </div>
+        <div class="card">
+            <h3>Total Findings</h3>
+            <div class="value">{{ total_findings }}</div>
+        </div>
+        {% for sev in severity_order %}
+        {% if findings_by_severity.get(sev, 0) > 0 %}
+        <div class="card">
+            <h3>{{ sev | upper }}</h3>
+            <div class="value" style="color: {{ sev | severity_color }}">{{ findings_by_severity[sev] }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <p>{{ report.get('summary', 'No summary available.') }}</p>
+    </div>
+
+    <!-- Technologies Detected -->
+    {% if report.get('technologies_detected') %}
+    <div class="section">
+        <h2>Technologies Detected</h2>
+        <div class="tech-list">
+            {% for tech in report.technologies_detected %}
+            <span class="tech-tag">{{ tech }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Findings -->
+    <div class="section">
+        <h2>Findings ({{ total_findings }})</h2>
+        {% for sev in severity_order %}
+        {% for finding in report.get('findings', []) %}
+        {% if finding.severity == sev %}
+        <div class="finding {{ finding.severity }}">
+            <h4>
+                <span class="badge badge-{{ finding.severity }}">{{ finding.severity }}</span>
+                {{ finding.title }}
+            </h4>
+            {% if finding.get('category') %}
+            <div style="font-size:13px;color:#666;margin-bottom:6px">Category: {{ finding.category }}</div>
+            {% endif %}
+
+            <p>{{ finding.description }}</p>
+
+            {% if finding.get('cve_ids') %}
+            <div style="margin:8px 0">
+                {% for cve in finding.cve_ids %}
+                <span class="cve-tag">{{ cve }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if finding.get('evidence') %}
+            <div class="evidence">{{ finding.evidence }}</div>
+            {% endif %}
+
+            {% if finding.get('remediation') %}
+            <div class="remediation">
+                <strong>Remediation:</strong> {{ finding.remediation }}
+                {% if finding.get('remediation_commands') %}
+                {% for cmd in finding.remediation_commands %}
+                <code>{{ cmd }}</code>
+                {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endfor %}
+    </div>
+
+    <!-- Scan Metadata -->
+    {% if report.get('scan_metadata') %}
+    <div class="section">
+        <h2>Scan Metadata</h2>
+        <div class="metadata-grid">
+            {% if report.scan_metadata.get('tools_used') %}
+            <div>
+                <dt>Tools Used</dt>
+                <dd>{{ report.scan_metadata.tools_used | join(', ') }}</dd>
+            </div>
+            {% endif %}
+            {% if report.scan_metadata.get('commands_executed') %}
+            <div>
+                <dt>Commands Executed</dt>
+                <dd>{{ report.scan_metadata.commands_executed }}</dd>
+            </div>
+            {% endif %}
+            {% if report.scan_metadata.get('duration_seconds') %}
+            <div>
+                <dt>Duration</dt>
+                <dd>{{ report.scan_metadata.duration_seconds }}s</dd>
+            </div>
+            {% endif %}
+            {% if report.scan_metadata.get('scan_type') %}
+            <div>
+                <dt>Scan Type</dt>
+                <dd>{{ report.scan_metadata.scan_type | upper }}</dd>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Generated by Security Scanner Platform &mdash; {{ generated_at }}
+    </div>
+</body>
+</html>

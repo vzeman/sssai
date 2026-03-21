@@ -1,0 +1,95 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      - RUNTIME=local
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./output:/output
+      - ./modules:/app/modules
+      - ./config:/app/config
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      - RUNTIME=local
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NOTIFICATION_CHANNELS=${NOTIFICATION_CHANNELS:-[]}
+    depends_on:
+      - redis
+    volumes:
+      - ./output:/output
+      - ./modules:/app/modules
+    cap_add:
+      - NET_RAW
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.scheduler
+    environment:
+      - RUNTIME=local
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./modules:/app/modules
+
+  monitor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.monitor
+    environment:
+      - RUNTIME=local
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=scanner
+      - POSTGRES_PASSWORD=scanner
+      - POSTGRES_DB=scanner
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

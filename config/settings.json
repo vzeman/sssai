@@ -1,0 +1,53 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "security_scanner",
+    "user": "scanner_user",
+    "password": "change_me"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": null
+  },
+  "email": {
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your_email@gmail.com",
+    "smtp_password": "your_password",
+    "from_email": "security@scanner.com",
+    "from_name": "Security Scanner"
+  },
+  "payment": {
+    "stripe_api_key": "sk_test_xxx",
+    "stripe_webhook_secret": "whsec_xxx",
+    "paypal_client_id": "your_paypal_id",
+    "paypal_secret": "your_paypal_secret"
+  },
+  "flowhunt": {
+    "api_key": "your_flowhunt_api_key",
+    "flow_id": "your_flowhunt_flow_id",
+    "api_url": "https://api.flowhunt.ai"
+  },
+  "scan_config": {
+    "external_timeout": 1800,
+    "internal_timeout": 3600,
+    "max_concurrent_scans": 3,
+    "priority_queue_size": 10
+  },
+  "reporting": {
+    "default_format": "html",
+    "formats": ["pdf", "html", "json"],
+    "html_template": "templates/html_template.html",
+    "pdf_template": "templates/pdf_template.html"
+  },
+  "monitoring": {
+    "health_check_interval": 60,
+    "alert_threshold": 70
+  },
+  "api": {
+    "base_url": "https://api.securityscanner.com",
+    "cors_origins": ["https://securityscanner.com", "http://localhost:3000"]
+  }
+}
