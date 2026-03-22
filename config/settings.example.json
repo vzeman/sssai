@@ -4,7 +4,7 @@
     "port": 5432,
     "name": "security_scanner",
     "user": "scanner_user",
-    "password": "change_me"
+    "password": "<YOUR_DB_PASSWORD>"
   },
   "redis": {
     "host": "localhost",
@@ -12,22 +12,22 @@
     "password": null
   },
   "email": {
-    "smtp_host": "smtp.gmail.com",
+    "smtp_host": "smtp.example.com",
     "smtp_port": 587,
-    "smtp_user": "your_email@gmail.com",
-    "smtp_password": "your_password",
-    "from_email": "security@scanner.com",
+    "smtp_user": "<YOUR_SMTP_USER>",
+    "smtp_password": "<YOUR_SMTP_PASSWORD>",
+    "from_email": "security@example.com",
     "from_name": "Security Scanner"
   },
   "payment": {
-    "stripe_api_key": "sk_test_xxx",
-    "stripe_webhook_secret": "whsec_xxx",
-    "paypal_client_id": "your_paypal_id",
-    "paypal_secret": "your_paypal_secret"
+    "stripe_api_key": "<YOUR_STRIPE_KEY>",
+    "stripe_webhook_secret": "<YOUR_STRIPE_WEBHOOK_SECRET>",
+    "paypal_client_id": "<YOUR_PAYPAL_CLIENT_ID>",
+    "paypal_secret": "<YOUR_PAYPAL_SECRET>"
   },
   "flowhunt": {
-    "api_key": "your_flowhunt_api_key",
-    "flow_id": "your_flowhunt_flow_id",
+    "api_key": "<YOUR_FLOWHUNT_API_KEY>",
+    "flow_id": "<YOUR_FLOWHUNT_FLOW_ID>",
     "api_url": "https://api.flowhunt.ai"
   },
   "scan_config": {

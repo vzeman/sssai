@@ -18,6 +18,7 @@ class RedisLogHandler(logging.Handler):
 
     def __init__(self, redis_url: str, key: str = "worker:logs", maxlen: int = 500):
         super().__init__()
+        self._emitting = False
         try:
             import redis
             self._r = redis.from_url(redis_url)
@@ -27,8 +28,9 @@ class RedisLogHandler(logging.Handler):
             self._r = None
 
     def emit(self, record):
-        if not self._r:
+        if not self._r or self._emitting:
             return
+        self._emitting = True
         try:
             msg = self.format(record)
             self._r.rpush(self._key, msg)
@@ -47,6 +49,8 @@ class RedisLogHandler(logging.Handler):
             })
         except Exception:
             pass
+        finally:
+            self._emitting = False
 
 
 _redis_url = os.environ.get("REDIS_URL", "redis://redis:6379")
@@ -103,9 +107,58 @@ signal.signal(signal.SIGTERM, shutdown)
 signal.signal(signal.SIGINT, shutdown)
 
 
+def _recover_orphaned_scans():
+    """Find scans stuck in 'running' status from a previous worker instance and recover them."""
+    if not _DB_URL:
+        return
+    try:
+        from sqlalchemy import create_engine, text
+        from modules.agent.checkpoint import load_checkpoint, build_resume_context
+
+        engine = create_engine(_DB_URL)
+        queue = get_queue()
+
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT id, target, scan_type, config FROM scans WHERE status = 'running'"
+            )).fetchall()
+
+        if not rows:
+            return
+
+        log.info("Found %d orphaned scan(s) in 'running' status", len(rows))
+
+        for row in rows:
+            scan_id, target, scan_type, config = row[0], row[1], row[2], row[3]
+            config = config or {}
+
+            checkpoint = load_checkpoint(scan_id)
+            if checkpoint:
+                log.info("Recovering scan %s from checkpoint (iteration %d)", scan_id, checkpoint.get("iteration", 0))
+                resume_config = {**config, "resume_context": build_resume_context(checkpoint)}
+                _update_scan_status(scan_id, "queued")
+                queue.send(QUEUE_NAME, {
+                    "scan_id": scan_id,
+                    "target": target,
+                    "scan_type": scan_type,
+                    "config": resume_config,
+                })
+            else:
+                log.warning("No checkpoint for orphaned scan %s — marking failed", scan_id)
+                _update_scan_status(scan_id, "failed")
+                from modules.infra import get_storage
+                get_storage().put_json(f"scans/{scan_id}/error.json", {
+                    "error": "Worker restarted with no checkpoint available. Scan could not be recovered.",
+                    "scan_id": scan_id,
+                })
+    except Exception as e:
+        log.error("Orphaned scan recovery failed: %s", e)
+
+
 def main():
     queue = get_queue()
     log.info("Worker started, listening on queue: %s", QUEUE_NAME)
+    _recover_orphaned_scans()
 
     while running:
         # Check scan jobs first

@@ -23,6 +23,7 @@ import httpx
 
 from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
+from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
 from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
 
@@ -34,6 +35,7 @@ MONITOR_INTERVAL = 10          # check progress every N tool calls
 SAME_TOOL_LIMIT = 3            # max identical calls before flagging
 SUMMARIZE_THRESHOLD = 80_000   # chars before summarizing old messages
 KEEP_RECENT = 6                # messages to keep un-summarized
+CHECKPOINT_INTERVAL = 5        # save checkpoint every N iterations
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
@@ -1175,6 +1177,89 @@ def _log_activity(scan_id: str, activity: dict):
         pass
 
 
+# ── Heartbeat & checkpoint ────────────────────────────────────────────────
+
+def _ping_heartbeat(scan_id: str):
+    """Update scan heartbeat timestamp so the heartbeat service knows we're alive."""
+    try:
+        import redis
+        r = redis.from_url(_REDIS_URL)
+        r.set(f"scan:heartbeat:{scan_id}", str(time.time()), ex=900)
+    except Exception:
+        pass
+
+
+def _save_scan_checkpoint(scan_id, target, scan_type, config, iteration,
+                          commands_executed, start_time, messages, scan_context, token_tracker):
+    """Save a checkpoint for crash recovery."""
+    summary = _quick_progress_summary(messages)
+    findings = _extract_findings_from_messages(messages)
+
+    save_checkpoint(scan_id, {
+        "scan_id": scan_id,
+        "target": target,
+        "scan_type": scan_type,
+        "config": {k: v for k, v in (config or {}).items() if k != "resume_context"},
+        "iteration": iteration,
+        "commands_executed": commands_executed,
+        "start_time": start_time,
+        "findings_so_far": findings,
+        "summary_of_progress": summary,
+        "attack_surface": scan_context.get("_attack_surface"),
+        "plan_history": scan_context.get("_plan_history"),
+        "token_usage": token_tracker.summary(),
+        "timestamp": time.time(),
+    })
+
+
+def _quick_progress_summary(messages: list) -> str:
+    """Build a text summary of scan progress from messages without an LLM call."""
+    tools_run = []
+    commands = []
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if hasattr(block, "name"):
+                    tools_run.append(block.name)
+                    if block.name == "run_command" and hasattr(block, "input"):
+                        cmd = block.input.get("command", "")[:100]
+                        if cmd:
+                            commands.append(cmd)
+                elif isinstance(block, dict) and block.get("type") == "tool_result":
+                    pass  # skip results for summary
+    # Deduplicate but keep order
+    seen = set()
+    unique_tools = []
+    for t in tools_run:
+        if t not in seen:
+            seen.add(t)
+            unique_tools.append(t)
+
+    parts = []
+    parts.append(f"Tools used: {', '.join(unique_tools) if unique_tools else 'none yet'}")
+    if commands:
+        recent = commands[-10:]  # last 10 commands
+        parts.append(f"Recent commands: {'; '.join(recent)}")
+    # Cap at 8KB
+    summary = "\n".join(parts)
+    return summary[:8000]
+
+
+def _extract_findings_from_messages(messages: list) -> list:
+    """Extract any partial findings from message content."""
+    findings = []
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if hasattr(block, "name") and block.name == "report" and hasattr(block, "input"):
+                    findings.extend(block.input.get("findings", []))
+                elif hasattr(block, "name") and block.name == "update_attack_surface":
+                    pass  # attack surface tracked separately
+    return findings[:50]  # cap at 50 findings
+
+
 # ── Main scan loop ───────────────────────────────────────────────────────
 
 def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = None):
@@ -1235,17 +1320,45 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "Keep scanning while waiting — don't block on non-critical questions."
     )
 
-    # Post initial agent message to chat
-    _post_agent_chat(scan_id, f"Starting {scan_type} scan of {target}. I'll keep you updated on progress.", "status")
-
     # All tools including sub-agents, search, and memory
     all_tools = TOOLS + SUBAGENT_TOOLS
 
-    messages = [{"role": "user", "content": f"Begin scanning {target} now."}]
+    # ── Resume from checkpoint if available ──
+    resume = config.get("resume_context")
+    if resume:
+        _post_agent_chat(scan_id, f"Resuming {scan_type} scan of {target} from checkpoint.", "status")
+        _log_activity(scan_id, {
+            "type": "system",
+            "message": f"Resuming from checkpoint (iteration {resume.get('iteration', 0)}, {resume.get('commands_executed', 0)} commands executed)",
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+        findings_count = len(resume.get("findings_so_far", []))
+        messages = [
+            {"role": "user", "content": f"Begin scanning {target} now."},
+            {"role": "assistant", "content": (
+                f"[CONVERSATION SUMMARY — SCAN RESUMED AFTER INTERRUPTION]\n\n"
+                f"This scan was interrupted and is being resumed. Here is what was accomplished before the interruption:\n\n"
+                f"{resume.get('summary_of_progress', 'No progress summary available.')}\n\n"
+                f"Findings so far: {findings_count} findings.\n"
+                f"Commands executed: {resume.get('commands_executed', 0)}\n"
+                f"Iterations completed: {resume.get('iteration', 0)}/{MAX_ITERATIONS}"
+            )},
+            {"role": "user", "content": (
+                "Continue the scan from where you left off. Do NOT repeat tools or commands "
+                "mentioned in the summary above. Focus on areas that have not been scanned yet."
+            )},
+        ]
+        if resume.get("attack_surface"):
+            scan_context["_attack_surface"] = resume["attack_surface"]
+        if resume.get("plan_history"):
+            scan_context["_plan_history"] = resume["plan_history"]
+    else:
+        _post_agent_chat(scan_id, f"Starting {scan_type} scan of {target}. I'll keep you updated on progress.", "status")
+        messages = [{"role": "user", "content": f"Begin scanning {target} now."}]
 
-    start_time = time.time()
+    start_time = resume.get("original_start_time", time.time()) if resume else time.time()
     report = None
-    commands_executed = 0
+    commands_executed = resume.get("commands_executed", 0) if resume else 0
     loop_detector = LoopDetector()
     reflector_attempts = 0
     max_reflector_attempts = 3
@@ -1260,6 +1373,14 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     iteration = 0
     while iteration < MAX_ITERATIONS:
         iteration += 1
+
+        # ── Heartbeat ping ──
+        _ping_heartbeat(scan_id)
+
+        # ── Periodic checkpoint ──
+        if iteration % CHECKPOINT_INTERVAL == 0:
+            _save_scan_checkpoint(scan_id, target, scan_type, config, iteration,
+                                  commands_executed, start_time, messages, scan_context, token_tracker)
 
         # ── Chain summarization ──
         chain_size = _estimate_chain_size(messages)
@@ -1533,6 +1654,9 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 **token_tracker.summary(),
             },
         }
+
+    # ── Clean up checkpoint ──
+    delete_checkpoint(scan_id)
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)

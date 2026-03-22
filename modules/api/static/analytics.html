@@ -87,6 +87,10 @@
   .empty { text-align: center; color: var(--muted); padding: 2rem; font-size: 0.9rem; }
   .loading { text-align: center; color: var(--muted); padding: 1rem; }
 
+  /* ─── Login overlay ─── */
+  .login-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .login-overlay.hidden { display: none; }
+
   /* ─── Floating chat ─── */
   .chat-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: white; border: none; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 20px rgba(59,130,246,0.4); z-index: 999; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
   .chat-fab:hover { transform: scale(1.1); }
@@ -120,6 +124,9 @@
     <div id="loginError" style="color:var(--red); font-size:0.8rem; text-align:center; margin-top:0.75rem;"></div>
   </div>
 </div>
+
+<!-- App (hidden until authenticated) -->
+<div id="app" style="display:none">
 
 <!-- Header -->
 <div class="header">
@@ -211,7 +218,7 @@
         <button class="btn" onclick="searchFindings()">Search</button>
       </div>
       <div id="findingsAggs" class="grid-3" style="margin-bottom:0.75rem;"></div>
-      <div id="findingsResults"><p class="empty">Enter a search query or click Search to browse all findings</p></div>
+      <div id="findingsResults"><p class="loading">Loading recent findings...</p></div>
     </div>
   </div>
 
@@ -245,7 +252,7 @@
         <input id="globalQuery" placeholder="Search across findings, logs, chat, and activity...">
         <button class="btn" onclick="globalSearch()">Search</button>
       </div>
-      <div id="globalResults"><p class="empty">Search across all data sources</p></div>
+      <div id="globalResults"><p class="loading">Loading recent data...</p></div>
     </div>
   </div>
 
@@ -270,7 +277,7 @@
         </select>
         <button class="btn" onclick="searchLogs()">Search</button>
       </div>
-      <div id="logsResults"><p class="empty">Search worker and scan logs</p></div>
+      <div id="logsResults"><p class="loading">Loading recent logs...</p></div>
     </div>
   </div>
 
@@ -290,6 +297,8 @@
   </div>
 </div>
 
+</div><!-- end #app -->
+
 <script>
 const API = '';
 let TOKEN = localStorage.getItem('scanner_token') || '';
@@ -298,25 +307,35 @@ let charts = {};
 // ─── Auth ───
 function headers() { return { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }; }
 
+function showLogin() {
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('app').style.display = 'block';
+}
+
 async function doLogin() {
   const email = document.getElementById('loginEmail').value;
   const pass = document.getElementById('loginPass').value;
   try {
     const r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, password: pass }) });
     const d = await r.json();
-    if (d.access_token) { TOKEN = d.access_token; localStorage.setItem('scanner_token', TOKEN); document.getElementById('loginOverlay').style.display = 'none'; init(); }
+    if (d.access_token) { TOKEN = d.access_token; localStorage.setItem('scanner_token', TOKEN); init(); }
     else { document.getElementById('loginError').textContent = d.detail || 'Login failed'; }
   } catch(e) { document.getElementById('loginError').textContent = 'Connection error'; }
 }
 
 async function logout() {
   try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: headers(), credentials: 'same-origin' }); } catch(e) {}
-  TOKEN = ''; localStorage.removeItem('scanner_token'); location.reload();
+  TOKEN = ''; localStorage.removeItem('scanner_token'); showLogin();
 }
 
 async function apiFetch(url) {
   const r = await fetch(API + url, { headers: headers() });
-  if (r.status === 401) { document.getElementById('loginOverlay').style.display = 'flex'; return null; }
+  if (r.status === 401) { showLogin(); return null; }
   return r.json();
 }
 
@@ -516,17 +535,19 @@ async function loadUptimeAnalytics() {
 // ─── Global Search ───
 async function globalSearch() {
   const q = document.getElementById('globalQuery').value;
-  if (!q) return;
   document.getElementById('globalResults').innerHTML = '<p class="loading">Searching...</p>';
 
-  const data = await apiFetch(`/api/search/global?q=${encodeURIComponent(q)}`);
+  const url = q ? `/api/search/global?q=${encodeURIComponent(q)}` : '/api/search/global?size=20';
+  const data = await apiFetch(url);
   if (!data) return;
 
+  const sectionLabels = { findings: 'Recent Findings', logs: 'Recent Logs', activity: 'Recent Activity', chat: 'Recent Chat' };
   let html = '';
   for (const [section, result] of Object.entries(data)) {
     const items = result.items || [];
     if (items.length === 0) continue;
-    html += `<h3 style="margin:1rem 0 0.5rem; text-transform:capitalize;">${section} (${result.total})</h3>`;
+    const label = q ? `${section} (${result.total})` : (sectionLabels[section] || section);
+    html += `<h3 style="margin:1rem 0 0.5rem; text-transform:capitalize;">${label}</h3>`;
     html += items.map(item => `
       <div class="result-item">
         <div class="title">${item.title ? esc(item.title) : esc((item.message || '').slice(0, 80))}</div>
@@ -536,7 +557,7 @@ async function globalSearch() {
       </div>
     `).join('');
   }
-  document.getElementById('globalResults').innerHTML = html || '<p class="empty">No results found</p>';
+  document.getElementById('globalResults').innerHTML = html || '<p class="empty">No data yet</p>';
 }
 
 // ─── Log Search ───
@@ -607,14 +628,17 @@ async function init() {
   // Check token
   try {
     const r = await fetch(API + '/api/auth/me', { headers: headers() });
-    if (r.status === 401) { document.getElementById('loginOverlay').style.display = 'flex'; return; }
+    if (r.status === 401) { showLogin(); return; }
     const user = await r.json();
     document.getElementById('userBadge').textContent = user.email || 'user';
-    document.getElementById('loginOverlay').style.display = 'none';
-  } catch(e) { document.getElementById('loginOverlay').style.display = 'flex'; return; }
+    showApp();
+  } catch(e) { showLogin(); return; }
 
   loadOverview();
   loadUptimeAnalytics();
+  searchFindings();
+  searchLogs();
+  globalSearch();
 }
 
 // Enter key for search bars
@@ -623,7 +647,7 @@ document.getElementById('findingsQuery')?.addEventListener('keydown', e => { if(
 document.getElementById('logsQuery')?.addEventListener('keydown', e => { if(e.key === 'Enter') searchLogs(); });
 
 if (TOKEN) init();
-else document.getElementById('loginOverlay').style.display = 'flex';
+else showLogin();
 </script>
 </body>
 </html>

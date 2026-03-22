@@ -179,23 +179,33 @@ def search_chat(
 
 @router.get("/global")
 def global_search(
-    q: str = Query(..., description="Search query"),
+    q: str = Query("", description="Search query (empty = recent items)"),
     size: int = Query(20, le=100),
     user: User = Depends(get_current_user),
 ):
-    """Search across all indices — findings, logs, chat, activity."""
+    """Search across all indices — findings, logs, chat, activity. Empty query returns recent items."""
     results = {}
+    per_section = size // 4 + 1
 
-    # Search findings
-    findings_result = search(
-        "scanner-scan-findings",
-        {"bool": {"must": [{"multi_match": {
+    if q:
+        findings_query = {"bool": {"must": [{"multi_match": {
             "query": q,
             "fields": ["title^3", "description^2", "remediation", "evidence"],
             "fuzziness": "AUTO",
-        }}]}},
-        size=size // 4 + 1,
-        sort=[{"timestamp": "desc"}],
+        }}]}}
+        logs_query = {"bool": {"must": [{"match": {"message": q}}]}}
+        activity_query = {"bool": {"must": [{"multi_match": {"query": q, "fields": ["message", "command", "output"]}}]}}
+        chat_query = {"bool": {"must": [{"match": {"message": q}}], "filter": [{"term": {"user_id": user.id}}]}}
+    else:
+        findings_query = {"match_all": {}}
+        logs_query = {"match_all": {}}
+        activity_query = {"match_all": {}}
+        chat_query = {"bool": {"filter": [{"term": {"user_id": user.id}}]}}
+
+    # Search findings
+    findings_result = search(
+        "scanner-scan-findings", findings_query,
+        size=per_section, sort=[{"timestamp": "desc"}],
     )
     results["findings"] = {
         "total": findings_result.get("hits", {}).get("total", {}).get("value", 0),
@@ -204,10 +214,8 @@ def global_search(
 
     # Search logs
     logs_result = search(
-        "scanner-worker-logs",
-        {"bool": {"must": [{"match": {"message": q}}]}},
-        size=size // 4 + 1,
-        sort=[{"timestamp": "desc"}],
+        "scanner-worker-logs", logs_query,
+        size=per_section, sort=[{"timestamp": "desc"}],
     )
     results["logs"] = {
         "total": logs_result.get("hits", {}).get("total", {}).get("value", 0),
@@ -216,10 +224,8 @@ def global_search(
 
     # Search activity
     activity_result = search(
-        "scanner-scan-activity",
-        {"bool": {"must": [{"multi_match": {"query": q, "fields": ["message", "command", "output"]}}]}},
-        size=size // 4 + 1,
-        sort=[{"timestamp": "desc"}],
+        "scanner-scan-activity", activity_query,
+        size=per_section, sort=[{"timestamp": "desc"}],
     )
     results["activity"] = {
         "total": activity_result.get("hits", {}).get("total", {}).get("value", 0),
@@ -228,10 +234,8 @@ def global_search(
 
     # Search chat
     chat_result = search(
-        "scanner-chat-messages",
-        {"bool": {"must": [{"match": {"message": q}}], "filter": [{"term": {"user_id": user.id}}]}},
-        size=size // 4 + 1,
-        sort=[{"timestamp": "desc"}],
+        "scanner-chat-messages", chat_query,
+        size=per_section, sort=[{"timestamp": "desc"}],
     )
     results["chat"] = {
         "total": chat_result.get("hits", {}).get("total", {}).get("value", 0),

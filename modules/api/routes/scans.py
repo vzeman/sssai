@@ -1,5 +1,7 @@
 import json
 import os
+import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from modules.infra import get_queue, get_storage
 import redis as _redis
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+_STUCK_TIMEOUT = int(os.environ.get("STUCK_SCAN_TIMEOUT_SECONDS", "600"))
 
 router = APIRouter()
 
@@ -36,6 +39,87 @@ def create_scan(body: ScanCreate, user: User = Depends(get_current_user), db: Se
 @router.get("/", response_model=list[ScanResponse])
 def list_scans(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Scan).filter(Scan.user_id == user.id).order_by(Scan.created_at.desc()).all()
+
+
+@router.get("/health/stuck")
+def list_stuck_scans(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List scans that appear stuck (running but no recent heartbeat)."""
+    running = db.query(Scan).filter(
+        Scan.user_id == user.id, Scan.status == "running"
+    ).all()
+
+    r = _redis.from_url(_REDIS_URL)
+    result = []
+    for scan in running:
+        last_beat = r.get(f"scan:heartbeat:{scan.id}")
+        if last_beat:
+            silent_seconds = int(time.time() - float(last_beat))
+        else:
+            silent_seconds = int((datetime.now(timezone.utc) - scan.created_at).total_seconds()) if scan.created_at else 0
+
+        result.append({
+            "id": scan.id,
+            "target": scan.target,
+            "scan_type": scan.scan_type,
+            "created_at": scan.created_at.isoformat() if scan.created_at else None,
+            "silent_seconds": silent_seconds,
+            "is_stuck": silent_seconds > _STUCK_TIMEOUT,
+            "has_checkpoint": r.exists(f"scan:checkpoint:{scan.id}") > 0,
+        })
+    return result
+
+
+@router.post("/force-retry/{scan_id}")
+def force_retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Force-retry a stuck or failed scan, using checkpoint if available."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if scan.status not in ("running", "failed"):
+        raise HTTPException(status_code=400, detail="Scan must be running or failed to force-retry")
+
+    from modules.agent.checkpoint import load_checkpoint, build_resume_context
+    checkpoint = load_checkpoint(scan_id)
+    config = scan.config or {}
+    if checkpoint:
+        config = {**config, "resume_context": build_resume_context(checkpoint)}
+
+    scan.status = "queued"
+    db.commit()
+
+    get_queue().send("scan-jobs", {
+        "scan_id": scan.id,
+        "target": scan.target,
+        "scan_type": scan.scan_type,
+        "config": config,
+    })
+    return {"id": scan.id, "status": "queued", "had_checkpoint": checkpoint is not None}
+
+
+@router.post("/force-fail/{scan_id}")
+def force_fail_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Force-fail a stuck scan."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if scan.status != "running":
+        raise HTTPException(status_code=400, detail="Scan is not running")
+
+    scan.status = "failed"
+    db.commit()
+
+    get_storage().put_json(f"scans/{scan_id}/error.json", {
+        "error": "Scan force-failed by user.",
+        "scan_id": scan_id,
+    })
+
+    r = _redis.from_url(_REDIS_URL)
+    r.delete(f"scan:heartbeat:{scan_id}")
+
+    from modules.agent.checkpoint import delete_checkpoint
+    delete_checkpoint(scan_id)
+
+    return {"id": scan.id, "status": "failed"}
 
 
 @router.get("/{scan_id}", response_model=ScanResponse)

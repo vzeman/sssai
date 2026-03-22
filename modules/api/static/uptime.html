@@ -68,9 +68,36 @@
   .uptime-pct.good { color: var(--green); }
   .uptime-pct.warn { color: var(--yellow); }
   .uptime-pct.bad { color: var(--red); }
+
+  /* ─── Login overlay ─── */
+  .login-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .login-overlay.hidden { display: none; }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .login-box label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 1rem; }
+  .login-box input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem; color: var(--text); font-size: 0.9rem; }
 </style>
 </head>
 <body>
+
+<!-- Login overlay -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2.5rem;">&#128994;</div>
+      <h1 style="font-size:1.5rem;">Uptime <span style="color:var(--accent)">Monitoring</span></h1>
+      <p style="color:var(--muted); font-size:0.85rem;">Sign in to continue</p>
+    </div>
+    <label>Email</label>
+    <input id="loginEmail" placeholder="admin@scanner.local">
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%; margin-top:1.5rem;" onclick="doLogin()">Sign In</button>
+    <div id="loginError" style="color:var(--red); font-size:0.8rem; text-align:center; margin-top:0.75rem;"></div>
+  </div>
+</div>
+
+<!-- App (hidden until authenticated) -->
+<div id="app" style="display:none">
 
 <div class="header">
   <div style="display:flex;align-items:center;gap:1.5rem;">
@@ -160,22 +187,41 @@
   </div>
 </div>
 
+
+</div><!-- end #app -->
+
 <script>
 var API = '';
 var token = localStorage.getItem('scanner_token') || '';
-var userEmail = localStorage.getItem('scanner_email') || '';
 var selectedMonitor = null;
 
-document.getElementById('user-badge').textContent = userEmail;
+function showLogin() {
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('app').style.display = 'none';
+}
 
-if (!token) { window.location.href = '/'; }
+function showApp() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('app').style.display = 'block';
+}
+
+async function doLogin() {
+  var email = document.getElementById('loginEmail').value;
+  var pass = document.getElementById('loginPass').value;
+  try {
+    var r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass }) });
+    var d = await r.json();
+    if (d.access_token) { token = d.access_token; localStorage.setItem('scanner_token', token); init(); }
+    else { document.getElementById('loginError').textContent = d.detail || 'Login failed'; }
+  } catch(e) { document.getElementById('loginError').textContent = 'Connection error'; }
+}
 
 async function apiCall(path, opts) {
   opts = opts || {};
   var headers = Object.assign({'Content-Type':'application/json'}, opts.headers || {});
   if (token) headers['Authorization'] = 'Bearer ' + token;
   var res = await fetch(API + path, Object.assign({}, opts, {headers: headers}));
-  if (res.status === 401) { window.location.href = '/'; }
+  if (res.status === 401) { showLogin(); return null; }
   return res;
 }
 
@@ -183,7 +229,7 @@ async function apiCall(path, opts) {
 async function loadMonitors() {
   try {
     var res = await apiCall('/api/monitors/enriched?hours=24');
-    if (!res.ok) return;
+    if (!res || !res.ok) return;
     var monitors = await res.json();
     var tbody = document.getElementById('monitors-table');
     if (!monitors.length) {
@@ -261,7 +307,7 @@ function buildSparkline(data) {
 async function loadSummary() {
   try {
     var res = await apiCall('/api/monitors/summary');
-    if (!res.ok) return;
+    if (!res || !res.ok) return;
     var data = await res.json();
     document.getElementById('stat-total').textContent = data.total;
     document.getElementById('stat-up').textContent = data.up;
@@ -419,8 +465,20 @@ async function refresh() {
 }
 
 // ═══ Init ═══
-refresh();
-setInterval(refresh, 15000);
+async function init() {
+  try {
+    var r = await fetch(API + '/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (r.status === 401) { showLogin(); return; }
+    var user = await r.json();
+    document.getElementById('user-badge').textContent = user.email || 'user';
+    showApp();
+  } catch(e) { showLogin(); return; }
+  refresh();
+  setInterval(refresh, 15000);
+}
+
+if (token) init();
+else showLogin();
 </script>
 </body>
 </html>

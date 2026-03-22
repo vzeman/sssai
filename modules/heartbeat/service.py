@@ -2,7 +2,8 @@
 Heartbeat service — periodically checks health of all platform modules
 and uses AI to generate a status summary posted to the global heartbeat feed.
 
-Checks: API, Worker, Scheduler, Monitor, Redis, PostgreSQL, Elasticsearch.
+Checks: API, Worker, Scheduler, Monitor, Redis, PostgreSQL, Elasticsearch, ScanHealth.
+The AI agent has tools to retry or fail stuck scans.
 """
 
 import json
@@ -22,12 +23,41 @@ from sqlalchemy.orm import sessionmaker
 log = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", "120"))  # seconds
+STUCK_SCAN_TIMEOUT = int(os.getenv("STUCK_SCAN_TIMEOUT_SECONDS", "600"))  # 10 min
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://scanner:scanner@postgres:5432/scanner")
 API_URL = os.getenv("API_URL", "http://api:8000")
 ES_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
 REDIS_KEY = "heartbeat:messages"
 MAX_MESSAGES = 100
+
+# ── AI tools for heartbeat agent ──
+
+HEARTBEAT_TOOLS = [
+    {
+        "name": "retry_stuck_scan",
+        "description": "Retry a stuck scan using its checkpoint if available. Use when a scan has been silent for 10-30 minutes.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {"type": "string", "description": "The scan ID to retry"},
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "fail_stuck_scan",
+        "description": "Mark a stuck scan as failed. Use when a scan has been silent for 30+ minutes or has already been retried once.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {"type": "string", "description": "The scan ID to fail"},
+                "reason": {"type": "string", "description": "Why the scan is being failed"},
+            },
+            "required": ["scan_id"],
+        },
+    },
+]
 
 
 def _check_redis(r: redis.Redis) -> dict:
@@ -138,6 +168,62 @@ def _check_monitor(engine) -> dict:
         return {"name": "Monitor", "status": "unknown", "error": str(e)}
 
 
+def _check_stuck_scans(engine, r: redis.Redis) -> dict:
+    """Detect scans that are in 'running' status but have no recent heartbeat."""
+    try:
+        with engine.connect() as conn:
+            running = conn.execute(text(
+                "SELECT id, target, scan_type, created_at FROM scans WHERE status = 'running'"
+            )).fetchall()
+
+        stuck = []
+        healthy = 0
+        for row in running:
+            scan_id, target, scan_type, created_at = row[0], row[1], row[2], row[3]
+            last_beat = r.get(f"scan:heartbeat:{scan_id}")
+            if last_beat:
+                age = time.time() - float(last_beat)
+                if age > STUCK_SCAN_TIMEOUT:
+                    already_retried = r.exists(f"scan:stuck_retry:{scan_id}")
+                    stuck.append({
+                        "scan_id": scan_id,
+                        "target": target,
+                        "scan_type": scan_type,
+                        "silent_seconds": int(age),
+                        "already_retried": bool(already_retried),
+                    })
+                else:
+                    healthy += 1
+            else:
+                # No heartbeat key — possibly orphaned from before checkpointing existed
+                if created_at:
+                    created_age = (datetime.utcnow() - created_at).total_seconds()
+                else:
+                    created_age = STUCK_SCAN_TIMEOUT + 1
+                if created_age > STUCK_SCAN_TIMEOUT:
+                    already_retried = r.exists(f"scan:stuck_retry:{scan_id}")
+                    stuck.append({
+                        "scan_id": scan_id,
+                        "target": target,
+                        "scan_type": scan_type,
+                        "silent_seconds": int(created_age),
+                        "no_heartbeat_key": True,
+                        "already_retried": bool(already_retried),
+                    })
+                else:
+                    healthy += 1
+
+        return {
+            "name": "ScanHealth",
+            "status": "warning" if stuck else "up",
+            "running_scans": len(running),
+            "healthy_scans": healthy,
+            "stuck_scans": stuck,
+        }
+    except Exception as e:
+        return {"name": "ScanHealth", "status": "unknown", "error": str(e)}
+
+
 def _generate_ai_summary(checks: list[dict]) -> str:
     """Use Claude to generate a concise heartbeat status summary."""
     try:
@@ -235,11 +321,151 @@ class HeartbeatService:
             _check_api(),
             _check_worker(self.r),
             _check_monitor(self.engine),
+            _check_stuck_scans(self.engine, self.r),
         ]
 
         statuses = {c["name"]: c["status"] for c in checks}
         log.info("Health: %s", statuses)
 
-        summary = _generate_ai_summary(checks)
+        # Check if any scans are stuck — if so, give AI tools to handle them
+        scan_health = next((c for c in checks if c["name"] == "ScanHealth"), {})
+        stuck_scans = scan_health.get("stuck_scans", [])
+
+        if stuck_scans:
+            summary = self._generate_ai_summary_with_tools(checks)
+        else:
+            summary = _generate_ai_summary(checks)
+
         _post_heartbeat(self.r, checks, summary)
         log.info("Heartbeat posted: %s", summary[:100])
+
+    def _generate_ai_summary_with_tools(self, checks: list[dict]) -> str:
+        """Use Claude with tools to analyze health AND take action on stuck scans."""
+        try:
+            import anthropic
+
+            client = anthropic.Anthropic()
+            checks_json = json.dumps(checks, indent=1)
+
+            system = (
+                "You are a platform health monitor for a security scanner. "
+                "Review the health checks and take action on any stuck scans.\n\n"
+                "Rules for stuck scans:\n"
+                "- If a scan has been silent for 10+ minutes and already_retried is false: retry it\n"
+                "- If a scan has been silent for 30+ minutes OR already_retried is true: fail it\n"
+                "- After taking actions, provide a brief 2-4 sentence status summary in plain text\n"
+                "- Include what actions you took on stuck scans in your summary"
+            )
+
+            messages = [{"role": "user", "content": f"Module health checks:\n{checks_json}"}]
+
+            for _ in range(5):
+                response = client.messages.create(
+                    model=AI_MODEL_LIGHT,
+                    max_tokens=500,
+                    system=system,
+                    tools=HEARTBEAT_TOOLS,
+                    messages=messages,
+                )
+
+                if response.stop_reason == "end_turn":
+                    return "".join(b.text for b in response.content if hasattr(b, "text"))
+
+                if response.stop_reason == "tool_use":
+                    tool_results = []
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            result = self._handle_heartbeat_tool(block.name, block.input)
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result,
+                            })
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append({"role": "user", "content": tool_results})
+                    continue
+                break
+
+        except Exception as e:
+            log.warning("AI summary with tools failed: %s", e)
+
+        return _generate_ai_summary(checks)
+
+    def _handle_heartbeat_tool(self, name: str, input_data: dict) -> str:
+        """Execute a heartbeat AI tool."""
+        if name == "retry_stuck_scan":
+            scan_id = input_data["scan_id"]
+            return self._retry_scan(scan_id)
+        elif name == "fail_stuck_scan":
+            scan_id = input_data["scan_id"]
+            reason = input_data.get("reason", "Marked failed by heartbeat AI — no activity detected")
+            return self._fail_scan(scan_id, reason)
+        return f"Unknown tool: {name}"
+
+    def _retry_scan(self, scan_id: str) -> str:
+        """Re-queue a stuck scan with checkpoint context if available."""
+        try:
+            from modules.agent.checkpoint import load_checkpoint, build_resume_context
+            from modules.infra import get_queue
+
+            with self.engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT target, scan_type, config FROM scans WHERE id = :sid"
+                ), {"sid": scan_id}).fetchone()
+                if not row:
+                    return f"Scan {scan_id} not found in database."
+                target, scan_type, config = row[0], row[1], row[2]
+                config = config or {}
+
+            checkpoint = load_checkpoint(scan_id)
+            if checkpoint:
+                config = {**config, "resume_context": build_resume_context(checkpoint)}
+
+            with self.engine.connect() as conn:
+                conn.execute(text("UPDATE scans SET status = 'queued' WHERE id = :sid"), {"sid": scan_id})
+                conn.commit()
+
+            # Mark that we already retried this scan (1h TTL)
+            self.r.set(f"scan:stuck_retry:{scan_id}", "1", ex=3600)
+
+            get_queue().send("scan-jobs", {
+                "scan_id": scan_id,
+                "target": target,
+                "scan_type": scan_type,
+                "config": config,
+            })
+
+            msg = f"Scan {scan_id} re-queued"
+            if checkpoint:
+                msg += f" with checkpoint (iteration {checkpoint.get('iteration', '?')})"
+            log.info(msg)
+            return msg + "."
+
+        except Exception as e:
+            log.error("Failed to retry scan %s: %s", scan_id, e)
+            return f"Failed to retry scan {scan_id}: {e}"
+
+    def _fail_scan(self, scan_id: str, reason: str) -> str:
+        """Mark a scan as failed."""
+        try:
+            from modules.infra import get_storage
+            from modules.agent.checkpoint import delete_checkpoint
+
+            with self.engine.connect() as conn:
+                conn.execute(text("UPDATE scans SET status = 'failed' WHERE id = :sid"), {"sid": scan_id})
+                conn.commit()
+
+            get_storage().put_json(f"scans/{scan_id}/error.json", {
+                "error": reason,
+                "scan_id": scan_id,
+            })
+
+            delete_checkpoint(scan_id)
+            self.r.delete(f"scan:stuck_retry:{scan_id}")
+
+            log.info("Scan %s marked as failed: %s", scan_id, reason)
+            return f"Scan {scan_id} marked as failed."
+
+        except Exception as e:
+            log.error("Failed to mark scan %s as failed: %s", scan_id, e)
+            return f"Failed to mark scan {scan_id} as failed: {e}"
