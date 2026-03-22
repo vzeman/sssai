@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Scanner — Analytics & Search</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6; --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316; --purple: #a855f7; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ─── Header ─── */
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 0.75rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 1.2rem; font-weight: 600; }
+  .header h1 span { color: var(--accent); }
+  .header .right { display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
+  .nav-links { display: flex; gap: 0.5rem; }
+  .nav-links a { color: var(--muted); text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.85rem; transition: all 0.2s; }
+  .nav-links a:hover, .nav-links a.active { color: var(--accent); background: rgba(59,130,246,0.1); }
+  .user-badge { background: rgba(59,130,246,0.15); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; }
+  .logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
+  .logout-btn:hover { color: var(--red); border-color: var(--red); }
+
+  /* ─── Tabs ─── */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 2rem; background: var(--card); }
+  .tab { padding: 0.75rem 1.25rem; cursor: pointer; color: var(--muted); font-size: 0.9rem; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ─── Content ─── */
+  .content { padding: 1.5rem 2rem; overflow-y: auto; height: calc(100vh - 100px); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ─── Cards ─── */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .card h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--muted); }
+
+  /* ─── Grid layouts ─── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+
+  /* ─── Stats ─── */
+  .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+  .stat-card .val { font-size: 1.8rem; font-weight: 700; }
+  .stat-card .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .stat-card.critical .val { color: var(--red); }
+  .stat-card.high .val { color: var(--orange); }
+  .stat-card.medium .val { color: var(--yellow); }
+  .stat-card.ok .val { color: var(--green); }
+
+  /* ─── Charts ─── */
+  .chart-container { position: relative; height: 300px; }
+  .chart-container.small { height: 200px; }
+
+  /* ─── Search ─── */
+  .search-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .search-bar input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 1rem; color: var(--text); font-size: 0.9rem; outline: none; }
+  .search-bar input:focus { border-color: var(--accent); }
+  .search-bar select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; color: var(--text); font-size: 0.85rem; }
+  .btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+  .btn:hover { opacity: 0.85; }
+
+  /* ─── Results ─── */
+  .result-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.5rem; }
+  .result-item .title { font-weight: 600; font-size: 0.9rem; }
+  .result-item .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .result-item .snippet { font-size: 0.82rem; color: var(--text); margin-top: 0.35rem; line-height: 1.4; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+  .badge.critical { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.high { background: rgba(249,115,22,0.2); color: var(--orange); }
+  .badge.medium { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .badge.low { background: rgba(59,130,246,0.2); color: var(--accent); }
+  .badge.info { background: rgba(148,163,184,0.2); color: var(--muted); }
+  .badge.up { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge.down { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.degraded { background: rgba(234,179,8,0.2); color: var(--yellow); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); }
+
+  .empty { text-align: center; color: var(--muted); padding: 2rem; font-size: 0.9rem; }
+  .loading { text-align: center; color: var(--muted); padding: 1rem; }
+
+  /* ─── Floating chat ─── */
+  .chat-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: white; border: none; font-size: 1.5rem; cursor: pointer; box-shadow: 0 4px 20px rgba(59,130,246,0.4); z-index: 999; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+  .chat-fab:hover { transform: scale(1.1); }
+  .chat-panel { position: fixed; bottom: 5rem; right: 1.5rem; width: 400px; height: 500px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; z-index: 998; display: none; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,0.4); }
+  .chat-panel.open { display: flex; }
+  .chat-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.9rem; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 0.75rem; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+  .chat-msg { padding: 0.5rem 0.75rem; border-radius: 10px; font-size: 0.82rem; line-height: 1.4; max-width: 85%; }
+  .chat-msg.human { background: var(--accent); color: white; align-self: flex-end; }
+  .chat-msg.agent { background: var(--bg); border: 1px solid var(--border); align-self: flex-start; }
+  .chat-input { display: flex; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid var(--border); }
+  .chat-input input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; color: var(--text); font-size: 0.85rem; outline: none; }
+  .chat-input button { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<!-- Login overlay -->
+<div class="login-overlay" id="loginOverlay">
+  <div style="background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 380px;">
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <span style="font-size: 2.5rem;">&#x1F6E1;</span>
+      <h1 style="font-size: 1.5rem;"><span style="color: var(--accent);">Security</span> Scanner</h1>
+      <p style="color: var(--muted); font-size: 0.85rem;">Analytics Dashboard</p>
+    </div>
+    <label style="display:block; font-size:0.8rem; color:var(--muted); margin-bottom:0.25rem;">Email</label>
+    <input id="loginEmail" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.65rem; color:var(--text); font-size:0.9rem;" placeholder="admin@scanner.local">
+    <label style="display:block; font-size:0.8rem; color:var(--muted); margin-bottom:0.25rem; margin-top:1rem;">Password</label>
+    <input id="loginPass" type="password" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.65rem; color:var(--text); font-size:0.9rem;" placeholder="password">
+    <button onclick="doLogin()" style="width:100%; margin-top:1.5rem; background:var(--accent); color:white; border:none; border-radius:8px; padding:0.7rem; font-size:0.95rem; font-weight:600; cursor:pointer;">Sign In</button>
+    <div id="loginError" style="color:var(--red); font-size:0.8rem; text-align:center; margin-top:0.75rem;"></div>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div style="display:flex; align-items:center; gap:1.5rem;">
+    <h1>&#x1F6E1; <span>Security</span> Scanner</h1>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/analytics" class="active">Analytics</a>
+      <a href="/uptime">Uptime</a>
+      <a href="/admin">Admin</a>
+    </div>
+  </div>
+  <div class="right">
+    <span class="user-badge" id="userBadge"></span>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" data-tab="findings" onclick="switchTab('findings')">Findings</div>
+  <div class="tab" data-tab="uptime-analytics" onclick="switchTab('uptime-analytics')">Uptime</div>
+  <div class="tab" data-tab="search" onclick="switchTab('search')">Search</div>
+  <div class="tab" data-tab="logs" onclick="switchTab('logs')">Logs</div>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Overview Tab -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="grid-4" id="overviewStats"></div>
+    <div class="grid-2" style="margin-top:1rem;">
+      <div class="card">
+        <h2>Findings Timeline</h2>
+        <div class="chart-container"><canvas id="findingsTimelineChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Severity Distribution</h2>
+        <div class="chart-container"><canvas id="severityChart"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:0;">
+      <div class="card">
+        <h2>Scan Types</h2>
+        <div class="chart-container small"><canvas id="scanTypeChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Top Targets</h2>
+        <div class="chart-container small"><canvas id="targetChart"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:0;">
+      <div class="card">
+        <h2>Top Recurring Findings</h2>
+        <div id="topFindings"></div>
+      </div>
+      <div class="card">
+        <h2>Scan Activity</h2>
+        <div class="chart-container small"><canvas id="activityChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Findings Tab -->
+  <div class="tab-content" id="tab-findings">
+    <div class="card">
+      <h2>Search Findings</h2>
+      <div class="search-bar">
+        <input id="findingsQuery" placeholder="Search findings... (e.g., XSS, SQL injection, CORS)">
+        <select id="findingsSeverity">
+          <option value="">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+          <option value="info">Info</option>
+        </select>
+        <select id="findingsScanType">
+          <option value="">All Types</option>
+          <option value="security">Security</option>
+          <option value="pentest">Pentest</option>
+          <option value="owasp">OWASP</option>
+          <option value="chatbot">Chatbot</option>
+          <option value="full">Full</option>
+          <option value="api_security">API Security</option>
+        </select>
+        <button class="btn" onclick="searchFindings()">Search</button>
+      </div>
+      <div id="findingsAggs" class="grid-3" style="margin-bottom:0.75rem;"></div>
+      <div id="findingsResults"><p class="empty">Enter a search query or click Search to browse all findings</p></div>
+    </div>
+  </div>
+
+  <!-- Uptime Analytics Tab -->
+  <div class="tab-content" id="tab-uptime-analytics">
+    <div class="grid-4" id="uptimeStats"></div>
+    <div class="grid-2" style="margin-top:1rem;">
+      <div class="card">
+        <h2>Response Time Trend</h2>
+        <div class="chart-container"><canvas id="responseTimeChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Status Distribution</h2>
+        <div class="chart-container"><canvas id="uptimeStatusChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Monitor Performance</h2>
+      <table>
+        <thead><tr><th>Monitor</th><th>Checks</th><th>Uptime %</th><th>Avg Response</th><th>Status</th></tr></thead>
+        <tbody id="uptimeMonitorTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Search Tab -->
+  <div class="tab-content" id="tab-search">
+    <div class="card">
+      <h2>Global Search</h2>
+      <div class="search-bar">
+        <input id="globalQuery" placeholder="Search across findings, logs, chat, and activity...">
+        <button class="btn" onclick="globalSearch()">Search</button>
+      </div>
+      <div id="globalResults"><p class="empty">Search across all data sources</p></div>
+    </div>
+  </div>
+
+  <!-- Logs Tab -->
+  <div class="tab-content" id="tab-logs">
+    <div class="card">
+      <h2>Search Logs</h2>
+      <div class="search-bar">
+        <input id="logsQuery" placeholder="Search log messages...">
+        <select id="logsLevel">
+          <option value="">All Levels</option>
+          <option value="ERROR">Error</option>
+          <option value="WARNING">Warning</option>
+          <option value="INFO">Info</option>
+        </select>
+        <select id="logsHours">
+          <option value="1">Last 1h</option>
+          <option value="6">Last 6h</option>
+          <option value="24" selected>Last 24h</option>
+          <option value="72">Last 3d</option>
+          <option value="168">Last 7d</option>
+        </select>
+        <button class="btn" onclick="searchLogs()">Search</button>
+      </div>
+      <div id="logsResults"><p class="empty">Search worker and scan logs</p></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Floating chat -->
+<button class="chat-fab" onclick="toggleChat()">&#x1F4AC;</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <span>AI Security Assistant</span>
+    <button onclick="toggleChat()" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.2rem;">&times;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input">
+    <input id="chatInput" placeholder="Ask about security..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('scanner_token') || '';
+let charts = {};
+
+// ─── Auth ───
+function headers() { return { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }; }
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const pass = document.getElementById('loginPass').value;
+  try {
+    const r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, password: pass }) });
+    const d = await r.json();
+    if (d.access_token) { TOKEN = d.access_token; localStorage.setItem('scanner_token', TOKEN); document.getElementById('loginOverlay').style.display = 'none'; init(); }
+    else { document.getElementById('loginError').textContent = d.detail || 'Login failed'; }
+  } catch(e) { document.getElementById('loginError').textContent = 'Connection error'; }
+}
+
+async function logout() {
+  try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: headers(), credentials: 'same-origin' }); } catch(e) {}
+  TOKEN = ''; localStorage.removeItem('scanner_token'); location.reload();
+}
+
+async function apiFetch(url) {
+  const r = await fetch(API + url, { headers: headers() });
+  if (r.status === 401) { document.getElementById('loginOverlay').style.display = 'flex'; return null; }
+  return r.json();
+}
+
+// ─── Tabs ───
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-' + name));
+}
+
+// ─── Chart helpers ───
+const COLORS = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#3b82f6', info: '#94a3b8' };
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function createChart(canvasId, config) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  charts[canvasId] = new Chart(ctx, config);
+}
+
+// ─── Overview ───
+async function loadOverview() {
+  const [findings, scans, uptime] = await Promise.all([
+    apiFetch('/api/search/analytics/findings?days=30'),
+    apiFetch('/api/search/analytics/scans?days=30'),
+    apiFetch('/api/search/analytics/uptime?days=7'),
+  ]);
+
+  if (!findings) return;
+
+  // Stats cards
+  const sev = findings.severity_distribution || {};
+  const totalFindings = Object.values(sev).reduce((a, b) => a + b, 0);
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="stat-card critical"><div class="val">${sev.critical || 0}</div><div class="label">Critical</div></div>
+    <div class="stat-card high"><div class="val">${sev.high || 0}</div><div class="label">High</div></div>
+    <div class="stat-card medium"><div class="val">${sev.medium || 0}</div><div class="label">Medium</div></div>
+    <div class="stat-card ok"><div class="val">${totalFindings}</div><div class="label">Total Findings (30d)</div></div>
+  `;
+
+  // Findings timeline
+  const timeline = findings.timeline || [];
+  createChart('findingsTimelineChart', {
+    type: 'bar',
+    data: {
+      labels: timeline.map(d => d.date ? d.date.split('T')[0].slice(5) : ''),
+      datasets: [
+        { label: 'Critical', data: timeline.map(d => d.critical || 0), backgroundColor: COLORS.critical },
+        { label: 'High', data: timeline.map(d => d.high || 0), backgroundColor: COLORS.high },
+        { label: 'Medium', data: timeline.map(d => d.medium || 0), backgroundColor: COLORS.medium },
+        { label: 'Low', data: timeline.map(d => d.low || 0), backgroundColor: COLORS.low },
+      ],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }, y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } } } },
+  });
+
+  // Severity donut
+  createChart('severityChart', {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(sev),
+      datasets: [{ data: Object.values(sev), backgroundColor: Object.keys(sev).map(k => COLORS[k] || '#64748b') }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e2e8f0' } } } },
+  });
+
+  // Scan types
+  const st = findings.by_scan_type || {};
+  createChart('scanTypeChart', {
+    type: 'bar',
+    data: {
+      labels: Object.keys(st),
+      datasets: [{ data: Object.values(st), backgroundColor: '#3b82f6' }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } },
+  });
+
+  // Top targets
+  const tgt = findings.by_target || {};
+  createChart('targetChart', {
+    type: 'bar',
+    data: {
+      labels: Object.keys(tgt).map(t => t.length > 30 ? t.slice(0,30) + '...' : t),
+      datasets: [{ data: Object.values(tgt), backgroundColor: '#a855f7' }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } },
+  });
+
+  // Top findings list
+  const tf = findings.top_findings || {};
+  const tfHtml = Object.entries(tf).slice(0, 10).map(([title, count]) =>
+    `<div class="result-item"><span class="title">${esc(title)}</span> <span style="float:right; color:var(--muted)">${count}x</span></div>`
+  ).join('') || '<p class="empty">No findings yet</p>';
+  document.getElementById('topFindings').innerHTML = tfHtml;
+
+  // Scan activity timeline
+  if (scans) {
+    const at = scans.timeline || [];
+    createChart('activityChart', {
+      type: 'line',
+      data: {
+        labels: at.map(d => d.date ? d.date.split('T')[0].slice(5) : ''),
+        datasets: [{ label: 'Activities', data: at.map(d => d.activities), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.3 }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } } } },
+    });
+  }
+}
+
+// ─── Findings Search ───
+async function searchFindings() {
+  const q = document.getElementById('findingsQuery').value;
+  const severity = document.getElementById('findingsSeverity').value;
+  const scanType = document.getElementById('findingsScanType').value;
+  const params = new URLSearchParams({ q, severity, scan_type: scanType, size: '50' });
+  document.getElementById('findingsResults').innerHTML = '<p class="loading">Searching...</p>';
+
+  const data = await apiFetch(`/api/search/findings?${params}`);
+  if (!data) return;
+
+  // Aggregations
+  const aggs = data.aggregations || {};
+  const sevAgg = aggs.severity || {};
+  document.getElementById('findingsAggs').innerHTML = Object.entries(sevAgg).map(([k, v]) =>
+    `<div class="stat-card ${k}"><div class="val">${v}</div><div class="label">${k}</div></div>`
+  ).join('');
+
+  // Results
+  const findings = data.findings || [];
+  if (findings.length === 0) {
+    document.getElementById('findingsResults').innerHTML = '<p class="empty">No findings found</p>';
+    return;
+  }
+  document.getElementById('findingsResults').innerHTML = findings.map(f => `
+    <div class="result-item">
+      <div class="title"><span class="badge ${f.severity}">${f.severity}</span> ${esc(f.title || 'Untitled')}</div>
+      <div class="meta">${esc(f.target || '')} &middot; ${f.scan_type || ''} &middot; ${f.timestamp ? f.timestamp.split('T')[0] : ''}</div>
+      ${f.description ? `<div class="snippet">${esc(f.description).slice(0, 200)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ─── Uptime Analytics ───
+async function loadUptimeAnalytics() {
+  const data = await apiFetch('/api/search/analytics/uptime?days=7');
+  if (!data) return;
+
+  // Stats
+  const sd = data.status_distribution || {};
+  const total = Object.values(sd).reduce((a, b) => a + b, 0);
+  document.getElementById('uptimeStats').innerHTML = `
+    <div class="stat-card ok"><div class="val">${sd.up || 0}</div><div class="label">Up Checks</div></div>
+    <div class="stat-card critical"><div class="val">${sd.down || 0}</div><div class="label">Down Checks</div></div>
+    <div class="stat-card"><div class="val">${data.avg_response_ms ? Math.round(data.avg_response_ms) + 'ms' : '-'}</div><div class="label">Avg Response</div></div>
+    <div class="stat-card"><div class="val">${total}</div><div class="label">Total Checks (7d)</div></div>
+  `;
+
+  // Response time chart
+  const timeline = data.timeline || [];
+  createChart('responseTimeChart', {
+    type: 'line',
+    data: {
+      labels: timeline.map(d => d.time ? d.time.split('T')[1]?.slice(0, 5) || d.time.slice(5, 16) : ''),
+      datasets: [
+        { label: 'Avg (ms)', data: timeline.map(d => d.avg_ms), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 },
+        { label: 'Max (ms)', data: timeline.map(d => d.max_ms), borderColor: '#f97316', borderDash: [4, 4], fill: false, tension: 0.3 },
+      ],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { color: '#94a3b8', maxTicksLimit: 24 }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } } } },
+  });
+
+  // Status distribution
+  createChart('uptimeStatusChart', {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(sd),
+      datasets: [{ data: Object.values(sd), backgroundColor: Object.keys(sd).map(k => k === 'up' ? '#22c55e' : k === 'down' ? '#ef4444' : '#eab308') }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e2e8f0' } } } },
+  });
+
+  // Monitor table
+  const monitors = data.monitors || [];
+  document.getElementById('uptimeMonitorTable').innerHTML = monitors.map(m => {
+    const statusClass = (m.uptime_pct || 0) >= 99 ? 'up' : (m.uptime_pct || 0) >= 95 ? 'degraded' : 'down';
+    return `<tr>
+      <td>${esc(m.name)}</td>
+      <td>${m.total_checks}</td>
+      <td><span class="badge ${statusClass}">${m.uptime_pct != null ? m.uptime_pct + '%' : '-'}</span></td>
+      <td>${m.avg_ms ? Math.round(m.avg_ms) + 'ms' : '-'}</td>
+      <td>${Object.entries(m.status_breakdown || {}).map(([k,v]) => `<span class="badge ${k}">${k}: ${v}</span>`).join(' ')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">No monitor data yet</td></tr>';
+}
+
+// ─── Global Search ───
+async function globalSearch() {
+  const q = document.getElementById('globalQuery').value;
+  if (!q) return;
+  document.getElementById('globalResults').innerHTML = '<p class="loading">Searching...</p>';
+
+  const data = await apiFetch(`/api/search/global?q=${encodeURIComponent(q)}`);
+  if (!data) return;
+
+  let html = '';
+  for (const [section, result] of Object.entries(data)) {
+    const items = result.items || [];
+    if (items.length === 0) continue;
+    html += `<h3 style="margin:1rem 0 0.5rem; text-transform:capitalize;">${section} (${result.total})</h3>`;
+    html += items.map(item => `
+      <div class="result-item">
+        <div class="title">${item.title ? esc(item.title) : esc((item.message || '').slice(0, 80))}</div>
+        <div class="meta">${item.severity ? `<span class="badge ${item.severity}">${item.severity}</span> ` : ''}${item.timestamp || ''} ${item.target ? '&middot; ' + esc(item.target) : ''}</div>
+        ${item.description ? `<div class="snippet">${esc(item.description).slice(0, 150)}</div>` : ''}
+        ${!item.title && item.message ? `<div class="snippet">${esc(item.message).slice(0, 200)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+  document.getElementById('globalResults').innerHTML = html || '<p class="empty">No results found</p>';
+}
+
+// ─── Log Search ───
+async function searchLogs() {
+  const q = document.getElementById('logsQuery').value;
+  const level = document.getElementById('logsLevel').value;
+  const hours = document.getElementById('logsHours').value;
+  const params = new URLSearchParams({ q, level, hours, size: '200' });
+  document.getElementById('logsResults').innerHTML = '<p class="loading">Searching...</p>';
+
+  const data = await apiFetch(`/api/search/logs?${params}`);
+  if (!data) return;
+
+  const logs = data.logs || [];
+  if (logs.length === 0) {
+    document.getElementById('logsResults').innerHTML = '<p class="empty">No logs found</p>';
+    return;
+  }
+
+  const levelColors = { ERROR: 'var(--red)', WARNING: 'var(--yellow)', INFO: 'var(--muted)' };
+  document.getElementById('logsResults').innerHTML = `
+    <div style="margin-bottom:0.5rem; color:var(--muted); font-size:0.8rem;">
+      ${Object.entries(data.levels || {}).map(([k,v]) => `<span style="color:${levelColors[k] || 'var(--muted)'}">${k}: ${v}</span>`).join(' &middot; ')}
+    </div>
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-family:monospace; font-size:0.78rem; max-height:500px; overflow-y:auto; line-height:1.6;">
+      ${logs.map(l => `<div><span style="color:${levelColors[l.level] || 'var(--muted)'}">[${l.level || ''}]</span> <span style="color:var(--muted)">${l.timestamp || ''}</span> ${esc(l.message || '')}</div>`).join('')}
+    </div>
+  `;
+}
+
+// ─── Chat ───
+let chatOpen = false;
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+  if (chatOpen) loadChat();
+}
+
+async function loadChat() {
+  const data = await apiFetch('/api/chat');
+  if (!data) return;
+  const el = document.getElementById('chatMessages');
+  el.innerHTML = (data.messages || []).map(m =>
+    `<div class="chat-msg ${m.role === 'human' ? 'human' : 'agent'}">${esc(m.message || '')}</div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  const el = document.getElementById('chatMessages');
+  el.innerHTML += `<div class="chat-msg human">${esc(msg)}</div>`;
+  el.scrollTop = el.scrollHeight;
+
+  await fetch(API + '/api/chat', { method: 'POST', headers: headers(), body: JSON.stringify({ message: msg }) });
+  setTimeout(loadChat, 2000);
+  setTimeout(loadChat, 5000);
+}
+
+// ─── Util ───
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ─── Init ───
+async function init() {
+  // Check token
+  try {
+    const r = await fetch(API + '/api/auth/me', { headers: headers() });
+    if (r.status === 401) { document.getElementById('loginOverlay').style.display = 'flex'; return; }
+    const user = await r.json();
+    document.getElementById('userBadge').textContent = user.email || 'user';
+    document.getElementById('loginOverlay').style.display = 'none';
+  } catch(e) { document.getElementById('loginOverlay').style.display = 'flex'; return; }
+
+  loadOverview();
+  loadUptimeAnalytics();
+}
+
+// Enter key for search bars
+document.getElementById('globalQuery')?.addEventListener('keydown', e => { if(e.key === 'Enter') globalSearch(); });
+document.getElementById('findingsQuery')?.addEventListener('keydown', e => { if(e.key === 'Enter') searchFindings(); });
+document.getElementById('logsQuery')?.addEventListener('keydown', e => { if(e.key === 'Enter') searchLogs(); });
+
+if (TOKEN) init();
+else document.getElementById('loginOverlay').style.display = 'flex';
+</script>
+</body>
+</html>

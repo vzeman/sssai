@@ -6,7 +6,7 @@ import os
 import signal
 import sys
 
-from modules.agent.scan_agent import run_scan
+from modules.agent.scan_agent import run_scan, run_validation
 from modules.infra import get_queue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -35,6 +35,18 @@ class RedisLogHandler(logging.Handler):
             self._r.ltrim(self._key, -self._maxlen, -1)
         except Exception:
             pass
+        # Dual-write to Elasticsearch
+        try:
+            from modules.infra.elasticsearch import index_doc
+            from datetime import datetime, timezone
+            index_doc("scanner-worker-logs", {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "level": record.levelname,
+                "message": record.getMessage(),
+                "service": "worker",
+            })
+        except Exception:
+            pass
 
 
 _redis_url = os.environ.get("REDIS_URL", "redis://redis:6379")
@@ -43,6 +55,7 @@ _rh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 logging.getLogger().addHandler(_rh)
 
 QUEUE_NAME = "scan-jobs"
+VALIDATION_QUEUE = "validation-jobs"
 _DB_URL = os.environ.get("DATABASE_URL", "")
 
 
@@ -89,32 +102,44 @@ def main():
     log.info("Worker started, listening on queue: %s", QUEUE_NAME)
 
     while running:
-        job = queue.receive(QUEUE_NAME, timeout=30)
-        if not job:
+        # Check scan jobs first
+        job = queue.receive(QUEUE_NAME, timeout=5)
+        if job:
+            scan_id = job["scan_id"]
+            target = job["target"]
+            scan_type = job.get("scan_type", "security")
+            config = job.get("config", {})
+
+            log.info("Starting scan %s: %s (%s)", scan_id, target, scan_type)
+            _update_scan_status(scan_id, "running")
+
+            try:
+                report = run_scan(scan_id, target, scan_type, config)
+                findings = len(report.get("findings", []))
+                score = report.get("risk_score", 0)
+                log.info("Scan %s completed: %d findings, risk score %s", scan_id, findings, score)
+                _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings)
+            except Exception as e:
+                log.exception("Scan %s failed: %s", scan_id, e)
+                _update_scan_status(scan_id, "failed")
+                from modules.infra import get_storage
+                get_storage().put_json(f"scans/{scan_id}/error.json", {
+                    "error": str(e),
+                    "scan_id": scan_id,
+                })
             continue
 
-        scan_id = job["scan_id"]
-        target = job["target"]
-        scan_type = job.get("scan_type", "security")
-        config = job.get("config", {})
-
-        log.info("Starting scan %s: %s (%s)", scan_id, target, scan_type)
-        _update_scan_status(scan_id, "running")
-
-        try:
-            report = run_scan(scan_id, target, scan_type, config)
-            findings = len(report.get("findings", []))
-            score = report.get("risk_score", 0)
-            log.info("Scan %s completed: %d findings, risk score %s", scan_id, findings, score)
-            _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings)
-        except Exception as e:
-            log.exception("Scan %s failed: %s", scan_id, e)
-            _update_scan_status(scan_id, "failed")
-            from modules.infra import get_storage
-            get_storage().put_json(f"scans/{scan_id}/error.json", {
-                "error": str(e),
-                "scan_id": scan_id,
-            })
+        # Check validation jobs
+        val_job = queue.receive(VALIDATION_QUEUE, timeout=5)
+        if val_job:
+            task_id = val_job["task_id"]
+            user_id = val_job["user_id"]
+            log.info("Starting validation task %s", task_id)
+            try:
+                run_validation(task_id, user_id, val_job)
+                log.info("Validation task %s completed", task_id)
+            except Exception as e:
+                log.exception("Validation task %s failed: %s", task_id, e)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ RUN pip install --no-cache-dir \
     redis boto3 pydantic pydantic-settings stripe \
     "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt<4.1" \
     python-multipart httpx alembic \
-    jinja2 weasyprint pyyaml
+    jinja2 weasyprint pyyaml anthropic "elasticsearch>=8.13,<9" \
+    pyotp "qrcode[pil]"
 
 COPY modules/ /app/modules/
 COPY config/ /app/config/

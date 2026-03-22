@@ -212,6 +212,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "store_memory":
         return _handle_store_memory(input, scan_context)
 
+    elif name == "ask_human":
+        return _handle_ask_human(input, scan_context)
+
     elif name == "report":
         return "__REPORT__"
 
@@ -538,6 +541,88 @@ def _handle_store_memory(input: dict, scan_context: dict | None) -> str:
         return f"ERROR: Memory store failed: {e}"
 
 
+# ── Human chat interaction ───────────────────────────────────────────────
+
+def _handle_ask_human(input: dict, scan_context: dict | None) -> str:
+    """Agent asks the human a question and waits for a response."""
+    try:
+        question = input["question"]
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        if not scan_id:
+            return "ERROR: No scan context for human interaction"
+
+        import redis
+        r = redis.from_url(_REDIS_URL)
+
+        # Post agent's question to chat history
+        agent_msg = json.dumps({
+            "role": "agent",
+            "message": question,
+            "type": "question",
+            "timestamp": time.strftime("%H:%M:%S"),
+            "ts": time.time(),
+        })
+        r.rpush(f"scan:chat:history:{scan_id}", agent_msg)
+        r.expire(f"scan:chat:history:{scan_id}", 86400)
+
+        # Log it as activity
+        _log_activity(scan_id, {
+            "type": "chat",
+            "direction": "agent_ask",
+            "message": question[:200],
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+
+        # Wait for human response (poll inbox, max 5 minutes)
+        timeout = input.get("timeout", 300)
+        start = time.time()
+        while time.time() - start < timeout:
+            reply = r.lpop(f"scan:chat:inbox:{scan_id}")
+            if reply:
+                data = json.loads(reply.decode() if isinstance(reply, bytes) else reply)
+                human_msg = data.get("message", "")
+                log.info("Scan %s: received human response: %s", scan_id, human_msg[:100])
+                return f"[HUMAN RESPONSE]: {human_msg}"
+            time.sleep(2)  # poll every 2 seconds
+
+        return "[HUMAN RESPONSE]: (no response within timeout — continue autonomously)"
+
+    except Exception as e:
+        return f"ERROR: ask_human failed: {e}"
+
+
+def _check_human_messages(scan_id: str) -> str | None:
+    """Check if the human sent any chat messages. Non-blocking."""
+    try:
+        import redis
+        r = redis.from_url(_REDIS_URL)
+        msg = r.lpop(f"scan:chat:inbox:{scan_id}")
+        if msg:
+            data = json.loads(msg.decode() if isinstance(msg, bytes) else msg)
+            return data.get("message", "")
+        return None
+    except Exception:
+        return None
+
+
+def _post_agent_chat(scan_id: str, message: str, msg_type: str = "info"):
+    """Post an agent message to the chat history."""
+    try:
+        import redis
+        r = redis.from_url(_REDIS_URL)
+        agent_msg = json.dumps({
+            "role": "agent",
+            "message": message,
+            "type": msg_type,
+            "timestamp": time.strftime("%H:%M:%S"),
+            "ts": time.time(),
+        })
+        r.rpush(f"scan:chat:history:{scan_id}", agent_msg)
+        r.expire(f"scan:chat:history:{scan_id}", 86400)
+    except Exception:
+        pass
+
+
 # ── Loop detection ───────────────────────────────────────────────────────
 
 class LoopDetector:
@@ -813,13 +898,21 @@ def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
 # ── Activity logging ─────────────────────────────────────────────────────
 
 def _log_activity(scan_id: str, activity: dict):
-    """Push scan activity to Redis for live dashboard."""
+    """Push scan activity to Redis for live dashboard + index to ES."""
     try:
         import redis
         r = redis.from_url(_REDIS_URL)
         r.rpush(f"scan:activity:{scan_id}", json.dumps(activity))
         r.ltrim(f"scan:activity:{scan_id}", -500, -1)
         r.expire(f"scan:activity:{scan_id}", 86400)
+    except Exception:
+        pass
+    # Dual-write to Elasticsearch
+    try:
+        from modules.infra.elasticsearch import index_doc
+        from datetime import datetime, timezone
+        es_doc = {**activity, "scan_id": scan_id, "timestamp": datetime.now(timezone.utc).isoformat()}
+        index_doc("scanner-scan-activity", es_doc)
     except Exception:
         pass
 
@@ -867,6 +960,23 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "Continue from where the summary leaves off."
     )
 
+    # Add chat/human interaction awareness
+    system_prompt += (
+        "\n\n## Human Interaction\n"
+        "A human operator may send you messages during the scan. These appear as "
+        "[HUMAN MESSAGE]: in the conversation. Respond to them appropriately — they may "
+        "provide guidance, ask questions, or request changes to your approach.\n\n"
+        "You can also proactively ask the human for input using the `ask_human` tool when:\n"
+        "- You find a critical vulnerability that needs immediate attention\n"
+        "- You need permission before running aggressive/intrusive tests\n"
+        "- You're unsure about scope or want to suggest alternative approaches\n"
+        "- You want to offer the human a choice of next steps\n"
+        "Keep scanning while waiting — don't block on non-critical questions."
+    )
+
+    # Post initial agent message to chat
+    _post_agent_chat(scan_id, f"Starting {scan_type} scan of {target}. I'll keep you updated on progress.", "status")
+
     # All tools including sub-agents, search, and memory
     all_tools = TOOLS + SUBAGENT_TOOLS
 
@@ -913,6 +1023,29 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 })
                 # Inject monitor feedback into the conversation
                 messages.append({"role": "user", "content": monitor_msg})
+
+        # ── Check for human chat messages ──
+        human_msg = _check_human_messages(scan_id)
+        if human_msg:
+            log.info("Scan %s: injecting human message: %s", scan_id, human_msg[:100])
+            _log_activity(scan_id, {
+                "type": "chat",
+                "direction": "human",
+                "message": human_msg[:200],
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            # Ensure proper message alternation
+            if messages and messages[-1].get("role") == "user":
+                # Append to existing user message
+                last_content = messages[-1].get("content", "")
+                if isinstance(last_content, str):
+                    messages[-1]["content"] = last_content + f"\n\n[HUMAN MESSAGE]: {human_msg}"
+                else:
+                    # tool_results list — add a new user message pair
+                    messages.append({"role": "assistant", "content": "Acknowledged. Let me address the human's message."})
+                    messages.append({"role": "user", "content": f"[HUMAN MESSAGE]: {human_msg}"})
+            else:
+                messages.append({"role": "user", "content": f"[HUMAN MESSAGE]: {human_msg}"})
 
         # ── Main LLM call ──
         response = client.messages.create(
@@ -977,6 +1110,13 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             "input": str(block.input)[:200],
                             "timestamp": time.strftime("%H:%M:%S"),
                         })
+                    elif block.name == "ask_human":
+                        _log_activity(scan_id, {
+                            "type": "chat",
+                            "direction": "agent_ask",
+                            "message": str(block.input.get("question", ""))[:200],
+                            "timestamp": time.strftime("%H:%M:%S"),
+                        })
                     elif block.name != "report":
                         _log_activity(scan_id, {
                             "type": "tool",
@@ -1026,6 +1166,10 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             text = "".join(
                 b.text for b in response.content if hasattr(b, "text")
             )
+
+            # Post agent's text to chat so human can see it
+            if text.strip():
+                _post_agent_chat(scan_id, text[:1000], "thinking")
 
             # ── Reflector pattern ──
             if not report and reflector_attempts < max_reflector_attempts:
@@ -1084,6 +1228,34 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
 
+    # ── Index findings to Elasticsearch ──
+    try:
+        from modules.infra.elasticsearch import bulk_index
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        es_findings = []
+        for f in report.get("findings", []):
+            es_findings.append({
+                "timestamp": now,
+                "scan_id": scan_id,
+                "target": target,
+                "scan_type": scan_type,
+                "severity": f.get("severity"),
+                "title": f.get("title"),
+                "description": f.get("description", ""),
+                "category": f.get("category", ""),
+                "remediation": f.get("remediation", ""),
+                "cvss_score": f.get("cvss_score"),
+                "cve_id": f.get("cve_id"),
+                "tool": f.get("tool"),
+                "evidence": f.get("evidence", ""),
+                "risk_score": report.get("risk_score"),
+            })
+        if es_findings:
+            bulk_index("scanner-scan-findings", es_findings)
+    except Exception:
+        pass
+
     # Store conversation log
     conv_log = [{"role": m["role"], "content": str(m["content"])[:5000]} for m in messages]
     storage.put_json(f"scans/{scan_id}/agent_log.json", conv_log)
@@ -1133,3 +1305,288 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     )
 
     return report
+
+
+# ── Validation / Exploit Proof-of-Concept Agent ─────────────────────────
+
+VALIDATION_TOOLS = [
+    {
+        "name": "run_command",
+        "description": (
+            "Execute a shell command in the sandbox environment. "
+            "You have access to: python3, curl, nmap, sqlmap, nuclei, nikto, "
+            "openssl, dig, whois, and all standard Linux tools. "
+            "Use this to run exploit scripts, test payloads, or verify vulnerabilities."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell command to execute"},
+                "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 120},
+            },
+            "required": ["command"],
+        },
+    },
+    {
+        "name": "write_file",
+        "description": "Write a file (exploit script, PoC code, config file, etc.)",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path to write"},
+                "content": {"type": "string", "description": "File content"},
+            },
+            "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "read_file",
+        "description": "Read a file from the filesystem.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path to read"},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "http_request",
+        "description": "Make an HTTP request to test endpoints, submit payloads, etc.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "method": {"type": "string", "default": "GET"},
+                "headers": {"type": "object", "default": {}},
+                "body": {"type": "string", "description": "Request body"},
+                "follow_redirects": {"type": "boolean", "default": True},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "submit_result",
+        "description": (
+            "Submit your validation result. Call this when done with your analysis."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "validated": {
+                    "type": "boolean",
+                    "description": "True if vulnerability was confirmed exploitable",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["critical", "high", "medium", "low", "info"],
+                    "description": "Assessed severity after validation",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Summary of what was tested and found",
+                },
+                "proof_of_concept": {
+                    "type": "string",
+                    "description": "Step-by-step PoC instructions to reproduce",
+                },
+                "commands_used": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Commands/scripts used during validation",
+                },
+                "evidence": {
+                    "type": "string",
+                    "description": "Raw output/screenshots proving the vulnerability",
+                },
+                "remediation": {
+                    "type": "string",
+                    "description": "Specific remediation steps",
+                },
+                "risk_rating": {
+                    "type": "string",
+                    "description": "CVSS-like risk assessment",
+                },
+            },
+            "required": ["validated", "summary", "proof_of_concept"],
+        },
+    },
+]
+
+
+def run_validation(task_id: str, user_id: str, request: dict):
+    """
+    Run a validation/exploit PoC task.
+
+    The AI agent attempts to validate a specific security finding by:
+    1. Analyzing the vulnerability details
+    2. Writing and running exploit/test scripts
+    3. Documenting exact reproduction steps
+    4. Producing a PoC report
+
+    Results are streamed to the global chat via Redis.
+    """
+    import redis
+    r = redis.from_url(_REDIS_URL)
+    chat_key = f"global:chat:{user_id}"
+
+    def _post_chat(message, msg_type="progress"):
+        msg = json.dumps({
+            "role": "agent",
+            "message": message,
+            "type": msg_type,
+            "task_id": task_id,
+            "timestamp": time.strftime("%H:%M:%S"),
+            "ts": time.time(),
+        })
+        r.rpush(chat_key, msg)
+        r.expire(chat_key, 86400 * 7)
+
+    target = request.get("target", "")
+    finding = request.get("finding", "")
+    scan_id = request.get("scan_id", "")
+    goal = request.get("goal", "Validate and document this vulnerability with a proof of concept")
+    report_context = request.get("report_context", "")
+
+    _post_chat(f"Starting validation task for: **{finding[:100]}**\nTarget: {target}")
+
+    client = anthropic.Anthropic()
+
+    system_prompt = (
+        "You are an expert penetration tester and security researcher. "
+        "Your task is to VALIDATE a specific security finding by attempting to exploit it "
+        "in a controlled manner. You must document everything precisely.\n\n"
+        f"## Target\n{target}\n\n"
+        f"## Finding to Validate\n{finding}\n\n"
+        f"## Goal\n{goal}\n\n"
+    )
+    if report_context:
+        system_prompt += f"## Scan Report Context\n{report_context[:10000]}\n\n"
+
+    system_prompt += (
+        "## Rules of Engagement\n"
+        "1. Only test the SPECIFIC vulnerability described — do not expand scope\n"
+        "2. Use the minimum necessary payload to prove exploitability\n"
+        "3. Do NOT cause data loss, service disruption, or permanent changes\n"
+        "4. Document every step so it can be reproduced\n"
+        "5. Write Python/bash scripts for complex exploit chains\n"
+        "6. If you cannot validate, explain WHY (false positive, patched, etc.)\n"
+        "7. Include raw command output as evidence\n\n"
+        "## Approach\n"
+        "1. Analyze the vulnerability and plan your validation approach\n"
+        "2. Verify the target is reachable and identify the exact component\n"
+        "3. Craft and send test payloads\n"
+        "4. Capture evidence of success or failure\n"
+        "5. Write a PoC script that can reproduce the finding\n"
+        "6. Call submit_result with your complete findings\n\n"
+        "Think step by step. Be thorough but focused."
+    )
+
+    messages = [{"role": "user", "content": f"Validate this finding: {finding}\n\nTarget: {target}\n\nGoal: {goal}"}]
+
+    start_time = time.time()
+    max_iterations = 40
+    result = None
+
+    for iteration in range(max_iterations):
+        try:
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8000,
+                system=system_prompt,
+                tools=VALIDATION_TOOLS,
+                messages=messages,
+            )
+        except Exception as e:
+            _post_chat(f"Error calling AI: {e}", "error")
+            break
+
+        if response.stop_reason == "tool_use":
+            tool_results = []
+
+            for block in response.content:
+                if block.type == "tool_use":
+                    if block.name == "submit_result":
+                        result = block.input
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": "Result submitted.",
+                        })
+                    else:
+                        # Log progress to chat
+                        if block.name == "run_command":
+                            cmd = block.input.get("command", "")
+                            _post_chat(f"`$ {cmd[:200]}`", "command")
+                        elif block.name == "write_file":
+                            _post_chat(f"Writing: `{block.input.get('path', '')}`", "file")
+
+                        tool_result = handle_tool(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": tool_result,
+                        })
+
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
+
+            if result:
+                break
+
+        elif response.stop_reason == "end_turn":
+            text = "".join(b.text for b in response.content if hasattr(b, "text"))
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": (
+                "You must call submit_result with your findings, even if you could not validate "
+                "the vulnerability. Explain what you tested and what the outcome was."
+            )})
+            if iteration > max_iterations - 3:
+                break
+
+    # Build final response
+    duration = int(time.time() - start_time)
+
+    if result:
+        validated = result.get("validated", False)
+        status_emoji = "CONFIRMED" if validated else "NOT CONFIRMED"
+        severity = result.get("severity", "unknown")
+
+        report_msg = f"## Validation Complete: {status_emoji}\n\n"
+        report_msg += f"**Severity:** {severity}\n"
+        report_msg += f"**Duration:** {duration}s\n\n"
+        report_msg += f"### Summary\n{result.get('summary', 'N/A')}\n\n"
+        report_msg += f"### Proof of Concept\n{result.get('proof_of_concept', 'N/A')}\n\n"
+
+        if result.get("commands_used"):
+            report_msg += "### Commands Used\n"
+            for cmd in result["commands_used"]:
+                report_msg += f"```\n{cmd}\n```\n"
+            report_msg += "\n"
+
+        if result.get("evidence"):
+            report_msg += f"### Evidence\n```\n{result['evidence'][:3000]}\n```\n\n"
+
+        if result.get("remediation"):
+            report_msg += f"### Remediation\n{result['remediation']}\n"
+
+        _post_chat(report_msg, "validation_result")
+
+        # Store validation result
+        storage = get_storage()
+        storage.put_json(f"validations/{task_id}/result.json", {
+            "task_id": task_id,
+            "target": target,
+            "finding": finding,
+            "result": result,
+            "duration_seconds": duration,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    else:
+        _post_chat(
+            f"Validation task completed after {duration}s but no structured result was produced. "
+            "The agent may have encountered issues during testing.",
+            "error",
+        )
+
+    return result

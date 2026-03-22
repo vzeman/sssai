@@ -10,39 +10,25 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
   /* ─── Login overlay ─── */
-  .login-overlay {
-    position: fixed; inset: 0; z-index: 1000;
-    background: var(--bg);
-    display: flex; align-items: center; justify-content: center;
-  }
+  .login-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; align-items: center; justify-content: center; }
   .login-overlay.hidden { display: none; }
-  .login-box {
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-    padding: 2.5rem; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-  }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .login-box .logo { text-align: center; margin-bottom: 1.5rem; }
   .login-box .logo h1 { font-size: 1.5rem; font-weight: 700; }
   .login-box .logo h1 span { color: var(--accent); }
   .login-box .logo p { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
   .login-box .shield { font-size: 2.5rem; margin-bottom: 0.5rem; display: block; }
   .login-box label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 1rem; }
-  .login-box input {
-    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.65rem 0.75rem; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
-  }
+  .login-box input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem 0.75rem; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
   .login-box input:focus { border-color: var(--accent); }
-  .login-box .login-btn {
-    width: 100%; margin-top: 1.5rem; background: var(--accent); color: white; border: none;
-    border-radius: 8px; padding: 0.7rem; font-size: 0.95rem; font-weight: 600; cursor: pointer;
-    transition: opacity 0.2s;
-  }
+  .login-box .login-btn { width: 100%; margin-top: 1.5rem; background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.7rem; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
   .login-box .login-btn:hover { opacity: 0.85; }
   .login-box .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .login-box .login-error { color: var(--red); font-size: 0.8rem; text-align: center; margin-top: 0.75rem; min-height: 1.2em; }
 
   /* ─── Header ─── */
-  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
-  .header h1 { font-size: 1.4rem; font-weight: 600; }
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 0.75rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 1.2rem; font-weight: 600; }
   .header h1 span { color: var(--accent); }
   .header .right { display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
   .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
@@ -52,12 +38,19 @@
   .logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
   .logout-btn:hover { color: var(--red); border-color: var(--red); }
 
-  /* ─── Layout ─── */
-  .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  /* ─── Main Layout: two columns ─── */
+  .main-layout { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 50px); overflow: hidden; }
+  .left-col { overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+
+  /* ─── Cards ─── */
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
-  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-  .full-width { grid-column: 1 / -1; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+
+  /* ─── Stats row ─── */
+  .stats { display: flex; gap: 0.75rem; }
+  .stat { flex: 1; background: var(--bg); border-radius: 8px; padding: 0.6rem; text-align: center; border: 1px solid var(--border); }
+  .stat .val { font-size: 1.3rem; font-weight: 700; }
+  .stat .label { font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
 
   /* ─── Buttons ─── */
   .btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: opacity 0.2s; }
@@ -68,17 +61,17 @@
   .btn.orange { background: var(--orange); }
 
   /* ─── Scan form ─── */
-  .scan-form { display: flex; gap: 0.5rem; }
-  .scan-form input, .scan-form select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; color: var(--text); font-size: 0.85rem; }
+  .scan-form { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .scan-form input, .scan-form select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.65rem; color: var(--text); font-size: 0.82rem; }
   .scan-form input { flex: 1; }
 
   /* ─── Tables ─── */
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
-  td { padding: 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); vertical-align: top; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.4rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.4rem; border-bottom: 1px solid rgba(51,65,85,0.5); vertical-align: top; }
 
   /* ─── Badges ─── */
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
   .badge.queued { background: rgba(59,130,246,0.2); color: var(--accent); }
   .badge.running { background: rgba(234,179,8,0.2); color: var(--yellow); animation: pulse 1.5s infinite; }
   .badge.completed, .badge.done { background: rgba(34,197,94,0.2); color: var(--green); }
@@ -92,60 +85,81 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
 
   /* ─── Risk ─── */
-  .risk-circle { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 700; margin: 0 auto; }
+  .risk-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; margin: 0 auto; }
   .risk-low { border: 4px solid var(--green); color: var(--green); }
   .risk-medium { border: 4px solid var(--yellow); color: var(--yellow); }
   .risk-high { border: 4px solid var(--orange); color: var(--orange); }
   .risk-critical { border: 4px solid var(--red); color: var(--red); }
 
   /* ─── Logs ─── */
-  .log-area { background: #0c0c0c; border-radius: 8px; padding: 0.75rem; font-family: 'SF Mono', Consolas, monospace; font-size: 0.78rem; line-height: 1.6; max-height: 350px; overflow-y: auto; color: #a3e635; white-space: pre-wrap; word-break: break-all; }
+  .log-area { background: #0c0c0c; border-radius: 8px; padding: 0.6rem; font-family: 'SF Mono', Consolas, monospace; font-size: 0.72rem; line-height: 1.5; max-height: 250px; overflow-y: auto; color: #a3e635; white-space: pre-wrap; word-break: break-all; }
   .log-area .ts { color: #64748b; } .log-area .err { color: var(--red); } .log-area .warn { color: var(--yellow); } .log-area .http { color: var(--accent); }
 
   /* ─── Findings ─── */
   .finding { background: var(--bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; border-left: 3px solid var(--muted); }
   .finding.critical { border-left-color: var(--red); } .finding.high { border-left-color: var(--orange); }
   .finding.medium { border-left-color: var(--yellow); } .finding.low { border-left-color: var(--accent); }
-  .finding .f-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+  .finding .f-title { font-weight: 600; font-size: 0.88rem; margin-bottom: 0.25rem; }
   .finding .f-desc { font-size: 0.8rem; color: var(--muted); }
 
-  /* ─── Stats ─── */
-  .stats { display: flex; gap: 1rem; margin-bottom: 1rem; }
-  .stat { flex: 1; background: var(--bg); border-radius: 8px; padding: 0.75rem; text-align: center; }
-  .stat .val { font-size: 1.5rem; font-weight: 700; }
-  .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
-
   /* ─── Tags ─── */
-  .tool-tag { display: inline-block; background: rgba(59,130,246,0.15); color: var(--accent); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; margin: 2px; }
-  .tech-tag { display: inline-block; background: rgba(34,197,94,0.15); color: var(--green); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; margin: 2px; }
-  .empty { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+  .tool-tag { display: inline-block; background: rgba(59,130,246,0.15); color: var(--accent); padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; margin: 2px; }
+  .tech-tag { display: inline-block; background: rgba(34,197,94,0.15); color: var(--green); padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; margin: 2px; }
+  .empty { text-align: center; padding: 1.5rem; color: var(--muted); font-size: 0.85rem; }
 
   /* ─── Tabs ─── */
-  .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
-  .tab { padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; border-bottom: 2px solid transparent; color: var(--muted); transition: all 0.2s; margin-bottom: -1px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+  .tab { padding: 0.4rem 0.8rem; cursor: pointer; font-size: 0.82rem; border-bottom: 2px solid transparent; color: var(--muted); transition: all 0.2s; margin-bottom: -1px; }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); } .tab:hover { color: var(--text); }
   .tab-content { display: none; } .tab-content.active { display: block; }
 
   /* ─── Check items ─── */
-  .check-item { background: var(--bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; display: flex; gap: 0.75rem; align-items: flex-start; border: 1px solid rgba(51,65,85,0.5); }
+  .check-item { background: var(--bg); border-radius: 8px; padding: 0.6rem; margin-bottom: 0.4rem; display: flex; gap: 0.6rem; align-items: flex-start; border: 1px solid rgba(51,65,85,0.5); }
   .check-item:hover { border-color: var(--border); }
-  .check-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; margin-top: 2px; }
+  .check-icon { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; margin-top: 2px; }
   .check-icon.pass { background: rgba(34,197,94,0.15); color: var(--green); }
   .check-icon.running { background: rgba(168,85,247,0.15); color: var(--purple); animation: pulse 1.5s infinite; }
   .check-body { flex: 1; min-width: 0; }
-  .check-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
-  .check-name { font-weight: 600; font-size: 0.85rem; }
-  .check-time { font-size: 0.75rem; color: var(--muted); margin-left: auto; }
-  .check-cmd { font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem; color: var(--muted); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .check-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+  .check-name { font-weight: 600; font-size: 0.82rem; }
+  .check-time { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
+  .check-cmd { font-family: 'SF Mono', Consolas, monospace; font-size: 0.72rem; color: var(--muted); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .progress-bar { height: 4px; background: var(--bg); border-radius: 2px; margin: 0.5rem 0; overflow: hidden; }
   .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 2px; transition: width 0.5s ease; }
-  .phase-header { font-size: 0.8rem; font-weight: 600; color: var(--purple); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.75rem 0 0.25rem; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+  .phase-header { font-size: 0.78rem; font-weight: 600; color: var(--purple); text-transform: uppercase; letter-spacing: 0.05em; padding: 0.6rem 0 0.2rem; border-top: 1px solid var(--border); margin-top: 0.4rem; }
   .phase-header:first-child { border-top: none; margin-top: 0; }
+
+  /* ─── Global Chat (right column) ─── */
+  .chat-col { display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--card); height: calc(100vh - 50px); overflow: hidden; }
+  .chat-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .chat-header h3 { flex: 1; font-size: 0.95rem; font-weight: 600; }
+  .chat-clear { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; cursor: pointer; }
+  .chat-clear:hover { color: var(--red); border-color: var(--red); }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
+  .chat-msg { max-width: 90%; padding: 0.55rem 0.8rem; border-radius: 12px; font-size: 0.83rem; line-height: 1.5; word-wrap: break-word; white-space: pre-wrap; }
+  .chat-msg.human { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 4px; }
+  .chat-msg.agent { align-self: flex-start; background: var(--bg); color: var(--text); border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+  .chat-msg .msg-time { font-size: 0.68rem; opacity: 0.5; margin-top: 0.2rem; }
+  .chat-msg .msg-role { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.1rem; }
+  .chat-msg.agent .msg-role { color: var(--purple); }
+  .chat-msg.human .msg-role { color: rgba(255,255,255,0.7); }
+  .chat-empty { text-align: center; color: var(--muted); font-size: 0.83rem; padding: 2rem 0.75rem; line-height: 1.6; }
+  .chat-input-area { padding: 0.6rem; border-top: 1px solid var(--border); display: flex; gap: 0.4rem; flex-shrink: 0; }
+  .chat-input-area input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; color: var(--text); font-size: 0.83rem; outline: none; }
+  .chat-input-area input:focus { border-color: var(--accent); }
+  .chat-input-area button { background: var(--accent); border: none; color: white; border-radius: 8px; padding: 0.5rem 0.9rem; cursor: pointer; font-size: 0.83rem; font-weight: 500; }
+  .chat-input-area button:hover { opacity: 0.85; }
+  .chat-typing { padding: 0.4rem 0.75rem; font-size: 0.75rem; color: var(--purple); display: none; flex-shrink: 0; }
+  .chat-typing.visible { display: block; animation: pulse 1.5s infinite; }
+
+  /* ─── Action buttons in scan rows ─── */
+  .row-actions { display: flex; gap: 3px; flex-wrap: wrap; }
+  .row-actions .btn { white-space: nowrap; }
 </style>
 </head>
 <body>
 
-<!-- ═══ LOGIN OVERLAY ═══ -->
+<!-- LOGIN OVERLAY -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-box">
     <div class="logo">
@@ -159,14 +173,28 @@
     <input type="password" id="login-password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
     <div class="login-error" id="login-error"></div>
+    <!-- 2FA step (hidden by default) -->
+    <div id="2fa-step" style="display:none; margin-top:1rem;">
+      <label for="login-2fa-code">Two-Factor Authentication Code</label>
+      <input type="text" id="login-2fa-code" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')verify2FA()" style="text-align:center; font-size:1.3rem; letter-spacing:0.3rem;">
+      <button class="login-btn" style="margin-top:0.75rem;" onclick="verify2FA()">Verify</button>
+    </div>
   </div>
 </div>
 
-<!-- ═══ MAIN APP (hidden until logged in) ═══ -->
+<!-- MAIN APP -->
 <div id="app" style="display:none">
 
 <div class="header">
-  <h1>&#128737; Security Scanner <span>Dashboard</span></h1>
+  <div style="display:flex;align-items:center;gap:1.5rem;">
+    <h1>&#128737; Security Scanner <span>Dashboard</span></h1>
+    <div style="display:flex;gap:0.5rem;">
+      <a href="/" style="color:var(--accent);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;background:rgba(59,130,246,0.1);">Dashboard</a>
+      <a href="/analytics" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Analytics</a>
+      <a href="/uptime" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Uptime</a>
+      <a href="/admin" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Admin</a>
+    </div>
+  </div>
   <div class="right">
     <span id="api-status"><span class="dot red"></span> API</span>
     <span class="user-badge" id="user-badge"></span>
@@ -174,61 +202,65 @@
   </div>
 </div>
 
-<div class="container">
-  <div class="card" style="margin-bottom:1.5rem">
-    <h2>+ New Scan</h2>
-    <div class="scan-form">
-      <input type="text" id="target" placeholder="https://example.com" value="https://hzcontainersaleseurope.com">
-      <select id="scan-type">
-        <option value="full">Full Audit</option>
-        <option value="security">Security</option>
-        <option value="pentest">Pentest</option>
-        <option value="seo">SEO</option>
-        <option value="performance">Performance</option>
-        <option value="compliance">Compliance</option>
-        <option value="api_security">API Security</option>
-        <option value="cloud">Cloud</option>
-        <option value="recon">Recon</option>
-        <option value="privacy">Privacy</option>
-        <option value="uptime">Uptime</option>
-      </select>
-      <button class="btn green" onclick="startScan()">Start Scan</button>
+<div class="main-layout">
+  <!-- LEFT COLUMN -->
+  <div class="left-col">
+    <div class="stats">
+      <div class="stat"><div class="val" id="stat-total">0</div><div class="label">Total Scans</div></div>
+      <div class="stat"><div class="val" id="stat-running" style="color:var(--yellow)">0</div><div class="label">Running</div></div>
+      <div class="stat"><div class="val" id="stat-checks" style="color:var(--accent)">0</div><div class="label">Checks</div></div>
+      <div class="stat"><div class="val" id="stat-findings" style="color:var(--orange)">0</div><div class="label">Findings</div></div>
     </div>
-  </div>
 
-  <div class="stats">
-    <div class="stat"><div class="val" id="stat-total">0</div><div class="label">Total Scans</div></div>
-    <div class="stat"><div class="val" id="stat-running" style="color:var(--yellow)">0</div><div class="label">Running</div></div>
-    <div class="stat"><div class="val" id="stat-checks" style="color:var(--accent)">0</div><div class="label">Checks Executed</div></div>
-    <div class="stat"><div class="val" id="stat-findings" style="color:var(--orange)">0</div><div class="label">Findings</div></div>
-  </div>
+    <!-- UPTIME WIDGET -->
+    <div class="card" id="uptime-widget" style="display:none">
+      <h2 style="cursor:pointer" onclick="window.open('/uptime','_blank')">&#128994; Uptime Monitors <span style="margin-left:auto;font-size:0.75rem;color:var(--accent);font-weight:400">Open full view &#8594;</span></h2>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap" id="uptime-badges"></div>
+      <div id="uptime-incidents" style="margin-top:0.5rem"></div>
+    </div>
 
-  <div class="grid">
+    <!-- SCANS (with new scan form integrated) -->
     <div class="card">
       <h2>&#128270; Scans</h2>
+      <div class="scan-form">
+        <input type="text" id="target" placeholder="https://example.com">
+        <select id="scan-type">
+          <option value="full">Full Audit</option>
+          <option value="security">Security</option>
+          <option value="pentest">Pentest</option>
+          <option value="seo">SEO</option>
+          <option value="performance">Performance</option>
+          <option value="compliance">Compliance</option>
+          <option value="api_security">API Security</option>
+          <option value="cloud">Cloud</option>
+          <option value="recon">Recon</option>
+          <option value="privacy">Privacy</option>
+          <option value="uptime">Uptime</option>
+          <option value="owasp">OWASP Top 10</option>
+          <option value="chatbot">Chatbot Security</option>
+        </select>
+        <button class="btn green" onclick="startScan()">Start</button>
+      </div>
       <table>
         <thead><tr><th>Target</th><th>Type</th><th>Status</th><th>Risk</th><th>Created</th><th></th></tr></thead>
         <tbody id="scans-table"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
-    <div class="card">
-      <h2>&#128196; Worker Logs</h2>
-      <div class="log-area" id="log-area">Connecting...</div>
-    </div>
-
-    <div class="card full-width" id="checks-card" style="display:none">
+    <!-- LIVE CHECKS -->
+    <div class="card" id="checks-card" style="display:none">
       <h2>
         <span style="animation:pulse 1.5s infinite">&#9889;</span>
         Live Scan: <span id="checks-target"></span>
         <span class="badge running" id="checks-status">running</span>
-        <span style="margin-left:auto;font-size:0.8rem;color:var(--muted)" id="checks-count"></span>
+        <span style="margin-left:auto;font-size:0.78rem;color:var(--muted)" id="checks-count"></span>
       </h2>
       <div class="progress-bar"><div class="progress-fill" id="checks-progress" style="width:0%"></div></div>
       <div id="checks-area"></div>
     </div>
 
-    <div class="card full-width" id="scan-detail" style="display:none">
+    <!-- SCAN DETAIL -->
+    <div class="card" id="scan-detail" style="display:none">
       <h2>&#128202; Scan Report: <span id="detail-target"></span></h2>
       <div class="tabs">
         <div class="tab active" data-tab="findings-tab" onclick="switchTab(this)">Findings</div>
@@ -244,23 +276,55 @@
       <div class="tab-content" id="agent-tab"></div>
     </div>
 
-    <div class="card full-width">
-      <h2>&#128295; Available Tools (by category)</h2>
+    <!-- WORKER LOGS -->
+    <div class="card">
+      <h2>&#128196; Worker Logs</h2>
+      <div class="log-area" id="log-area">Connecting...</div>
+    </div>
+
+    <!-- TOOLS -->
+    <div class="card">
+      <h2>&#128295; Available Tools</h2>
       <div id="tools-area"><div class="empty">Loading tools...</div></div>
     </div>
   </div>
+
+  <!-- RIGHT COLUMN: GLOBAL CHAT -->
+  <div class="chat-col">
+    <div class="chat-header">
+      <span style="font-size:1rem">&#129302;</span>
+      <h3>AI Security Assistant</h3>
+      <button class="chat-clear" onclick="clearChat()">Clear</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-empty">
+        I'm your AI security assistant. I can help you:<br><br>
+        &#128270; Plan and start security scans<br>
+        &#128202; Analyze scan results and findings<br>
+        &#128274; Discuss vulnerabilities and remediation<br>
+        &#9881;&#65039; Suggest optimal scan configurations<br><br>
+        Try: "Scan example.com for vulnerabilities" or "What did the last scan find?"
+      </div>
+    </div>
+    <div class="chat-typing" id="chat-typing">AI is thinking...</div>
+    <div class="chat-input-area">
+      <input type="text" id="chat-input" placeholder="Ask about security, scans, findings..." onkeydown="if(event.key==='Enter')sendChatMsg()">
+      <button onclick="sendChatMsg()">Send</button>
+    </div>
+  </div>
 </div>
+
 </div><!-- /app -->
 
 <script>
-const API = '';
-let token = '';
-let userEmail = '';
-let refreshTimer = null;
-let selectedScan = null;
-let lastActivities = [];
+var API = '';
+var token = '';
+var userEmail = '';
+var refreshTimer = null;
+var selectedScan = null;
+var lastActivities = [];
 
-const TOOL_NAMES = {
+var TOOL_NAMES = {
   'nmap':'Nmap Port Scanner','nuclei':'Nuclei Vulnerability Scanner','whatweb':'WhatWeb Tech Detection',
   'subfinder':'Subfinder Subdomains','amass':'OWASP Amass OSINT','wafw00f':'WAF Detection',
   'testssl':'testssl.sh TLS Analysis','sslyze':'SSLyze Deep SSL Scan','nikto':'Nikto Web Scanner',
@@ -273,7 +337,7 @@ const TOOL_NAMES = {
   'wapiti':'Wapiti Web Fuzzer','ffuf':'FFUF Fuzzer','masscan':'Masscan Port Scanner',
   'hey':'Hey Load Tester','wrk':'WRK Benchmark','timeout':'Timeout Wrapper',
 };
-const PHASES = {
+var PHASES = {
   'dns_lookup':'Reconnaissance','nmap':'Reconnaissance','whatweb':'Reconnaissance','subfinder':'Reconnaissance',
   'amass':'Reconnaissance','wafw00f':'Reconnaissance','whois':'Reconnaissance','http_request':'Reconnaissance',
   'nuclei':'Security Assessment','testssl':'Security Assessment','sslyze':'Security Assessment',
@@ -285,33 +349,47 @@ const PHASES = {
   'lighthouse':'Performance & SEO','pa11y':'Accessibility','curl':'HTTP Analysis',
   'dig':'DNS & Email Security','checkdmarc':'DNS & Email Security',
 };
-function getToolName(cmd) { if(!cmd) return 'unknown'; const p=cmd.trim().split(/\s+/); let n=p[0]; if(n==='timeout'&&p.length>2) n=p[2]; return n.replace(/^.*\//,''); }
+function getToolName(cmd) { if(!cmd) return 'unknown'; var p=cmd.trim().split(/\s+/); var n=p[0]; if(n==='timeout'&&p.length>2) n=p[2]; return n.replace(/^.*\//,''); }
 function getPhase(t) { return PHASES[t]||'Other'; }
 function getFriendlyName(t) { return TOOL_NAMES[t]||t; }
 
 // ═══ AUTH ═══
+var tokenRefreshTimer = null;
+var pendingTotpToken = '';
+
 async function doLogin() {
-  const email = document.getElementById('login-email').value;
-  const pw = document.getElementById('login-password').value;
-  const errEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
+  var email = document.getElementById('login-email').value;
+  var pw = document.getElementById('login-password').value;
+  var errEl = document.getElementById('login-error');
+  var btn = document.getElementById('login-btn');
   if (!email || !pw) { errEl.textContent = 'Please enter email and password'; return; }
   btn.disabled = true; btn.textContent = 'Signing in...'; errEl.textContent = '';
   try {
-    const res = await fetch(API + '/api/auth/login', {
+    var res = await fetch(API + '/api/auth/login', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ email, password: pw }),
+      credentials: 'same-origin',
+      body: JSON.stringify({ email: email, password: pw }),
     });
+    var data = await res.json();
     if (res.ok) {
-      const data = await res.json();
-      token = data.access_token;
-      userEmail = email;
-      localStorage.setItem('scanner_token', token);
-      localStorage.setItem('scanner_email', email);
-      showApp();
+      if (data.requires_2fa) {
+        // Show 2FA input
+        pendingTotpToken = data.access_token;
+        document.getElementById('login-email').parentElement.querySelectorAll('label, input:not(#login-2fa-code), #login-btn').forEach(function(el) { if (el.id !== '2fa-step') el.style.display = 'none'; });
+        document.getElementById('login-btn').style.display = 'none';
+        document.getElementById('2fa-step').style.display = 'block';
+        document.getElementById('login-2fa-code').focus();
+        errEl.textContent = '';
+      } else {
+        token = data.access_token;
+        userEmail = email;
+        localStorage.setItem('scanner_token', token);
+        localStorage.setItem('scanner_email', email);
+        scheduleTokenRefresh();
+        showApp();
+      }
     } else {
-      const err = await res.json().catch(()=>({}));
-      errEl.textContent = err.detail || 'Invalid email or password';
+      errEl.textContent = data.detail || 'Invalid email or password';
     }
   } catch(e) {
     errEl.textContent = 'Cannot connect to server';
@@ -319,11 +397,44 @@ async function doLogin() {
   btn.disabled = false; btn.textContent = 'Sign In';
 }
 
-function doLogout() {
+async function verify2FA() {
+  var code = document.getElementById('login-2fa-code').value.trim();
+  var errEl = document.getElementById('login-error');
+  if (!code || code.length < 6) { errEl.textContent = 'Enter your 6-digit code'; return; }
+  try {
+    var res = await fetch(API + '/api/auth/verify-2fa', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({ totp_token: pendingTotpToken, code: code }),
+    });
+    var data = await res.json();
+    if (res.ok) {
+      token = data.access_token;
+      userEmail = localStorage.getItem('scanner_email') || document.getElementById('login-email').value;
+      localStorage.setItem('scanner_token', token);
+      scheduleTokenRefresh();
+      showApp();
+    } else {
+      errEl.textContent = data.detail || 'Invalid code';
+      document.getElementById('login-2fa-code').value = '';
+    }
+  } catch(e) { errEl.textContent = 'Connection error'; }
+}
+
+async function doLogout() {
+  try {
+    await fetch(API + '/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      credentials: 'same-origin',
+    });
+  } catch(e) {}
   token = ''; userEmail = '';
   localStorage.removeItem('scanner_token');
   localStorage.removeItem('scanner_email');
   if (refreshTimer) clearInterval(refreshTimer);
+  if (chatPollTimer) clearInterval(chatPollTimer);
+  if (tokenRefreshTimer) clearInterval(tokenRefreshTimer);
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-overlay').classList.remove('hidden');
   document.getElementById('login-email').value = '';
@@ -331,20 +442,45 @@ function doLogout() {
   document.getElementById('login-error').textContent = '';
 }
 
+function scheduleTokenRefresh() {
+  if (tokenRefreshTimer) clearInterval(tokenRefreshTimer);
+  // Refresh token every 25 minutes (access token expires in 30)
+  tokenRefreshTimer = setInterval(async function() {
+    try {
+      var res = await fetch(API + '/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        credentials: 'same-origin',
+      });
+      if (res.ok) {
+        var data = await res.json();
+        token = data.access_token;
+        localStorage.setItem('scanner_token', token);
+      } else {
+        doLogout();
+      }
+    } catch(e) { /* network error, will retry next interval */ }
+  }, 25 * 60 * 1000);
+}
+
 function showApp() {
   document.getElementById('login-overlay').classList.add('hidden');
   document.getElementById('app').style.display = 'block';
   document.getElementById('user-badge').textContent = userEmail;
   loadTools();
+  loadGlobalChat();
   refresh();
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refresh, 5000);
+  if (chatPollTimer) clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(loadGlobalChat, 3000);
 }
 
-async function apiCall(path, opts = {}) {
-  const headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
+async function apiCall(path, opts) {
+  opts = opts || {};
+  var headers = Object.assign({'Content-Type':'application/json'}, opts.headers || {});
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  let res = await fetch(API + path, { ...opts, headers });
+  var res = await fetch(API + path, Object.assign({}, opts, {headers: headers}));
   if (res.status === 401) { doLogout(); }
   return res;
 }
@@ -352,7 +488,7 @@ async function apiCall(path, opts = {}) {
 // ═══ HEALTH ═══
 async function checkHealth() {
   try {
-    const res = await fetch(API + '/health');
+    var res = await fetch(API + '/health');
     if (res.ok) { document.getElementById('api-status').innerHTML = '<span class="dot green"></span> API'; return; }
   } catch(e) {}
   document.getElementById('api-status').innerHTML = '<span class="dot red"></span> API';
@@ -361,53 +497,63 @@ async function checkHealth() {
 // ═══ SCANS ═══
 async function loadScans() {
   try {
-    const res = await apiCall('/api/scans/');
+    var res = await apiCall('/api/scans/');
     if (!res.ok) return;
-    const scans = await res.json();
-    const tbody = document.getElementById('scans-table');
+    var scans = await res.json();
+    var tbody = document.getElementById('scans-table');
     if (!scans.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No scans yet. Start one above!</td></tr>'; return; }
-    let running=0, totalFindings=0;
-    tbody.innerHTML = scans.map(s => {
+    var running=0, totalFindings=0;
+    var html = '';
+    for (var i = 0; i < scans.length; i++) {
+      var s = scans[i];
       if (s.status==='queued'||s.status==='running') running++;
       totalFindings += s.findings_count||0;
-      const risk = s.risk_score!=null ? s.risk_score : '-';
-      return `<tr style="cursor:pointer" onclick="selectScan('${s.id}')">
-        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.target}">${s.target}</td>
-        <td>${s.scan_type}</td>
-        <td><span class="badge ${s.status}">${s.status}</span></td>
-        <td>${risk}</td>
-        <td style="font-size:0.8rem;color:var(--muted)">${new Date(s.created_at).toLocaleTimeString()}</td>
-        <td>${s.status==='completed'?'<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>':''}${(s.status==='failed'||s.status==='completed')?'<button class="btn sm" style="background:var(--purple);margin-left:4px" onclick="event.stopPropagation();retryScan(\''+s.id+'\')">Retry</button>':''}</td>
-      </tr>`;
-    }).join('');
+      var risk = s.risk_score!=null ? s.risk_score : '-';
+      var actions = '<div class="row-actions">';
+      if (s.status==='completed') actions += '<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>';
+      if (s.status==='failed'||s.status==='completed') actions += '<button class="btn sm" style="background:var(--purple)" onclick="event.stopPropagation();retryScan(\''+s.id+'\')">Retry</button>';
+      actions += '</div>';
+      html += '<tr style="cursor:pointer" onclick="selectScan(\''+s.id+'\')">';
+      html += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+s.target+'">'+s.target+'</td>';
+      html += '<td>'+s.scan_type+'</td>';
+      html += '<td><span class="badge '+s.status+'">'+s.status+'</span></td>';
+      html += '<td>'+risk+'</td>';
+      html += '<td style="font-size:0.75rem;color:var(--muted)">'+new Date(s.created_at).toLocaleTimeString()+'</td>';
+      html += '<td>'+actions+'</td>';
+      html += '</tr>';
+    }
+    tbody.innerHTML = html;
     document.getElementById('stat-total').textContent = scans.length;
     document.getElementById('stat-running').textContent = running;
     document.getElementById('stat-findings').textContent = totalFindings;
-  } catch(e) {}
+  } catch(e) {
+    console.error('loadScans error:', e);
+    document.getElementById('scans-table').innerHTML = '<tr><td colspan="6" class="empty">Error loading scans: '+e.message+'</td></tr>';
+  }
 }
 
 async function startScan() {
-  const target = document.getElementById('target').value;
-  const scanType = document.getElementById('scan-type').value;
+  var target = document.getElementById('target').value;
+  var scanType = document.getElementById('scan-type').value;
   if (!target) return;
-  const res = await apiCall('/api/scans/', { method:'POST', body: JSON.stringify({target,scan_type:scanType}) });
+  var res = await apiCall('/api/scans/', { method:'POST', body: JSON.stringify({target:target,scan_type:scanType}) });
   if (res.ok) refresh();
 }
 
 // ═══ LIVE CHECKS ═══
 async function loadChecks() {
   try {
-    const res = await apiCall('/api/scans/');
+    var res = await apiCall('/api/scans/');
     if (!res.ok) return;
-    const scans = await res.json();
-    const runningScan = scans.find(s => s.status==='running'||s.status==='queued');
+    var scans = await res.json();
+    var runningScan = null;
+    for (var i=0; i<scans.length; i++) { if (scans[i].status==='running'||scans[i].status==='queued') { runningScan=scans[i]; break; } }
     if (!runningScan) {
-      const recent = scans[0];
-      if (recent && lastActivities.length > 0) {
+      if (scans[0] && lastActivities.length > 0) {
         document.getElementById('checks-card').style.display = 'block';
-        document.getElementById('checks-target').textContent = recent.target;
-        document.getElementById('checks-status').textContent = recent.status;
-        document.getElementById('checks-status').className = 'badge '+recent.status;
+        document.getElementById('checks-target').textContent = scans[0].target;
+        document.getElementById('checks-status').textContent = scans[0].status;
+        document.getElementById('checks-status').className = 'badge '+scans[0].status;
         document.getElementById('checks-progress').style.width = '100%';
       } else {
         document.getElementById('checks-card').style.display = 'none';
@@ -419,37 +565,39 @@ async function loadChecks() {
     document.getElementById('checks-status').textContent = runningScan.status;
     document.getElementById('checks-status').className = 'badge '+runningScan.status;
 
-    const actRes = await fetch(API+`/api/scans/${runningScan.id}/activity`);
+    var actRes = await fetch(API+'/api/scans/'+runningScan.id+'/activity');
     if (!actRes.ok) return;
-    const data = await actRes.json();
-    const activities = data.activities || [];
+    var data = await actRes.json();
+    var activities = data.activities || [];
     lastActivities = activities;
-    const cmdCount = activities.filter(a=>a.type==='command').length;
+    var cmdCount = 0;
+    for (var i=0;i<activities.length;i++) { if (activities[i].type==='command') cmdCount++; }
     document.getElementById('stat-checks').textContent = cmdCount;
-    document.getElementById('checks-count').textContent = cmdCount+' checks executed';
+    document.getElementById('checks-count').textContent = cmdCount+' checks';
     document.getElementById('checks-progress').style.width = Math.min(95,Math.round(cmdCount/30*100))+'%';
     renderChecks(activities);
   } catch(e) {}
 }
 
 function renderChecks(activities) {
-  const el = document.getElementById('checks-area');
+  var el = document.getElementById('checks-area');
   if (!activities.length) { el.innerHTML = '<div class="empty">Waiting for scan to begin...</div>'; return; }
-  let html='', currentPhase='';
-  activities.forEach((a,idx) => {
-    const isLast = idx===activities.length-1;
-    let toolName,phase,friendlyName,cmd;
+  var html='', currentPhase='';
+  for (var idx=0; idx<activities.length; idx++) {
+    var a = activities[idx];
+    var isLast = idx===activities.length-1;
+    var toolName, phase, friendlyName, cmd;
     if (a.type==='command') { toolName=getToolName(a.command); cmd=a.command; }
     else { toolName=a.tool; cmd=a.input||''; }
     phase=getPhase(toolName); friendlyName=getFriendlyName(toolName);
-    if (phase!==currentPhase) { currentPhase=phase; html+=`<div class="phase-header">${phase}</div>`; }
-    const iconCls=isLast?'running':'pass', icon=isLast?'&#9658;':'&#10003;';
-    const badge=isLast?'<span class="badge active">running</span>':'<span class="badge done">done</span>';
-    html+=`<div class="check-item"><div class="check-icon ${iconCls}">${icon}</div><div class="check-body">
-      <div class="check-header"><span class="check-name">${friendlyName}</span>${badge}<span class="check-time">${a.timestamp||''}</span></div>
-      <div class="check-cmd" title="${(cmd||'').replace(/"/g,'&quot;')}">${cmd||''}</div>
-    </div></div>`;
-  });
+    if (phase!==currentPhase) { currentPhase=phase; html+='<div class="phase-header">'+phase+'</div>'; }
+    var iconCls=isLast?'running':'pass', icon=isLast?'&#9658;':'&#10003;';
+    var badge=isLast?'<span class="badge active">running</span>':'<span class="badge done">done</span>';
+    html+='<div class="check-item"><div class="check-icon '+iconCls+'">'+icon+'</div><div class="check-body">';
+    html+='<div class="check-header"><span class="check-name">'+friendlyName+'</span>'+badge+'<span class="check-time">'+(a.timestamp||'')+'</span></div>';
+    html+='<div class="check-cmd" title="'+(cmd||'').replace(/"/g,'&quot;')+'">'+(cmd||'')+'</div>';
+    html+='</div></div>';
+  }
   el.innerHTML = html;
 }
 
@@ -458,31 +606,41 @@ async function selectScan(scanId) {
   selectedScan = scanId;
   document.getElementById('scan-detail').style.display = 'block';
   try {
-    const res = await apiCall(`/api/scans/${scanId}/report`);
+    var res = await apiCall('/api/scans/'+scanId+'/report');
     if (res.ok) { renderReport(await res.json(), scanId); }
     else {
       document.getElementById('detail-target').textContent = scanId.slice(0,8)+'...';
       document.getElementById('findings-tab').innerHTML = '<div class="empty">Report not ready yet. Scan may still be running.</div>';
-      ['summary-tab','tech-tab','surface-tab','agent-tab'].forEach(id=>document.getElementById(id).innerHTML='');
+      var ids = ['summary-tab','tech-tab','surface-tab','agent-tab'];
+      for (var i=0;i<ids.length;i++) document.getElementById(ids[i]).innerHTML='';
     }
   } catch(e) {}
 }
 
 function renderReport(r, scanId) {
-  document.getElementById('detail-target').textContent = r.target||r.scan_metadata?.target||'';
-  const riskClass = (r.risk_score||0)>=75?'risk-critical':(r.risk_score||0)>=50?'risk-high':(r.risk_score||0)>=25?'risk-medium':'risk-low';
-  const findings = r.findings||[];
-  document.getElementById('findings-tab').innerHTML = findings.length ? findings.map(f=>`
-    <div class="finding ${(f.severity||'info').toLowerCase()}">
-      <div class="f-title"><span class="badge ${(f.severity||'info').toLowerCase()}">${f.severity||'info'}</span> ${f.title||f.name||'Finding'}</div>
-      <div class="f-desc">${f.description||''}</div>
-      ${f.remediation?'<div style="margin-top:0.25rem;font-size:0.8rem;color:var(--green)">Remediation: '+f.remediation+'</div>':''}
-      ${f.cwes?.length?'<div style="margin-top:0.25rem;font-size:0.75rem;color:var(--muted)">CWE: '+f.cwes.join(', ')+'</div>':''}
-      ${f.owasp_category?'<div style="font-size:0.75rem;color:var(--muted)">OWASP: '+f.owasp_category+'</div>':''}
-      ${f.affected_urls?.length?'<div style="font-size:0.75rem;color:var(--accent);margin-top:0.25rem">Affected: '+f.affected_urls.join(', ')+'</div>':''}
-    </div>`).join('') : '<div class="empty">No findings</div>';
+  document.getElementById('detail-target').textContent = r.target||(r.scan_metadata?r.scan_metadata.target:'')||'';
+  var riskClass = (r.risk_score||0)>=75?'risk-critical':(r.risk_score||0)>=50?'risk-high':(r.risk_score||0)>=25?'risk-medium':'risk-low';
+  var findings = r.findings||[];
+  var fHtml = '';
+  if (findings.length) {
+    for (var i=0;i<findings.length;i++) {
+      var f = findings[i];
+      var sev = (f.severity||'info').toLowerCase();
+      fHtml += '<div class="finding '+sev+'">';
+      fHtml += '<div class="f-title"><span class="badge '+sev+'">'+(f.severity||'info')+'</span> '+(f.title||f.name||'Finding')+'</div>';
+      fHtml += '<div class="f-desc">'+(f.description||'')+'</div>';
+      if (f.remediation) fHtml += '<div style="margin-top:0.25rem;font-size:0.8rem;color:var(--green)">Remediation: '+f.remediation+'</div>';
+      if (f.cwes&&f.cwes.length) fHtml += '<div style="margin-top:0.25rem;font-size:0.75rem;color:var(--muted)">CWE: '+f.cwes.join(', ')+'</div>';
+      if (f.owasp_category) fHtml += '<div style="font-size:0.75rem;color:var(--muted)">OWASP: '+f.owasp_category+'</div>';
+      if (f.affected_urls&&f.affected_urls.length) fHtml += '<div style="font-size:0.75rem;color:var(--accent);margin-top:0.25rem">Affected: '+f.affected_urls.join(', ')+'</div>';
+      fHtml += '</div>';
+    }
+  } else {
+    fHtml = '<div class="empty">No findings</div>';
+  }
+  document.getElementById('findings-tab').innerHTML = fHtml;
 
-  var summaryHtml = '<div style="text-align:center;margin:1rem 0"><div class="risk-circle '+riskClass+'">'+(r.risk_score!=null?r.risk_score:'-')+'</div><div style="margin-top:0.5rem;color:var(--muted);font-size:0.85rem">Risk Score (0-100)</div></div>';
+  var summaryHtml = '<div style="text-align:center;margin:1rem 0"><div class="risk-circle '+riskClass+'">'+(r.risk_score!=null?r.risk_score:'-')+'</div><div style="margin-top:0.5rem;color:var(--muted);font-size:0.85rem">Risk Score</div></div>';
   summaryHtml += '<div style="padding:1rem;background:var(--bg);border-radius:8px;font-size:0.85rem;line-height:1.7">'+(r.summary||'No summary')+'</div>';
   if (r.scan_metadata) {
     summaryHtml += '<div style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.8rem">';
@@ -499,9 +657,14 @@ function renderReport(r, scanId) {
   document.getElementById('summary-tab').innerHTML = summaryHtml;
 
   var techs = r.technologies_detected||r.technologies||[];
-  document.getElementById('tech-tab').innerHTML = techs.length
-    ? '<div style="display:flex;flex-wrap:wrap;gap:4px">'+techs.map(function(t){return '<span class="tech-tag">'+(typeof t==='string'?t:t.name||JSON.stringify(t))+'</span>';}).join('')+'</div>'
-    : '<div class="empty">No technologies detected</div>';
+  if (techs.length) {
+    var techHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    for (var i=0;i<techs.length;i++) { var t=techs[i]; techHtml+='<span class="tech-tag">'+(typeof t==='string'?t:t.name||JSON.stringify(t))+'</span>'; }
+    techHtml += '</div>';
+    document.getElementById('tech-tab').innerHTML = techHtml;
+  } else {
+    document.getElementById('tech-tab').innerHTML = '<div class="empty">No technologies detected</div>';
+  }
 
   var as = r.attack_surface;
   document.getElementById('surface-tab').innerHTML = as
@@ -518,7 +681,13 @@ function renderReport(r, scanId) {
   document.getElementById('agent-tab').innerHTML = agentHtml;
 }
 
-async function viewReport(scanId) { window.open('/api/reports/'+scanId+'/html?token='+encodeURIComponent(token),'_blank'); }
+async function viewReport(scanId) {
+  try {
+    var res = await apiCall('/api/reports/'+scanId+'/html/token');
+    if (res.ok) { var data = await res.json(); window.open(data.url, '_blank'); }
+    else { alert('Could not generate report link'); }
+  } catch(e) { alert('Error: '+e.message); }
+}
 
 async function retryScan(scanId) {
   try {
@@ -540,9 +709,9 @@ async function retryScan(scanId) {
 // ═══ TOOLS ═══
 async function loadTools() {
   try {
-    const res = await fetch(API+'/api/tools/');
+    var res = await fetch(API+'/api/tools/');
     if (!res.ok) return;
-    const data = await res.json();
+    var data = await res.json();
     var cats = data.categories || data;
     if (!Array.isArray(cats)) return;
     var html='';
@@ -550,7 +719,7 @@ async function loadTools() {
       var cat = cats[i];
       var catName = cat.category_name || cat.category || 'Unknown';
       var tools = cat.tools || [];
-      html+='<div style="margin-bottom:0.75rem"><strong style="font-size:0.85rem;color:var(--muted)">'+catName+'</strong><div>';
+      html+='<div style="margin-bottom:0.5rem"><strong style="font-size:0.8rem;color:var(--muted)">'+catName+'</strong><div>';
       for (var j=0; j<tools.length; j++) {
         var t = tools[j];
         var desc = (t.description||'').replace(/"/g,'&quot;');
@@ -563,35 +732,71 @@ async function loadTools() {
 }
 
 // ═══ LOGS ═══
-let lastLogLen=0;
+var lastLogLen=0;
 async function loadLogs() {
   try {
-    const res = await fetch(API+'/api/logs/worker');
+    var res = await fetch(API+'/api/logs/worker');
     if (!res.ok) return;
-    const data = await res.json();
-    const el = document.getElementById('log-area');
-    const lines = (data.logs||'').split('\n').filter(l=>l.trim());
+    var data = await res.json();
+    var el = document.getElementById('log-area');
+    var lines = (data.logs||'').split('\n').filter(function(l){return l.trim();});
     if (!lines.length) { el.textContent='No logs yet.'; return; }
-    el.innerHTML = lines.map(line => {
-      let cls='';
-      if (line.includes('ERROR')||line.includes('Exception')) cls='err';
-      else if (line.includes('WARNING')) cls='warn';
-      else if (line.includes('HTTP Request')) cls='http';
-      const ts=line.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
-      if (ts) line=`<span class="ts">${ts[0]}</span>`+line.slice(ts[0].length);
-      return cls?`<span class="${cls}">${line}</span>`:line;
-    }).join('\n');
+    var html = '';
+    for (var i=0;i<lines.length;i++) {
+      var line = lines[i];
+      var cls='';
+      if (line.indexOf('ERROR')!==-1||line.indexOf('Exception')!==-1) cls='err';
+      else if (line.indexOf('WARNING')!==-1) cls='warn';
+      else if (line.indexOf('HTTP Request')!==-1) cls='http';
+      var ts=line.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+      if (ts) line='<span class="ts">'+ts[0]+'</span>'+line.slice(ts[0].length);
+      html += (cls?'<span class="'+cls+'">'+line+'</span>':line)+'\n';
+    }
+    el.innerHTML = html;
     if (lines.length!==lastLogLen) { el.scrollTop=el.scrollHeight; lastLogLen=lines.length; }
   } catch(e) {}
 }
 
 // ═══ TABS ═══
 function switchTab(el) {
-  el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  var tabs = el.parentElement.querySelectorAll('.tab');
+  for (var i=0;i<tabs.length;i++) tabs[i].classList.remove('active');
   el.classList.add('active');
-  const parent=el.closest('.card');
-  parent.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  var parent = el.closest('.card');
+  var contents = parent.querySelectorAll('.tab-content');
+  for (var i=0;i<contents.length;i++) contents[i].classList.remove('active');
   parent.querySelector('#'+el.dataset.tab).classList.add('active');
+}
+
+// ═══ UPTIME WIDGET ═══
+async function loadUptimeWidget() {
+  try {
+    var res = await apiCall('/api/monitors/summary');
+    if (!res.ok) return;
+    var data = await res.json();
+    var widget = document.getElementById('uptime-widget');
+    if (data.total === 0) { widget.style.display = 'none'; return; }
+    widget.style.display = 'block';
+
+    var html = '';
+    html += '<span style="font-size:0.8rem;color:var(--green);font-weight:600">'+data.up+' up</span>';
+    if (data.down > 0) html += ' <span style="font-size:0.8rem;color:var(--red);font-weight:600;animation:pulse 1.5s infinite">'+data.down+' DOWN</span>';
+    if (data.degraded > 0) html += ' <span style="font-size:0.8rem;color:var(--yellow);font-weight:600">'+data.degraded+' degraded</span>';
+    html += ' <span style="font-size:0.75rem;color:var(--muted)">of '+data.total+' monitors</span>';
+    document.getElementById('uptime-badges').innerHTML = html;
+
+    var incHtml = '';
+    if (data.incidents_24h && data.incidents_24h.length > 0) {
+      for (var i = 0; i < Math.min(data.incidents_24h.length, 3); i++) {
+        var inc = data.incidents_24h[i];
+        incHtml += '<div style="font-size:0.78rem;padding:0.2rem 0;color:var(--red)">';
+        incHtml += '<strong>'+inc.monitor_name+'</strong> '+inc.status;
+        if (inc.error) incHtml += ' - '+inc.error;
+        incHtml += '</div>';
+      }
+    }
+    document.getElementById('uptime-incidents').innerHTML = incHtml;
+  } catch(e) {}
 }
 
 // ═══ REFRESH ═══
@@ -600,25 +805,186 @@ async function refresh() {
   await loadScans();
   await loadLogs();
   await loadChecks();
+  await loadUptimeWidget();
+}
+
+// ═══ GLOBAL CHAT ═══
+var chatPollTimer = null;
+var chatLastCount = 0;
+var chatWaiting = false;
+
+async function loadGlobalChat() {
+  if (!token) return;
+  try {
+    var res = await fetch(API + '/api/chat', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var msgs = data.messages || [];
+    var el = document.getElementById('chat-messages');
+    if (!msgs.length) {
+      el.innerHTML = '<div class="chat-empty">I\'m your AI security assistant. I can help you:<br><br>&#128270; Plan and start security scans<br>&#128202; Analyze scan results and findings<br>&#128274; Discuss vulnerabilities and remediation<br>&#9881;&#65039; Suggest optimal scan configurations<br><br>Try: "Scan example.com for vulnerabilities" or "What did the last scan find?"</div>';
+      chatLastCount = 0;
+      return;
+    }
+    if (msgs.length === chatLastCount) return;
+    var wasWaiting = chatWaiting;
+    chatLastCount = msgs.length;
+    // Check if last message is from agent — stop waiting indicator
+    if (msgs[msgs.length-1].role === 'agent') {
+      chatWaiting = false;
+      document.getElementById('chat-typing').classList.remove('visible');
+      // Check for action blocks in the response
+      var lastMsg = msgs[msgs.length-1].message || '';
+      handleChatActions(lastMsg);
+    }
+    var html = '';
+    for (var i = 0; i < msgs.length; i++) {
+      var m = msgs[i];
+      var role = m.role || 'human';
+      var isAgent = role === 'agent';
+      var cls = isAgent ? 'agent' : 'human';
+      html += '<div class="chat-msg ' + cls + '">';
+      html += '<div class="msg-role">' + (isAgent ? 'AI Assistant' : 'You') + '</div>';
+      html += '<div>' + formatChatMsg(m.message || '') + '</div>';
+      html += '<div class="msg-time">' + (m.timestamp || '') + '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+  } catch (e) {}
+}
+
+function formatChatMsg(text) {
+  // Escape HTML
+  text = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Bold **text**
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Inline code `text`
+  text = text.replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;font-size:0.8em">$1</code>');
+  // Code blocks ```action ... ```  — highlight as action
+  text = text.replace(/```action\n?([\s\S]*?)```/g, '<div style="background:rgba(168,85,247,0.1);border:1px solid var(--purple);border-radius:6px;padding:0.5rem;margin:0.4rem 0;font-family:monospace;font-size:0.8em">$1</div>');
+  // Other code blocks
+  text = text.replace(/```\w*\n?([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:0.5rem;border-radius:6px;margin:0.3rem 0;font-size:0.8em;overflow-x:auto">$1</pre>');
+  return text;
+}
+
+function handleChatActions(text) {
+  // Look for action blocks like ```action\n{"action":"create_scan",...}\n```
+  var actionMatch = text.match(/```action\s*\n?\s*(\{[\s\S]*?\})\s*\n?```/);
+  if (!actionMatch) return;
+  try {
+    var action = JSON.parse(actionMatch[1]);
+    if (action.action === 'create_scan' && action.target) {
+      document.getElementById('target').value = action.target;
+      if (action.scan_type) {
+        var sel = document.getElementById('scan-type');
+        for (var i=0;i<sel.options.length;i++) {
+          if (sel.options[i].value === action.scan_type) { sel.selectedIndex = i; break; }
+        }
+      }
+      if (confirm('AI suggests scanning ' + action.target + ' (' + (action.scan_type||'full') + '). Start scan now?')) {
+        startScan();
+      }
+    } else if (action.action === 'validate_finding' && action.target && action.finding) {
+      if (confirm('AI wants to validate: "' + action.finding.substring(0,80) + '"\nThis will run exploit code in the sandbox. Proceed?')) {
+        startValidation(action);
+      }
+    }
+  } catch(e) {}
+}
+
+async function sendChatMsg() {
+  if (!token) return;
+  var input = document.getElementById('chat-input');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  // Optimistically show the message
+  var el = document.getElementById('chat-messages');
+  var emptyEl = el.querySelector('.chat-empty');
+  if (emptyEl) emptyEl.remove();
+  el.innerHTML += '<div class="chat-msg human"><div class="msg-role">You</div><div>' + formatChatMsg(msg) + '</div><div class="msg-time">now</div></div>';
+  el.scrollTop = el.scrollHeight;
+  // Show typing indicator
+  chatWaiting = true;
+  document.getElementById('chat-typing').classList.add('visible');
+  try {
+    await fetch(API + '/api/chat', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+  } catch (e) {
+    chatWaiting = false;
+    document.getElementById('chat-typing').classList.remove('visible');
+  }
+}
+
+async function startValidation(action) {
+  try {
+    var res = await fetch(API + '/api/validate', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target: action.target,
+        finding: action.finding,
+        scan_id: action.scan_id || '',
+        goal: action.goal || 'Validate and document this vulnerability with a proof of concept',
+      }),
+    });
+    if (res.ok) {
+      var data = await res.json();
+      // The validation agent will stream results to global chat
+    }
+  } catch(e) {
+    console.error('Validation error:', e);
+  }
+}
+
+async function clearChat() {
+  if (!confirm('Clear chat history?')) return;
+  try {
+    await fetch(API + '/api/chat', {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    chatLastCount = 0;
+    loadGlobalChat();
+  } catch(e) {}
 }
 
 // ═══ INIT ═══
 (async function init() {
-  // Try restore session
   token = localStorage.getItem('scanner_token') || '';
   userEmail = localStorage.getItem('scanner_email') || '';
   if (token) {
-    // Verify token is still valid
     try {
-      const res = await fetch(API+'/api/scans/', { headers: { 'Authorization':'Bearer '+token } });
-      if (res.ok) { showApp(); return; }
+      var res = await fetch(API+'/api/auth/me', { headers: { 'Authorization':'Bearer '+token } });
+      if (res.ok) {
+        var me = await res.json();
+        userEmail = me.email;
+        localStorage.setItem('scanner_email', userEmail);
+        scheduleTokenRefresh();
+        showApp();
+        return;
+      }
+      // Token expired — try refresh
+      var rr = await fetch(API+'/api/auth/refresh', { method:'POST', headers:{'Authorization':'Bearer '+token}, credentials:'same-origin' });
+      if (rr.ok) {
+        var data = await rr.json();
+        token = data.access_token;
+        localStorage.setItem('scanner_token', token);
+        scheduleTokenRefresh();
+        showApp();
+        return;
+      }
     } catch(e) {}
-    // Token expired
     token=''; userEmail='';
     localStorage.removeItem('scanner_token');
     localStorage.removeItem('scanner_email');
   }
-  // Show login
   document.getElementById('login-overlay').classList.remove('hidden');
 })();
 </script>

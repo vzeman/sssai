@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uptime Monitoring</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6; --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316; --purple: #a855f7; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 0.75rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 1.2rem; font-weight: 600; }
+  .header h1 span { color: var(--accent); }
+  .header .nav { display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; }
+  .header a { color: var(--muted); text-decoration: none; }
+  .header a:hover { color: var(--accent); }
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .stats { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+  .stat { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+  .stat .val { font-size: 1.8rem; font-weight: 700; }
+  .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; }
+  .btn:hover { opacity: 0.85; }
+  .btn.sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  .btn.green { background: var(--green); }
+  .btn.red { background: var(--red); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge.up { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge.down { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.degraded { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); }
+  .empty { text-align: center; padding: 2rem; color: var(--muted); }
+  .form-row { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .form-row input, .form-row select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.65rem; color: var(--text); font-size: 0.85rem; }
+  .form-row input { flex: 1; min-width: 200px; }
+  .detail-panel { display: none; }
+  .detail-panel.open { display: block; }
+  .uptime-bar { display: flex; gap: 1px; height: 32px; border-radius: 6px; overflow: hidden; margin: 0.75rem 0; }
+  .uptime-bar .tick { flex: 1; min-width: 2px; transition: background 0.2s; }
+  .uptime-bar .tick.up { background: var(--green); }
+  .uptime-bar .tick.down { background: var(--red); }
+  .uptime-bar .tick.degraded { background: var(--yellow); }
+  .uptime-bar .tick.none { background: var(--border); }
+  .log-entry { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-bottom: 1px solid rgba(51,65,85,0.3); font-size: 0.82rem; }
+  .log-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .log-dot.up { background: var(--green); }
+  .log-dot.down { background: var(--red); }
+  .log-dot.degraded { background: var(--yellow); }
+  .log-time { color: var(--muted); font-size: 0.75rem; min-width: 140px; }
+  .log-ms { color: var(--accent); font-size: 0.8rem; min-width: 60px; text-align: right; }
+  .log-error { color: var(--red); font-size: 0.78rem; }
+  .checks-scroll { max-height: 400px; overflow-y: auto; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 28px; vertical-align: middle; }
+  .spark .bar { width: 3px; min-height: 1px; border-radius: 1px; transition: height 0.2s; }
+  .spark .bar.up { background: var(--green); }
+  .spark .bar.down { background: var(--red); }
+  .spark .bar.degraded { background: var(--yellow); }
+  .cnt-ok { color: var(--green); font-weight: 600; font-size: 0.8rem; }
+  .cnt-fail { color: var(--red); font-weight: 600; font-size: 0.8rem; }
+  .cnt-deg { color: var(--yellow); font-weight: 600; font-size: 0.8rem; }
+  .cnt-total { color: var(--muted); font-size: 0.75rem; }
+  .uptime-pct { font-weight: 700; font-size: 0.85rem; }
+  .uptime-pct.good { color: var(--green); }
+  .uptime-pct.warn { color: var(--yellow); }
+  .uptime-pct.bad { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:1.5rem;">
+    <h1>&#128994; Uptime <span>Monitoring</span></h1>
+    <div style="display:flex;gap:0.5rem;">
+      <a href="/" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Dashboard</a>
+      <a href="/analytics" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Analytics</a>
+      <a href="/uptime" style="color:var(--accent);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;background:rgba(59,130,246,0.1);">Uptime</a>
+      <a href="/admin" style="color:var(--muted);text-decoration:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.85rem;">Admin</a>
+    </div>
+  </div>
+  <div class="nav">
+    <span id="user-badge" style="color:var(--accent)"></span>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats" id="stats-row">
+    <div class="stat"><div class="val" id="stat-total" style="color:var(--accent)">-</div><div class="label">Monitors</div></div>
+    <div class="stat"><div class="val" id="stat-up" style="color:var(--green)">-</div><div class="label">Up</div></div>
+    <div class="stat"><div class="val" id="stat-down" style="color:var(--red)">-</div><div class="label">Down</div></div>
+    <div class="stat"><div class="val" id="stat-degraded" style="color:var(--yellow)">-</div><div class="label">Degraded</div></div>
+  </div>
+
+  <!-- Add Monitor -->
+  <div class="card">
+    <h2>+ Add Monitor</h2>
+    <div class="form-row">
+      <input type="text" id="mon-name" placeholder="Name (optional)">
+      <input type="text" id="mon-target" placeholder="https://example.com">
+      <select id="mon-type">
+        <option value="http">HTTP</option>
+        <option value="tcp">TCP</option>
+        <option value="dns">DNS</option>
+        <option value="tls">TLS/SSL</option>
+      </select>
+      <select id="mon-interval">
+        <option value="60">Every 1 min</option>
+        <option value="120">Every 2 min</option>
+        <option value="300" selected>Every 5 min</option>
+        <option value="600">Every 10 min</option>
+        <option value="1800">Every 30 min</option>
+        <option value="3600">Every 1 hour</option>
+      </select>
+      <button class="btn green" onclick="addMonitor()">Add</button>
+    </div>
+  </div>
+
+  <!-- Monitors List -->
+  <div class="card">
+    <h2>&#128994; Monitors</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Status</th><th>Uptime</th><th>Checks</th><th>Avg</th><th>Response Time</th><th>Last Check</th><th></th></tr></thead>
+      <tbody id="monitors-table"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Detail Panel (shown when a monitor is selected) -->
+  <div class="card detail-panel" id="detail-panel">
+    <h2>&#128200; <span id="detail-name"></span>
+      <span class="badge" id="detail-status" style="margin-left:0.5rem"></span>
+      <span style="margin-left:auto;font-size:0.8rem;color:var(--muted)" id="detail-uptime"></span>
+    </h2>
+
+    <!-- Uptime bar (visual timeline) -->
+    <div style="font-size:0.75rem;color:var(--muted);display:flex;justify-content:space-between"><span>24h ago</span><span>Now</span></div>
+    <div class="uptime-bar" id="uptime-bar"></div>
+
+    <!-- Stats -->
+    <div class="stats" style="margin:0.75rem 0">
+      <div class="stat"><div class="val" id="d-uptime" style="color:var(--green)">-</div><div class="label">Uptime %</div></div>
+      <div class="stat"><div class="val" id="d-avg" style="color:var(--accent)">-</div><div class="label">Avg Response</div></div>
+      <div class="stat"><div class="val" id="d-min">-</div><div class="label">Min</div></div>
+      <div class="stat"><div class="val" id="d-max">-</div><div class="label">Max</div></div>
+      <div class="stat"><div class="val" id="d-incidents" style="color:var(--red)">-</div><div class="label">Incidents</div></div>
+    </div>
+
+    <!-- Check log -->
+    <h2 style="margin-top:1rem">&#128203; Check Log</h2>
+    <div class="checks-scroll" id="checks-log"></div>
+  </div>
+
+  <!-- Incidents -->
+  <div class="card" id="incidents-card" style="display:none">
+    <h2 style="color:var(--red)">&#9888;&#65039; Recent Incidents (24h)</h2>
+    <div id="incidents-list"></div>
+  </div>
+</div>
+
+<script>
+var API = '';
+var token = localStorage.getItem('scanner_token') || '';
+var userEmail = localStorage.getItem('scanner_email') || '';
+var selectedMonitor = null;
+
+document.getElementById('user-badge').textContent = userEmail;
+
+if (!token) { window.location.href = '/'; }
+
+async function apiCall(path, opts) {
+  opts = opts || {};
+  var headers = Object.assign({'Content-Type':'application/json'}, opts.headers || {});
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  var res = await fetch(API + path, Object.assign({}, opts, {headers: headers}));
+  if (res.status === 401) { window.location.href = '/'; }
+  return res;
+}
+
+// ═══ Load monitors ═══
+async function loadMonitors() {
+  try {
+    var res = await apiCall('/api/monitors/enriched?hours=24');
+    if (!res.ok) return;
+    var monitors = await res.json();
+    var tbody = document.getElementById('monitors-table');
+    if (!monitors.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">No monitors yet. Add one above!</td></tr>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < monitors.length; i++) {
+      var m = monitors[i];
+      var statusCls = m.last_status || 'none';
+      var statusText = m.last_status || 'pending';
+      var lastCheck = m.last_checked_at ? new Date(m.last_checked_at).toLocaleString() : 'never';
+
+      // Uptime percentage with color
+      var uptimeCls = 'good';
+      if (m.uptime_pct !== null) {
+        if (m.uptime_pct < 95) uptimeCls = 'bad';
+        else if (m.uptime_pct < 99.5) uptimeCls = 'warn';
+      }
+
+      // Build sparkline
+      var sparkHtml = buildSparkline(m.sparkline || []);
+
+      html += '<tr style="cursor:pointer" onclick="selectMonitor(\''+m.id+'\')">';
+      // Name + URL
+      html += '<td><strong>'+(m.name||m.target)+'</strong>';
+      html += '<div style="font-size:0.72rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+m.target+'">'+m.target+'</div></td>';
+      // Status
+      html += '<td><span class="badge '+statusCls+'">'+statusText+'</span>';
+      html += '<div style="font-size:0.7rem;color:var(--muted)">'+m.check_type.toUpperCase()+'</div></td>';
+      // Uptime %
+      html += '<td><span class="uptime-pct '+uptimeCls+'">'+(m.uptime_pct !== null ? m.uptime_pct + '%' : '-')+'</span></td>';
+      // Checks: ok / fail / total
+      html += '<td>';
+      html += '<span class="cnt-ok">'+m.ok_checks+'</span>';
+      if (m.failed_checks > 0) html += ' <span class="cnt-fail">'+m.failed_checks+'</span>';
+      if (m.degraded_checks > 0) html += ' <span class="cnt-deg">'+m.degraded_checks+'</span>';
+      html += ' <span class="cnt-total">/ '+m.total_checks+'</span>';
+      html += '</td>';
+      // Avg response
+      html += '<td>'+(m.avg_ms !== null ? m.avg_ms + 'ms' : '-')+'</td>';
+      // Sparkline
+      html += '<td>'+sparkHtml+'</td>';
+      // Last check
+      html += '<td style="font-size:0.75rem;color:var(--muted)">'+lastCheck+'</td>';
+      // Actions
+      html += '<td>';
+      html += '<button class="btn sm" onclick="event.stopPropagation();toggleMonitor(\''+m.id+'\','+(!m.is_active)+')" style="background:'+(m.is_active?'var(--yellow)':'var(--green)')+'">'+( m.is_active?'Pause':'Resume')+'</button> ';
+      html += '<button class="btn sm red" onclick="event.stopPropagation();deleteMonitor(\''+m.id+'\')">Del</button>';
+      html += '</td></tr>';
+    }
+    tbody.innerHTML = html;
+  } catch(e) { console.error('loadMonitors:', e); }
+}
+
+function buildSparkline(data) {
+  if (!data.length) return '<span style="color:var(--muted);font-size:0.75rem">no data</span>';
+  // Find max for scaling
+  var maxMs = 1;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i].ms > maxMs) maxMs = data[i].ms;
+  }
+  var html = '<div class="spark" title="Response time over 24h">';
+  for (var i = 0; i < data.length; i++) {
+    var d = data[i];
+    var h = Math.max(2, Math.round((d.ms / maxMs) * 26));
+    var cls = d.s || 'up';
+    html += '<div class="bar '+cls+'" style="height:'+h+'px"></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ═══ Summary ═══
+async function loadSummary() {
+  try {
+    var res = await apiCall('/api/monitors/summary');
+    if (!res.ok) return;
+    var data = await res.json();
+    document.getElementById('stat-total').textContent = data.total;
+    document.getElementById('stat-up').textContent = data.up;
+    document.getElementById('stat-down').textContent = data.down;
+    document.getElementById('stat-degraded').textContent = data.degraded;
+
+    var incCard = document.getElementById('incidents-card');
+    if (data.incidents_24h && data.incidents_24h.length > 0) {
+      incCard.style.display = 'block';
+      var html = '';
+      for (var i = 0; i < data.incidents_24h.length; i++) {
+        var inc = data.incidents_24h[i];
+        html += '<div class="log-entry">';
+        html += '<div class="log-dot '+inc.status+'"></div>';
+        html += '<div class="log-time">'+inc.checked_at+'</div>';
+        html += '<strong>'+inc.monitor_name+'</strong>';
+        html += '<span class="badge '+inc.status+'">'+inc.status+'</span>';
+        if (inc.error) html += '<span class="log-error">'+inc.error+'</span>';
+        html += '</div>';
+      }
+      document.getElementById('incidents-list').innerHTML = html;
+    } else {
+      incCard.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+// ═══ Add monitor ═══
+async function addMonitor() {
+  var name = document.getElementById('mon-name').value.trim();
+  var target = document.getElementById('mon-target').value.trim();
+  var checkType = document.getElementById('mon-type').value;
+  var interval = parseInt(document.getElementById('mon-interval').value);
+  if (!target) return;
+  try {
+    var res = await apiCall('/api/monitors/', {
+      method: 'POST',
+      body: JSON.stringify({ name: name, target: target, check_type: checkType, interval_seconds: interval }),
+    });
+    if (res.ok) {
+      document.getElementById('mon-name').value = '';
+      document.getElementById('mon-target').value = '';
+      refresh();
+    }
+  } catch(e) {}
+}
+
+// ═══ Toggle / Delete ═══
+async function toggleMonitor(id, active) {
+  await apiCall('/api/monitors/'+id, { method: 'PATCH', body: JSON.stringify({ is_active: active }) });
+  refresh();
+}
+
+async function deleteMonitor(id) {
+  if (!confirm('Delete this monitor?')) return;
+  await apiCall('/api/monitors/'+id, { method: 'DELETE' });
+  document.getElementById('detail-panel').classList.remove('open');
+  refresh();
+}
+
+// ═══ Select monitor → show detail ═══
+async function selectMonitor(id) {
+  selectedMonitor = id;
+  document.getElementById('detail-panel').classList.add('open');
+
+  // Load stats
+  try {
+    var res = await apiCall('/api/monitors/'+id+'/stats?hours=24');
+    if (res.ok) {
+      var s = await res.json();
+      document.getElementById('d-uptime').textContent = s.uptime_percent != null ? s.uptime_percent + '%' : '-';
+      document.getElementById('d-avg').textContent = s.avg_response_ms != null ? s.avg_response_ms + 'ms' : '-';
+      document.getElementById('d-min').textContent = s.min_response_ms != null ? s.min_response_ms + 'ms' : '-';
+      document.getElementById('d-max').textContent = s.max_response_ms != null ? s.max_response_ms + 'ms' : '-';
+      document.getElementById('d-incidents').textContent = s.incidents;
+      document.getElementById('detail-uptime').textContent = 'Uptime: ' + (s.uptime_percent != null ? s.uptime_percent + '%' : 'N/A') + ' (24h)';
+    }
+  } catch(e) {}
+
+  // Load monitor info
+  try {
+    var res = await apiCall('/api/monitors/'+id);
+    if (res.ok) {
+      var m = await res.json();
+      document.getElementById('detail-name').textContent = m.name || m.target;
+      document.getElementById('detail-status').textContent = m.last_status || 'pending';
+      document.getElementById('detail-status').className = 'badge ' + (m.last_status || '');
+    }
+  } catch(e) {}
+
+  // Load checks
+  try {
+    var res = await apiCall('/api/monitors/'+id+'/checks?hours=24&limit=500');
+    if (res.ok) {
+      var checks = await res.json();
+      renderUptimeBar(checks);
+      renderCheckLog(checks);
+    }
+  } catch(e) {}
+}
+
+function renderUptimeBar(checks) {
+  var bar = document.getElementById('uptime-bar');
+  if (!checks.length) { bar.innerHTML = '<div class="tick none" style="flex:1"></div>'; return; }
+
+  // Group checks into ~90 buckets across 24h
+  var buckets = 90;
+  var now = Date.now();
+  var dayMs = 24 * 60 * 60 * 1000;
+  var bucketSize = dayMs / buckets;
+  var grid = [];
+  for (var i = 0; i < buckets; i++) grid[i] = 'none';
+
+  for (var i = 0; i < checks.length; i++) {
+    var c = checks[i];
+    var age = now - new Date(c.checked_at).getTime();
+    var idx = buckets - 1 - Math.floor(age / bucketSize);
+    if (idx >= 0 && idx < buckets) {
+      if (c.status === 'down') grid[idx] = 'down';
+      else if (c.status === 'degraded' && grid[idx] !== 'down') grid[idx] = 'degraded';
+      else if (grid[idx] === 'none') grid[idx] = c.status;
+    }
+  }
+
+  var html = '';
+  for (var i = 0; i < buckets; i++) {
+    html += '<div class="tick '+grid[i]+'" title="'+grid[i]+'"></div>';
+  }
+  bar.innerHTML = html;
+}
+
+function renderCheckLog(checks) {
+  var el = document.getElementById('checks-log');
+  if (!checks.length) { el.innerHTML = '<div class="empty">No checks recorded yet</div>'; return; }
+  var html = '';
+  for (var i = 0; i < Math.min(checks.length, 200); i++) {
+    var c = checks[i];
+    html += '<div class="log-entry">';
+    html += '<div class="log-dot '+c.status+'"></div>';
+    html += '<div class="log-time">'+new Date(c.checked_at).toLocaleString()+'</div>';
+    html += '<span class="badge '+c.status+'">'+c.status+'</span>';
+    html += '<div class="log-ms">'+(c.response_ms||0)+'ms</div>';
+    if (c.status_code) html += '<span style="color:var(--muted);font-size:0.78rem">HTTP '+c.status_code+'</span>';
+    if (c.error) html += '<span class="log-error">'+c.error+'</span>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+// ═══ Refresh ═══
+async function refresh() {
+  await loadSummary();
+  await loadMonitors();
+  if (selectedMonitor) await selectMonitor(selectedMonitor);
+}
+
+// ═══ Init ═══
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>

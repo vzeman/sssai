@@ -25,3 +25,15 @@ def get_secrets():
         return SecretsManagerStore()
     from modules.infra.local_secrets import EnvSecrets
     return EnvSecrets()
+
+
+def get_es():
+    """Return the Elasticsearch client singleton."""
+    from modules.infra.elasticsearch import get_client
+    return get_client()
+
+
+def setup_es():
+    """Create ES indices and ILM policies."""
+    from modules.infra.elasticsearch import setup_indices
+    return setup_indices()

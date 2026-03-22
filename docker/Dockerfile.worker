@@ -99,7 +99,7 @@ RUN npm install -g yellowlabtools artillery backstopjs sitespeed.io 2>/dev/null 
 # ─── Core Python dependencies (must succeed) ──────────────────────────
 RUN pip3 install --no-cache-dir \
     anthropic boto3 redis httpx pydantic jinja2 weasyprint pyyaml \
-    sqlalchemy psycopg2-binary
+    sqlalchemy psycopg2-binary "elasticsearch>=8.13,<9"
 
 # ─── Python security tools (best-effort) ──────────────────────────────
 RUN pip3 install --no-cache-dir \

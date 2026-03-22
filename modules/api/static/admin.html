@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Scanner — User Management</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6; --green: #22c55e; --yellow: #eab308; --red: #ef4444; --orange: #f97316; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 0.75rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 1.2rem; font-weight: 600; }
+  .header h1 span { color: var(--accent); }
+  .header .right { display: flex; gap: 1rem; align-items: center; font-size: 0.85rem; color: var(--muted); }
+  .nav-links { display: flex; gap: 0.5rem; }
+  .nav-links a { color: var(--muted); text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.85rem; transition: all 0.2s; }
+  .nav-links a:hover, .nav-links a.active { color: var(--accent); background: rgba(59,130,246,0.1); }
+  .user-badge { background: rgba(59,130,246,0.15); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.8rem; }
+  .logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 3px 10px; font-size: 0.8rem; cursor: pointer; }
+  .logout-btn:hover { color: var(--red); border-color: var(--red); }
+  .content { max-width: 900px; margin: 2rem auto; padding: 0 2rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; }
+  .form-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .form-row input, .form-row select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 0.75rem; color: var(--text); font-size: 0.9rem; outline: none; flex: 1; }
+  .form-row input:focus { border-color: var(--accent); }
+  .btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: opacity 0.2s; }
+  .btn:hover { opacity: 0.85; }
+  .btn.red { background: var(--red); }
+  .btn.green { background: var(--green); }
+  .btn.orange { background: var(--orange); }
+  .btn.sm { padding: 0.35rem 0.65rem; font-size: 0.8rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.6rem; border-bottom: 1px solid var(--border); }
+  td { padding: 0.6rem; border-bottom: 1px solid rgba(51,65,85,0.5); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.72rem; font-weight: 600; }
+  .badge.active { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge.inactive { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.locked { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .badge.admin { background: rgba(168,85,247,0.2); color: #a855f7; }
+  .alert { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; }
+  .alert.success { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+  .alert.error { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; width: 400px; }
+  .modal h3 { margin-bottom: 1rem; font-size: 1rem; }
+  .modal label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 0.75rem; }
+  .modal input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem; color: var(--text); font-size: 0.9rem; }
+  .modal .actions { display: flex; gap: 0.5rem; margin-top: 1.25rem; justify-content: flex-end; }
+  .empty { color: var(--muted); text-align: center; padding: 2rem; }
+  .pw-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+
+  /* Login */
+  .login-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .login-overlay.hidden { display: none; }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; width: 380px; }
+  .login-box label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 1rem; }
+  .login-box input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem; color: var(--text); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2.5rem;">&#x1F6E1;</div>
+      <h1 style="font-size:1.5rem;"><span style="color:var(--accent)">Security</span> Scanner</h1>
+      <p style="color:var(--muted); font-size:0.85rem;">Admin Login</p>
+    </div>
+    <label>Email</label>
+    <input id="loginEmail" placeholder="admin@scanner.local">
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%; margin-top:1.5rem;" onclick="doLogin()">Sign In</button>
+    <div id="loginError" style="color:var(--red); font-size:0.8rem; text-align:center; margin-top:0.75rem;"></div>
+  </div>
+</div>
+
+<div class="header">
+  <div style="display:flex; align-items:center; gap:1.5rem;">
+    <h1>&#x1F6E1; <span>Security</span> Scanner</h1>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/analytics">Analytics</a>
+      <a href="/uptime">Uptime</a>
+      <a href="/admin" class="active">Admin</a>
+    </div>
+  </div>
+  <div class="right">
+    <span class="user-badge" id="userBadge"></span>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
+  </div>
+</div>
+
+<div class="content" id="mainContent" style="display:none;">
+  <div id="alertBox"></div>
+
+  <!-- My Account -->
+  <div class="card">
+    <h2>My Account</h2>
+    <div class="form-row">
+      <input id="currentPw" type="password" placeholder="Current password">
+      <input id="newPw" type="password" placeholder="New password (min 8, upper+lower+digit)">
+      <button class="btn" onclick="changePassword()">Change Password</button>
+    </div>
+    <!-- 2FA Section -->
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border);">
+      <h3 style="font-size:0.95rem; margin-bottom:0.75rem;">Two-Factor Authentication (2FA)</h3>
+      <div id="2fa-status"></div>
+      <div id="2fa-setup" style="display:none;">
+        <p style="font-size:0.85rem; color:var(--muted); margin-bottom:0.75rem;">Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to verify.</p>
+        <div style="text-align:center; margin:1rem 0;">
+          <img id="2fa-qr" style="border-radius:8px; background:white; padding:8px;" width="200" height="200">
+        </div>
+        <div id="2fa-secret-display" style="text-align:center; font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem;"></div>
+        <div class="form-row">
+          <input id="2fa-verify-code" type="text" placeholder="6-digit code" maxlength="6" inputmode="numeric" style="text-align:center; font-size:1.1rem; letter-spacing:0.2rem;">
+          <button class="btn green" onclick="enable2FA()">Enable 2FA</button>
+          <button class="btn" style="background:var(--border);" onclick="cancel2FASetup()">Cancel</button>
+        </div>
+      </div>
+      <div id="2fa-disable" style="display:none;">
+        <div class="form-row">
+          <input id="2fa-disable-code" type="text" placeholder="Enter 6-digit code to disable" maxlength="6" inputmode="numeric">
+          <button class="btn red" onclick="disable2FA()">Disable 2FA</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User -->
+  <div class="card">
+    <h2>Create New User</h2>
+    <div class="form-row">
+      <input id="newEmail" type="email" placeholder="Email">
+      <input id="newUserPw" type="password" placeholder="Password">
+      <select id="newPlan"><option value="free">Free</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
+      <button class="btn green" onclick="createUser()">Create</button>
+    </div>
+    <div class="pw-hint">Password: min 8 characters, at least 1 uppercase, 1 lowercase, 1 digit</div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="card">
+    <h2>Users</h2>
+    <table>
+      <thead><tr><th>Email</th><th>Plan</th><th>Status</th><th>Last Login</th><th>Failed Attempts</th><th>Created</th><th>Actions</th></tr></thead>
+      <tbody id="usersTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <h3>Reset Password</h3>
+    <input id="resetUserId" type="hidden">
+    <label>User</label>
+    <input id="resetUserEmail" disabled>
+    <label>Current Password (yours)</label>
+    <input id="resetAdminPw" type="password" placeholder="Your admin password">
+    <label>New Password</label>
+    <input id="resetNewPw" type="password" placeholder="New password for user">
+    <div class="pw-hint">Min 8 characters, at least 1 uppercase, 1 lowercase, 1 digit</div>
+    <div class="actions">
+      <button class="btn" style="background:var(--border)" onclick="closeModal('resetModal')">Cancel</button>
+      <button class="btn orange" onclick="doResetPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('scanner_token') || '';
+let currentUserId = '';
+
+function hdrs() { return { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }; }
+
+function showAlert(msg, type) {
+  document.getElementById('alertBox').innerHTML = `<div class="alert ${type}">${msg}</div>`;
+  setTimeout(() => { document.getElementById('alertBox').innerHTML = ''; }, 5000);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const pass = document.getElementById('loginPass').value;
+  try {
+    const r = await fetch(API + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ email, password: pass }) });
+    const d = await r.json();
+    if (d.access_token) { TOKEN = d.access_token; localStorage.setItem('scanner_token', TOKEN); document.getElementById('loginOverlay').classList.add('hidden'); init(); }
+    else { document.getElementById('loginError').textContent = d.detail || 'Login failed'; }
+  } catch(e) { document.getElementById('loginError').textContent = 'Connection error'; }
+}
+
+async function doLogout() {
+  try { await fetch(API + '/api/auth/logout', { method: 'POST', headers: hdrs(), credentials: 'same-origin' }); } catch(e) {}
+  TOKEN = ''; localStorage.removeItem('scanner_token'); location.reload();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function init() {
+  try {
+    const r = await fetch(API + '/api/auth/me', { headers: hdrs() });
+    if (r.status === 401) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
+    const me = await r.json();
+    currentUserId = me.id;
+    document.getElementById('userBadge').textContent = me.email;
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('loginOverlay').classList.add('hidden');
+    load2FAStatus(me);
+    loadUsers();
+  } catch(e) { document.getElementById('loginOverlay').classList.remove('hidden'); }
+}
+
+// ─── 2FA Management ───
+function load2FAStatus(me) {
+  const el = document.getElementById('2fa-status');
+  if (me.totp_enabled) {
+    el.innerHTML = '<span class="badge active" style="font-size:0.85rem;">2FA Enabled</span> <button class="btn sm red" style="margin-left:0.5rem;" onclick="show2FADisable()">Disable 2FA</button>';
+    document.getElementById('2fa-setup').style.display = 'none';
+    document.getElementById('2fa-disable').style.display = 'none';
+  } else {
+    el.innerHTML = '<span class="badge inactive" style="font-size:0.85rem;">2FA Not Enabled</span> <button class="btn sm green" style="margin-left:0.5rem;" onclick="start2FASetup()">Set Up 2FA</button>';
+    document.getElementById('2fa-setup').style.display = 'none';
+    document.getElementById('2fa-disable').style.display = 'none';
+  }
+}
+
+async function start2FASetup() {
+  const r = await fetch(API + '/api/auth/2fa/setup', { method: 'POST', headers: hdrs() });
+  const d = await r.json();
+  if (!r.ok) { showAlert(d.detail || 'Error', 'error'); return; }
+  document.getElementById('2fa-qr').src = API + '/api/auth/2fa/qrcode?_t=' + Date.now();
+  document.getElementById('2fa-qr').style.display = 'block';
+  // Add auth header for image load
+  fetch(API + '/api/auth/2fa/qrcode', { headers: { 'Authorization': 'Bearer ' + TOKEN } })
+    .then(r => r.blob())
+    .then(blob => { document.getElementById('2fa-qr').src = URL.createObjectURL(blob); });
+  document.getElementById('2fa-secret-display').textContent = 'Manual entry key: ' + d.secret;
+  document.getElementById('2fa-setup').style.display = 'block';
+  document.getElementById('2fa-verify-code').value = '';
+  document.getElementById('2fa-verify-code').focus();
+}
+
+function cancel2FASetup() {
+  document.getElementById('2fa-setup').style.display = 'none';
+}
+
+async function enable2FA() {
+  const code = document.getElementById('2fa-verify-code').value.trim();
+  if (!code || code.length < 6) { showAlert('Enter the 6-digit code from your authenticator', 'error'); return; }
+  const r = await fetch(API + '/api/auth/2fa/enable', { method: 'POST', headers: hdrs(), body: JSON.stringify({ code }) });
+  const d = await r.json();
+  if (r.ok) {
+    showAlert('2FA enabled successfully! You will need to enter a code on next login.', 'success');
+    document.getElementById('2fa-setup').style.display = 'none';
+    // Refresh status
+    const mr = await fetch(API + '/api/auth/me', { headers: hdrs() });
+    if (mr.ok) load2FAStatus(await mr.json());
+  } else { showAlert(d.detail || 'Invalid code', 'error'); }
+}
+
+function show2FADisable() {
+  document.getElementById('2fa-disable').style.display = 'block';
+  document.getElementById('2fa-disable-code').value = '';
+  document.getElementById('2fa-disable-code').focus();
+}
+
+async function disable2FA() {
+  const code = document.getElementById('2fa-disable-code').value.trim();
+  if (!code || code.length < 6) { showAlert('Enter your 6-digit code to confirm', 'error'); return; }
+  const r = await fetch(API + '/api/auth/2fa/disable', { method: 'POST', headers: hdrs(), body: JSON.stringify({ code }) });
+  const d = await r.json();
+  if (r.ok) {
+    showAlert('2FA disabled', 'success');
+    document.getElementById('2fa-disable').style.display = 'none';
+    const mr = await fetch(API + '/api/auth/me', { headers: hdrs() });
+    if (mr.ok) load2FAStatus(await mr.json());
+  } else { showAlert(d.detail || 'Invalid code', 'error'); }
+}
+
+async function loadUsers() {
+  try {
+    const r = await fetch(API + '/api/auth/users', { headers: hdrs() });
+    if (r.status === 403) {
+      document.getElementById('usersTable').innerHTML = '<tr><td colspan="7" class="empty">Admin access required (first registered user is admin)</td></tr>';
+      return;
+    }
+    const users = await r.json();
+    if (!users.length) { document.getElementById('usersTable').innerHTML = '<tr><td colspan="7" class="empty">No users</td></tr>'; return; }
+
+    document.getElementById('usersTable').innerHTML = users.map((u, i) => {
+      const isMe = u.id === currentUserId;
+      const statusBadge = u.is_active === false ? '<span class="badge inactive">Disabled</span>'
+        : '<span class="badge active">Active</span>';
+      const adminBadge = i === 0 ? ' <span class="badge admin">Admin</span>' : '';
+      return `<tr>
+        <td>${esc(u.email)}${adminBadge}</td>
+        <td>${esc(u.plan)}</td>
+        <td>${statusBadge}</td>
+        <td>${u.last_login ? new Date(u.last_login).toLocaleString() : '-'}</td>
+        <td>${u.failed_attempts || 0}</td>
+        <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+        <td>
+          ${!isMe ? `
+            <button class="btn sm" onclick="openResetModal('${u.id}','${esc(u.email)}')">Reset PW</button>
+            <button class="btn sm ${u.is_active === false ? 'green' : 'orange'}" onclick="toggleActive('${u.id}', ${u.is_active === false})">${u.is_active === false ? 'Enable' : 'Disable'}</button>
+            <button class="btn sm" onclick="unlockUser('${u.id}')">Unlock</button>
+            <button class="btn sm red" onclick="deleteUser('${u.id}','${esc(u.email)}')">Delete</button>
+          ` : '<span style="color:var(--muted);font-size:0.8rem">You</span>'}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('usersTable').innerHTML = '<tr><td colspan="7" class="empty">Error loading users</td></tr>';
+  }
+}
+
+async function changePassword() {
+  const cur = document.getElementById('currentPw').value;
+  const nw = document.getElementById('newPw').value;
+  if (!cur || !nw) { showAlert('Fill in both fields', 'error'); return; }
+  const r = await fetch(API + '/api/auth/change-password', { method: 'POST', headers: hdrs(), body: JSON.stringify({ current_password: cur, new_password: nw }) });
+  const d = await r.json();
+  if (r.ok) { showAlert('Password changed', 'success'); document.getElementById('currentPw').value = ''; document.getElementById('newPw').value = ''; }
+  else { showAlert(d.detail || 'Error', 'error'); }
+}
+
+async function createUser() {
+  const email = document.getElementById('newEmail').value;
+  const pw = document.getElementById('newUserPw').value;
+  const plan = document.getElementById('newPlan').value;
+  if (!email || !pw) { showAlert('Email and password required', 'error'); return; }
+  const r = await fetch(API + '/api/auth/users', { method: 'POST', headers: hdrs(), body: JSON.stringify({ email, password: pw, plan }) });
+  const d = await r.json();
+  if (r.ok) { showAlert('User created: ' + d.email, 'success'); document.getElementById('newEmail').value = ''; document.getElementById('newUserPw').value = ''; loadUsers(); }
+  else { showAlert(d.detail || 'Error', 'error'); }
+}
+
+async function toggleActive(userId, enable) {
+  const r = await fetch(API + '/api/auth/users/' + userId, { method: 'PATCH', headers: hdrs(), body: JSON.stringify({ is_active: enable }) });
+  if (r.ok) { showAlert(enable ? 'User enabled' : 'User disabled', 'success'); loadUsers(); }
+  else { const d = await r.json(); showAlert(d.detail || 'Error', 'error'); }
+}
+
+async function unlockUser(userId) {
+  const r = await fetch(API + '/api/auth/users/' + userId + '/unlock', { method: 'POST', headers: hdrs() });
+  if (r.ok) { showAlert('User unlocked', 'success'); loadUsers(); }
+  else { const d = await r.json(); showAlert(d.detail || 'Error', 'error'); }
+}
+
+async function deleteUser(userId, email) {
+  if (!confirm('Delete user ' + email + '? This cannot be undone.')) return;
+  const r = await fetch(API + '/api/auth/users/' + userId, { method: 'DELETE', headers: hdrs() });
+  if (r.ok) { showAlert('User deleted', 'success'); loadUsers(); }
+  else { const d = await r.json(); showAlert(d.detail || 'Error', 'error'); }
+}
+
+function openResetModal(userId, email) {
+  document.getElementById('resetUserId').value = userId;
+  document.getElementById('resetUserEmail').value = email;
+  document.getElementById('resetAdminPw').value = '';
+  document.getElementById('resetNewPw').value = '';
+  document.getElementById('resetModal').classList.add('open');
+}
+
+async function doResetPassword() {
+  const userId = document.getElementById('resetUserId').value;
+  const adminPw = document.getElementById('resetAdminPw').value;
+  const newPw = document.getElementById('resetNewPw').value;
+  if (!adminPw || !newPw) { showAlert('Fill in all fields', 'error'); return; }
+  const r = await fetch(API + '/api/auth/users/' + userId + '/reset-password', {
+    method: 'POST', headers: hdrs(),
+    body: JSON.stringify({ current_password: adminPw, new_password: newPw }),
+  });
+  const d = await r.json();
+  if (r.ok) { showAlert('Password reset', 'success'); closeModal('resetModal'); }
+  else { showAlert(d.detail || 'Error', 'error'); }
+}
+
+if (TOKEN) init();
+else document.getElementById('loginOverlay').classList.remove('hidden');
+</script>
+</body>
+</html>

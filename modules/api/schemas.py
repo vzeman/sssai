@@ -13,6 +13,12 @@ class UserResponse(BaseModel):
     id: str
     email: str
     plan: str
+    is_active: bool = True
+    failed_attempts: int = 0
+    locked_until: datetime | None = None
+    last_login: datetime | None = None
+    totp_enabled: bool = False
+    created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -44,20 +50,45 @@ class ScanResponse(BaseModel):
 
 # ─── Monitors ──────────────────────────────────────────────────────────
 class MonitorCreate(BaseModel):
+    name: str = ""
     target: str
     check_type: str = "http"
     interval_seconds: int = 300
+    expected_status: int = 200
+
+
+class MonitorUpdate(BaseModel):
+    name: str | None = None
+    target: str | None = None
+    check_type: str | None = None
+    interval_seconds: int | None = None
+    expected_status: int | None = None
+    is_active: bool | None = None
 
 
 class MonitorResponse(BaseModel):
     id: str
+    name: str = ""
     target: str
     check_type: str
     interval_seconds: int
+    expected_status: int = 200
     is_active: bool
     last_status: str | None = None
     last_response_ms: int | None = None
     last_checked_at: datetime | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class MonitorCheckResponse(BaseModel):
+    id: str
+    status: str
+    status_code: int | None = None
+    response_ms: int = 0
+    error: str | None = None
+    checked_at: datetime
 
     model_config = {"from_attributes": True}
 

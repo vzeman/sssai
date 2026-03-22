@@ -12,11 +12,15 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
     volumes:
       - ./output:/output
       - ./modules:/app/modules
@@ -32,8 +36,10 @@ services:
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - NOTIFICATION_CHANNELS=${NOTIFICATION_CHANNELS:-[]}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       - redis
+      - elasticsearch
     volumes:
       - ./output:/output
       - ./modules:/app/modules
@@ -48,11 +54,14 @@ services:
       - RUNTIME=local
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
     volumes:
       - ./modules:/app/modules
 
@@ -64,16 +73,34 @@ services:
       - RUNTIME=local
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./modules:/app/modules
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - esdata:/var/lib/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6380:6379"
 
   postgres:
     image: postgres:16-alpine
@@ -81,8 +108,6 @@ services:
       - POSTGRES_USER=scanner
       - POSTGRES_PASSWORD=scanner
       - POSTGRES_DB=scanner
-    ports:
-      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -93,3 +118,4 @@ services:
 
 volumes:
   pgdata:
+  esdata:

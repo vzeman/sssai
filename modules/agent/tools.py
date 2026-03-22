@@ -507,4 +507,29 @@ SUBAGENT_TOOLS = [
             "required": ["content"],
         },
     },
+    {
+        "name": "ask_human",
+        "description": (
+            "Ask the human operator a question and wait for their response. "
+            "Use this when you need human judgment, authorization, or clarification. "
+            "Examples: asking permission before aggressive testing, clarifying scope, "
+            "reporting a critical finding that needs immediate attention, or suggesting "
+            "next steps that require human decision. The human may take up to 5 minutes "
+            "to respond. If no response, continue autonomously."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {
+                    "type": "string",
+                    "description": "The question or message for the human operator",
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "How long to wait for response in seconds (default 300)",
+                },
+            },
+            "required": ["question"],
+        },
+    },
 ]

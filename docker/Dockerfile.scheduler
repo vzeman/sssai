@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 RUN pip install --no-cache-dir \
-    sqlalchemy psycopg2-binary redis boto3 httpx
+    sqlalchemy psycopg2-binary redis boto3 httpx "elasticsearch>=8.13,<9"
 
 COPY modules/ /app/modules/
 COPY config/ /app/config/
