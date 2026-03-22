@@ -1,0 +1,38 @@
+## Advanced Reconnaissance & OSINT
+
+### Subdomain Enumeration
+- **amass**: `amass enum -d {domain} -passive -o /output/amass-passive.txt`
+- **subfinder**: `subfinder -d {domain} -o /output/subdomains.txt`
+- **theHarvester**: `theHarvester -d {domain} -b all --file /output/harvester`
+
+### Live Host Probing
+- `cat /output/subdomains.txt | httpx -status-code -title -tech-detect -json -o /output/httpx.json`
+
+### Email Security
+- **checkdmarc**: `checkdmarc {domain} -f json -o /output/checkdmarc.json`
+- SPF: `dig {domain} TXT +short`
+- DMARC: `dig _dmarc.{domain} TXT +short`
+
+### Subdomain Takeover
+- **subjack**: `subjack -w /output/subdomains.txt -t 100 -timeout 30 -o /output/subjack.txt -ssl`
+- **dnsreaper**: `dnsreaper scan --domain {domain} --out /output/dnsreaper.json --out-format json`
+
+### Phishing & Brand Protection
+- **dnstwist**: `dnstwist --registered --format json {domain} > /output/dnstwist.json`
+
+### Certificate Transparency
+- Check CT logs for additional domains/subdomains
+
+### DNS Analysis
+- **dnsrecon**: `dnsrecon -d {domain} -t std -j /output/dnsrecon.json`
+- Zone transfer attempts
+- DNSSEC validation: `dig +dnssec {domain}`
+- **whois**: `whois {domain}`
+
+### Technology Detection
+- **whatweb**: `whatweb {target} --log-json=/output/whatweb.json`
+- **wafw00f**: `wafw00f {target}` (WAF detection)
+
+### Port Scanning
+- **nmap**: `nmap -sV -sC -oN /output/nmap.txt {target}`
+- **masscan**: `masscan {target} -p0-65535 --rate 1000 -oJ /output/masscan.json`

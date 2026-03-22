@@ -210,6 +210,7 @@
       <div class="stat"><div class="val" id="stat-running" style="color:var(--yellow)">0</div><div class="label">Running</div></div>
       <div class="stat"><div class="val" id="stat-checks" style="color:var(--accent)">0</div><div class="label">Checks</div></div>
       <div class="stat"><div class="val" id="stat-findings" style="color:var(--orange)">0</div><div class="label">Findings</div></div>
+      <div class="stat"><div class="val" id="stat-cost" style="color:var(--green)">$0</div><div class="label">Total Cost</div></div>
     </div>
 
     <!-- UPTIME WIDGET -->
@@ -225,6 +226,7 @@
       <div class="scan-form">
         <input type="text" id="target" placeholder="https://example.com">
         <select id="scan-type">
+          <option value="adaptive">Adaptive (AI-First)</option>
           <option value="full">Full Audit</option>
           <option value="security">Security</option>
           <option value="pentest">Pentest</option>
@@ -242,8 +244,8 @@
         <button class="btn green" onclick="startScan()">Start</button>
       </div>
       <table>
-        <thead><tr><th>Target</th><th>Type</th><th>Status</th><th>Risk</th><th>Created</th><th></th></tr></thead>
-        <tbody id="scans-table"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+        <thead><tr><th>Target</th><th>Type</th><th>Status</th><th>Risk</th><th>Cost</th><th>Created</th><th></th></tr></thead>
+        <tbody id="scans-table"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -501,15 +503,20 @@ async function loadScans() {
     if (!res.ok) return;
     var scans = await res.json();
     var tbody = document.getElementById('scans-table');
-    if (!scans.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No scans yet. Start one above!</td></tr>'; return; }
-    var running=0, totalFindings=0;
+    if (!scans.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No scans yet. Start one above!</td></tr>'; return; }
+    var running=0, totalFindings=0, totalCost=0;
     var html = '';
     for (var i = 0; i < scans.length; i++) {
       var s = scans[i];
       if (s.status==='queued'||s.status==='running') running++;
       totalFindings += s.findings_count||0;
+      totalCost += s.estimated_cost||0;
       var risk = s.risk_score!=null ? s.risk_score : '-';
+      var cost = s.estimated_cost ? '$'+s.estimated_cost.toFixed(4) : '-';
+      var tokens = s.total_input_tokens + s.total_output_tokens;
+      if (tokens > 0) cost += '<br><span style="font-size:0.68rem;color:var(--muted)">'+(tokens>1000?(tokens/1000).toFixed(1)+'k':tokens)+' tok</span>';
       var actions = '<div class="row-actions">';
+      if (s.status==='running'||s.status==='queued') actions += '<button class="btn sm red" onclick="event.stopPropagation();stopScan(\''+s.id+'\')">Stop</button>';
       if (s.status==='completed') actions += '<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>';
       if (s.status==='failed'||s.status==='completed') actions += '<button class="btn sm" style="background:var(--purple)" onclick="event.stopPropagation();retryScan(\''+s.id+'\')">Retry</button>';
       actions += '</div>';
@@ -518,6 +525,7 @@ async function loadScans() {
       html += '<td>'+s.scan_type+'</td>';
       html += '<td><span class="badge '+s.status+'">'+s.status+'</span></td>';
       html += '<td>'+risk+'</td>';
+      html += '<td style="font-size:0.75rem">'+cost+'</td>';
       html += '<td style="font-size:0.75rem;color:var(--muted)">'+new Date(s.created_at).toLocaleTimeString()+'</td>';
       html += '<td>'+actions+'</td>';
       html += '</tr>';
@@ -526,6 +534,7 @@ async function loadScans() {
     document.getElementById('stat-total').textContent = scans.length;
     document.getElementById('stat-running').textContent = running;
     document.getElementById('stat-findings').textContent = totalFindings;
+    document.getElementById('stat-cost').textContent = '$'+totalCost.toFixed(2);
   } catch(e) {
     console.error('loadScans error:', e);
     document.getElementById('scans-table').innerHTML = '<tr><td colspan="6" class="empty">Error loading scans: '+e.message+'</td></tr>';
@@ -643,10 +652,16 @@ function renderReport(r, scanId) {
   var summaryHtml = '<div style="text-align:center;margin:1rem 0"><div class="risk-circle '+riskClass+'">'+(r.risk_score!=null?r.risk_score:'-')+'</div><div style="margin-top:0.5rem;color:var(--muted);font-size:0.85rem">Risk Score</div></div>';
   summaryHtml += '<div style="padding:1rem;background:var(--bg);border-radius:8px;font-size:0.85rem;line-height:1.7">'+(r.summary||'No summary')+'</div>';
   if (r.scan_metadata) {
-    summaryHtml += '<div style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;font-size:0.8rem">';
+    summaryHtml += '<div style="margin-top:0.75rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:0.5rem;font-size:0.8rem">';
     summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+(r.scan_metadata.duration_seconds||0)+'s</strong><br><span style="color:var(--muted)">Duration</span></div>';
     summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+(r.scan_metadata.commands_executed||0)+'</strong><br><span style="color:var(--muted)">Commands</span></div>';
-    summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+findings.length+'</strong><br><span style="color:var(--muted)">Findings</span></div></div>';
+    summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+findings.length+'</strong><br><span style="color:var(--muted)">Findings</span></div>';
+    if (r.scan_metadata.estimated_cost_usd) {
+      summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>$'+r.scan_metadata.estimated_cost_usd.toFixed(4)+'</strong><br><span style="color:var(--muted)">AI Cost</span></div>';
+      var totalTok = (r.scan_metadata.total_input_tokens||0)+(r.scan_metadata.total_output_tokens||0);
+      summaryHtml += '<div style="background:var(--bg);padding:0.5rem;border-radius:6px;text-align:center"><strong>'+(totalTok>1000?(totalTok/1000).toFixed(1)+'k':totalTok)+'</strong><br><span style="color:var(--muted)">Tokens</span></div>';
+    }
+    summaryHtml += '</div>';
   }
   if (r.compliance_summary) {
     summaryHtml += '<div style="margin-top:1rem"><strong>Compliance:</strong><pre style="background:var(--bg);padding:0.75rem;border-radius:8px;font-size:0.8rem;overflow-x:auto;color:var(--muted)">'+JSON.stringify(r.compliance_summary,null,2)+'</pre></div>';
@@ -704,6 +719,18 @@ async function retryScan(scanId) {
       alert('Retry failed: '+(err.detail||'Unknown error'));
     }
   } catch(e) { alert('Could not retry: '+e.message); }
+}
+
+async function stopScan(scanId) {
+  if (!confirm('Stop this scan? The agent will finish its current step and save partial results.')) return;
+  try {
+    var res = await apiCall('/api/scans/'+scanId+'/stop', { method:'POST' });
+    if (res.ok) { refresh(); }
+    else {
+      var err = await res.json().catch(function(){return {};});
+      alert('Stop failed: '+(err.detail||'Unknown error'));
+    }
+  } catch(e) { alert('Could not stop scan: '+e.message); }
 }
 
 // ═══ TOOLS ═══

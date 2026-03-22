@@ -1,0 +1,32 @@
+## SSL/TLS Security Testing Methodology
+
+### Full TLS Analysis
+- **testssl**: `testssl --json /output/testssl.json {target}`
+  - Heartbleed, ROBOT, CCS injection, BREACH, POODLE, DROWN
+  - Protocol support (TLS 1.0/1.1/1.2/1.3)
+  - Cipher suite analysis
+- **sslyze**: `sslyze {target} --json_out /output/sslyze.json`
+- **sslscan**: `sslscan --xml=/output/sslscan.xml {target}`
+
+### Certificate Validation
+- `openssl s_client -connect {target}:443 -servername {target}`
+- Check expiry date, chain of trust, key strength
+- Verify SAN (Subject Alternative Names) match
+- Check for wildcard cert misuse
+- OCSP stapling support
+
+### Protocol Issues
+- Ensure TLS 1.0 and 1.1 are disabled
+- Verify TLS 1.3 is supported
+- Check for SSL renegotiation issues
+- Verify forward secrecy (ECDHE/DHE cipher suites)
+
+### Cipher Suite Analysis
+- Reject weak ciphers (RC4, DES, 3DES, NULL, EXPORT)
+- Prefer AEAD ciphers (AES-GCM, ChaCha20-Poly1305)
+- Check cipher order (server preference)
+
+### HTTP Security Headers
+- HSTS (Strict-Transport-Security) with includeSubDomains and preload
+- No mixed content (HTTP resources on HTTPS pages)
+- Secure cookie flags

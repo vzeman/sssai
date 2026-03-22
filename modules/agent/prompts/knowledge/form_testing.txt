@@ -1,0 +1,47 @@
+## Web Form Security Testing
+
+### XSS (Cross-Site Scripting)
+Test all form inputs with payloads:
+- `<script>alert(1)</script>`
+- `"><img src=x onerror=alert(1)>`
+- `javascript:alert(1)` in URL fields
+- Event handlers: `onmouseover`, `onfocus`, `onerror`
+- SVG payloads: `<svg onload=alert(1)>`
+- Encoded payloads: HTML entities, URL encoding, double encoding
+
+For each form field, test both reflected and stored XSS.
+Use `wapiti -u {target} -o /output/wapiti/ -f json -m xss` for automated testing.
+
+### SQL Injection
+- Single quote: `'`, `''`, `' OR '1'='1`
+- Comment injection: `--`, `#`, `/**/`
+- UNION-based: `' UNION SELECT 1,2,3--`
+- Time-based blind: `' AND SLEEP(5)--`
+- `sqlmap -u '{target}' --forms --batch --crawl=2 --output-dir=/output/sqlmap/`
+
+### CSRF (Cross-Site Request Forgery)
+- Check for CSRF tokens on state-changing forms
+- Test if CSRF token is validated server-side
+- Check SameSite cookie attribute
+- Test token reuse and predictability
+
+### File Upload Testing
+- Upload web shells (.php, .jsp, .aspx)
+- MIME type bypass (rename .php to .jpg, change Content-Type)
+- Path traversal in filename: `../../etc/passwd`
+- Large file upload (DoS)
+- SVG with embedded JavaScript
+
+### Input Validation
+- Command injection: `; ls`, `| cat /etc/passwd`, `` `whoami` ``
+- Path traversal: `../../../etc/passwd`
+- LDAP injection, XML injection (XXE)
+- Integer overflow, negative values
+- Null bytes: `%00`
+
+### Form-Specific Checks
+- **Login forms**: Test enumeration, brute force, credential stuffing
+- **Search forms**: Test for reflected XSS, SQL injection
+- **Contact forms**: Test for email injection, spam
+- **Registration forms**: Test for mass registration, weak validation
+- **File upload forms**: Test for unrestricted upload, path traversal

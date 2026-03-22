@@ -36,6 +36,57 @@ KEEP_RECENT = 6                # messages to keep un-summarized
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
+# Claude Sonnet 4 pricing (per million tokens) as of 2025
+_COST_PER_1M_INPUT = 3.00
+_COST_PER_1M_OUTPUT = 15.00
+
+
+class TokenTracker:
+    """Tracks token usage and estimated cost across all LLM calls in a scan."""
+
+    def __init__(self):
+        self.total_input = 0
+        self.total_output = 0
+        self.calls = 0
+        self.by_caller = {}  # caller -> {input, output, calls}
+
+    def record(self, response, caller: str = "main"):
+        """Extract and accumulate token usage from an Anthropic response."""
+        usage = getattr(response, "usage", None)
+        if not usage:
+            return
+        inp = getattr(usage, "input_tokens", 0) or 0
+        out = getattr(usage, "output_tokens", 0) or 0
+        self.total_input += inp
+        self.total_output += out
+        self.calls += 1
+        entry = self.by_caller.setdefault(caller, {"input": 0, "output": 0, "calls": 0})
+        entry["input"] += inp
+        entry["output"] += out
+        entry["calls"] += 1
+
+    @property
+    def total_tokens(self) -> int:
+        return self.total_input + self.total_output
+
+    @property
+    def estimated_cost(self) -> float:
+        """Estimated cost in USD."""
+        return (
+            (self.total_input / 1_000_000) * _COST_PER_1M_INPUT
+            + (self.total_output / 1_000_000) * _COST_PER_1M_OUTPUT
+        )
+
+    def summary(self) -> dict:
+        return {
+            "total_input_tokens": self.total_input,
+            "total_output_tokens": self.total_output,
+            "total_tokens": self.total_tokens,
+            "estimated_cost_usd": round(self.estimated_cost, 4),
+            "api_calls": self.calls,
+            "by_caller": self.by_caller,
+        }
+
 
 # ── Tool handlers ────────────────────────────────────────────────────────
 
@@ -215,10 +266,182 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "ask_human":
         return _handle_ask_human(input, scan_context)
 
+    elif name == "adapt_plan":
+        return _handle_adapt_plan(input, scan_context)
+
+    elif name == "load_knowledge":
+        return _handle_load_knowledge(input, scan_context)
+
+    elif name == "update_attack_surface":
+        return _handle_update_attack_surface(input, scan_context)
+
     elif name == "report":
         return "__REPORT__"
 
     return "Unknown tool"
+
+
+# ── AI-first adaptive tool handlers ─────────────────────────────────────
+
+def _handle_adapt_plan(input: dict, scan_context: dict | None) -> str:
+    """Record a plan revision and log it for audit trail."""
+    try:
+        if not scan_context:
+            scan_context = {}
+
+        revision_num = scan_context.get("_plan_revision", 0) + 1
+        plan_revision = {
+            "reason": input["reason"],
+            "discoveries": input.get("discoveries", []),
+            "plan_steps": input["plan_steps"],
+            "knowledge_needed": input.get("knowledge_needed", []),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "revision_number": revision_num,
+        }
+        scan_context["_plan_revision"] = revision_num
+        scan_context.setdefault("_plan_history", []).append(plan_revision)
+        scan_context["_current_plan"] = plan_revision
+
+        scan_id = scan_context.get("scan_id", "")
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "plan_adaptation",
+                "reason": input["reason"],
+                "steps_count": len(input["plan_steps"]),
+                "revision": revision_num,
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            _post_agent_chat(scan_id,
+                f"Plan revision #{revision_num}: {input['reason']} "
+                f"({len(input['plan_steps'])} steps)",
+                "plan")
+
+        # Check which knowledge modules are available
+        knowledge_dir = os.path.join(os.path.dirname(__file__), "prompts", "knowledge")
+        available = []
+        for module in input.get("knowledge_needed", []):
+            path = os.path.join(knowledge_dir, f"{module}.txt")
+            if os.path.exists(path):
+                available.append(module)
+
+        result = f"Plan revision #{revision_num} recorded ({len(input['plan_steps'])} steps). Reason: {input['reason']}"
+        if available:
+            result += f"\nKnowledge modules ready to load: {', '.join(available)}. Use load_knowledge to inject them."
+        return result
+
+    except Exception as e:
+        return f"ERROR: adapt_plan failed: {e}"
+
+
+def _handle_load_knowledge(input: dict, scan_context: dict | None) -> str:
+    """Load a specialized testing knowledge module on demand."""
+    try:
+        module = input["module"]
+        knowledge_dir = os.path.join(os.path.dirname(__file__), "prompts", "knowledge")
+        path = os.path.join(knowledge_dir, f"{module}.txt")
+
+        if not os.path.exists(path):
+            available = [f.replace(".txt", "") for f in os.listdir(knowledge_dir) if f.endswith(".txt")]
+            return f"ERROR: Knowledge module '{module}' not found. Available: {', '.join(available)}"
+
+        content = Path(path).read_text()
+
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "knowledge_loaded",
+                "module": module,
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        return f"[KNOWLEDGE MODULE: {module}]\n\n{content}"
+
+    except Exception as e:
+        return f"ERROR: load_knowledge failed: {e}"
+
+
+def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str:
+    """Update the structured attack surface map with new discoveries."""
+    try:
+        if not scan_context:
+            scan_context = {}
+
+        surface = scan_context.setdefault("_attack_surface", {})
+
+        # Merge new data into existing surface
+        for key, value in input.items():
+            if isinstance(value, list):
+                existing = surface.get(key, [])
+                if value and isinstance(value[0], (str, int)):
+                    # Deduplicate simple types
+                    surface[key] = list(set(existing + value))
+                else:
+                    # Append complex objects
+                    surface[key] = existing + value
+            elif isinstance(value, dict):
+                surface.setdefault(key, {}).update(value)
+            else:
+                surface[key] = value
+
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        if scan_id:
+            # Persist to storage
+            try:
+                storage = get_storage()
+                storage.put_json(f"scans/{scan_id}/attack_surface.json", surface)
+            except Exception:
+                pass
+
+            _log_activity(scan_id, {
+                "type": "attack_surface_update",
+                "components": list(input.keys()),
+                "chatbots_found": len(input.get("chatbots", [])),
+                "apis_found": len(input.get("api_endpoints", [])),
+                "forms_found": len(input.get("forms", [])),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        # Generate actionable suggestions
+        suggestions = []
+        if input.get("chatbots"):
+            for cb in input["chatbots"]:
+                suggestions.append(
+                    f"CHATBOT DETECTED ({cb.get('type', 'unknown')}) at {cb.get('endpoint', '?')} "
+                    f"— load chatbot_testing knowledge and test for prompt injection, jailbreak, data exfiltration"
+                )
+        if input.get("api_endpoints"):
+            count = len(input["api_endpoints"])
+            suggestions.append(
+                f"API ENDPOINTS FOUND ({count}) — load api_testing knowledge, test auth, IDOR, injection on each endpoint"
+            )
+        if input.get("forms"):
+            form_types = [f.get("type", "unknown") for f in input["forms"]]
+            if "login" in form_types or "registration" in form_types:
+                suggestions.append("LOGIN/REGISTRATION FORM FOUND — load auth_testing knowledge, test brute force, credential stuffing, session management")
+            suggestions.append(
+                f"FORMS FOUND ({', '.join(form_types)}) — load form_testing knowledge, test XSS/SQLi/CSRF on each form"
+            )
+        if input.get("auth_mechanisms"):
+            mechs = input["auth_mechanisms"]
+            if any("jwt" in m.lower() for m in mechs):
+                suggestions.append("JWT DETECTED — load auth_testing knowledge, test algorithm confusion, weak secrets, token manipulation")
+        if input.get("infrastructure", {}).get("waf"):
+            suggestions.append(f"WAF DETECTED ({input['infrastructure']['waf']}) — adapt payloads to bypass WAF rules")
+
+        # Summary
+        total_components = sum(
+            len(v) if isinstance(v, list) else (1 if v else 0)
+            for v in surface.values()
+        )
+        result = f"Attack surface updated. {total_components} total components mapped."
+        if suggestions:
+            result += "\n\nSUGGESTED NEXT ACTIONS:\n" + "\n".join(f"- {s}" for s in suggestions)
+        else:
+            result += "\nNo high-priority components detected yet. Continue reconnaissance."
+        return result
+
+    except Exception as e:
+        return f"ERROR: update_attack_surface failed: {e}"
 
 
 # ── Web search ───────────────────────────────────────────────────────────
@@ -344,16 +567,20 @@ _SUBAGENT_PROMPTS = {
         "- Focus on practical, exploitable vulnerabilities\n"
     ),
     "coder": (
-        "You are a specialized coding agent. You have been delegated a task that requires "
-        "writing code, scripts, or custom tooling. This might include:\n"
-        "- Writing custom exploit scripts\n"
-        "- Creating configuration files for scanning tools\n"
-        "- Processing or analyzing scan output data\n"
-        "- Writing automation scripts\n\n"
+        "You are a specialized coding agent for security testing. You write custom test scripts "
+        "tailored to specific targets. Common tasks:\n"
+        "- Write Python scripts to interact with discovered chatbot APIs (test prompt injection, data exfil)\n"
+        "- Generate custom XSS/SQLi payloads based on form field names and types\n"
+        "- Write API test scripts targeting specific endpoint signatures\n"
+        "- Create authentication bypass test scripts\n"
+        "- Build multi-turn conversation attack scripts for chatbots\n"
+        "- Process and correlate scan output data\n\n"
         "Rules:\n"
-        "- Write clean, working code\n"
-        "- Save scripts to /output/\n"
-        "- Test your code when possible\n"
+        "- Write clean, working code with error handling\n"
+        "- Save scripts to /output/custom_tests/\n"
+        "- Test your code and report results\n"
+        "- Output results in JSON format when possible\n"
+        "- Only target the authorized target: {target}\n"
     ),
 }
 
@@ -362,7 +589,7 @@ _SUBAGENT_TOOL_ACCESS = {
     "pentester": ["run_command", "read_file", "write_file", "http_request", "dns_lookup",
                    "parse_json", "screenshot"],
     "searcher": ["web_search", "exploit_search", "http_request", "read_file"],
-    "coder": ["run_command", "read_file", "write_file"],
+    "coder": ["run_command", "read_file", "write_file", "http_request"],
 }
 
 
@@ -387,6 +614,8 @@ def _handle_subagent(agent_type: str, input: dict, scan_context: dict | None) ->
         max_iterations = 20
         all_output = []
 
+        tracker = scan_context.get("_token_tracker") if scan_context else None
+
         for _ in range(max_iterations):
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
@@ -395,6 +624,8 @@ def _handle_subagent(agent_type: str, input: dict, scan_context: dict | None) ->
                 tools=agent_tools,
                 messages=messages,
             )
+            if tracker:
+                tracker.record(response, caller=f"subagent_{agent_type}")
 
             if response.stop_reason == "end_turn":
                 text = "".join(b.text for b in response.content if hasattr(b, "text"))
@@ -671,7 +902,8 @@ class LoopDetector:
 # ── Execution monitor ────────────────────────────────────────────────────
 
 def _run_execution_monitor(client, messages: list, loop_detector: LoopDetector,
-                           target: str, scan_type: str) -> str | None:
+                           target: str, scan_type: str,
+                           scan_context: dict | None = None) -> str | None:
     """Run a separate LLM call to review agent progress and suggest pivots."""
     try:
         summary = loop_detector.summary()
@@ -690,15 +922,44 @@ def _run_execution_monitor(client, messages: list, loop_detector: LoopDetector,
                     elif hasattr(item, "name"):
                         recent_actions.append(f"  Tool: {item.name}")
 
+        # Attack surface and plan awareness
+        surface_info = ""
+        plan_info = ""
+        if scan_context:
+            surface = scan_context.get("_attack_surface", {})
+            if surface:
+                parts = []
+                for k, v in surface.items():
+                    if isinstance(v, list):
+                        parts.append(f"{k}: {len(v)} items")
+                    elif isinstance(v, dict):
+                        parts.append(f"{k}: {json.dumps(v)[:100]}")
+                surface_info = f"\nAttack surface: {', '.join(parts)}"
+            else:
+                surface_info = "\nAttack surface: NOT YET MAPPED (agent should call update_attack_surface)"
+
+            current_plan = scan_context.get("_current_plan")
+            if current_plan:
+                plan_info = (
+                    f"\nCurrent plan (revision #{current_plan.get('revision_number', 0)}): "
+                    f"{len(current_plan.get('plan_steps', []))} steps, "
+                    f"reason: {current_plan.get('reason', '?')}"
+                )
+            else:
+                plan_info = "\nScan plan: NOT YET CREATED (agent should call adapt_plan after discovery)"
+
         monitor_prompt = (
-            f"You are an execution monitor reviewing the progress of a {scan_type} scan against {target}.\n\n"
-            f"Tool call summary ({total} total calls): {summary}\n\n"
+            f"You are an execution monitor reviewing a {scan_type} scan of {target}.\n\n"
+            f"Tool call summary ({total} total): {summary}\n"
+            f"{surface_info}{plan_info}\n\n"
             f"Recent actions:\n" + "\n".join(recent_actions[-20:]) + "\n\n"
             f"Assess:\n"
-            f"1. Is the agent making progress or stuck in a loop?\n"
-            f"2. Are there important scan areas being missed?\n"
-            f"3. Should the agent change strategy?\n\n"
-            f"Provide a brief (2-3 sentence) recommendation. If the agent is doing well, say so."
+            f"1. Is the agent making progress or stuck?\n"
+            f"2. Has the agent completed Phase 0 (discovery) before testing?\n"
+            f"3. Has the agent called update_attack_surface and adapt_plan?\n"
+            f"4. Are there discovered components (chatbots, APIs, forms) not yet tested?\n"
+            f"5. Should the agent load any knowledge modules or adapt its plan?\n\n"
+            f"Provide a brief (2-3 sentence) recommendation."
         )
 
         response = client.messages.create(
@@ -706,6 +967,9 @@ def _run_execution_monitor(client, messages: list, loop_detector: LoopDetector,
             max_tokens=500,
             messages=[{"role": "user", "content": monitor_prompt}],
         )
+        tracker = scan_context.get("_token_tracker") if scan_context else None
+        if tracker:
+            tracker.record(response, caller="monitor")
 
         text = "".join(b.text for b in response.content if hasattr(b, "text"))
         return f"[EXECUTION MONITOR]: {text}" if text else None
@@ -756,7 +1020,7 @@ def _find_safe_split(messages: list, keep_recent: int) -> int:
     return ideal_split  # fallback
 
 
-def _summarize_chain(client, messages: list) -> list:
+def _summarize_chain(client, messages: list, scan_context: dict | None = None) -> list:
     """Summarize older messages to reduce context size, keeping recent ones intact.
 
     Critical: maintains tool_use/tool_result pairing in the kept portion to avoid
@@ -807,6 +1071,9 @@ def _summarize_chain(client, messages: list) -> list:
                 ),
             }],
         )
+        tracker = scan_context.get("_token_tracker") if scan_context else None
+        if tracker:
+            tracker.record(response, caller="summarizer")
         summary = "".join(b.text for b in response.content if hasattr(b, "text"))
     except Exception:
         summary = old_text[:3000] + "\n... [summarization failed, truncated]"
@@ -841,7 +1108,8 @@ def _summarize_chain(client, messages: list) -> list:
 
 # ── Reflector pattern ────────────────────────────────────────────────────
 
-def _run_reflector(client, text_output: str, system_prompt: str, tools: list) -> list | None:
+def _run_reflector(client, text_output: str, system_prompt: str, tools: list,
+                   scan_context: dict | None = None) -> list | None:
     """When agent produces text instead of tool calls, redirect back to tool use."""
     try:
         reflector_prompt = (
@@ -859,6 +1127,9 @@ def _run_reflector(client, text_output: str, system_prompt: str, tools: list) ->
             max_tokens=500,
             messages=[{"role": "user", "content": reflector_prompt}],
         )
+        tracker = scan_context.get("_token_tracker") if scan_context else None
+        if tracker:
+            tracker.record(response, caller="reflector")
 
         redirect = "".join(b.text for b in response.content if hasattr(b, "text"))
         return redirect
@@ -870,29 +1141,16 @@ def _run_reflector(client, text_output: str, system_prompt: str, tools: list) ->
 # ── Planning step ────────────────────────────────────────────────────────
 
 def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
-    """Generate a structured scan plan before execution."""
-    try:
-        plan_prompt = (
-            f"You are planning a {scan_type} scan of {target}.\n\n"
-            f"Create a focused plan with 3-7 steps. For each step, specify:\n"
-            f"1. What to check/scan\n"
-            f"2. Which tools to use\n"
-            f"3. What findings to look for\n\n"
-            f"Be specific and actionable. Order steps from broad reconnaissance to deep analysis.\n"
-            f"Config: {json.dumps(config) if config else 'default'}"
-        )
-
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": plan_prompt}],
-        )
-
-        plan = "".join(b.text for b in response.content if hasattr(b, "text"))
-        return plan
-
-    except Exception:
-        return ""
+    """Return phase instructions — the agent generates its own detailed plan via adapt_plan after discovery."""
+    return (
+        "Phase 0 (Discovery): Run deep reconnaissance before any testing. "
+        "Detect technologies, chatbots, APIs, forms, auth mechanisms, infrastructure.\n"
+        "Phase 1 (Map): Call update_attack_surface with all findings.\n"
+        "Phase 2 (Plan): Call adapt_plan to create a custom test plan based on discoveries. "
+        "Load relevant knowledge modules.\n"
+        "Phase 3 (Execute): Follow your plan. Adapt when you find new things.\n"
+        "Phase 4 (Report): Call report with all findings, attack surface, and plan evolution."
+    )
 
 
 # ── Activity logging ─────────────────────────────────────────────────────
@@ -926,10 +1184,13 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     queue = get_queue()
     config = config or {}
 
+    token_tracker = TokenTracker()
+
     scan_context = {
         "scan_id": scan_id,
         "target": target,
         "scan_type": scan_type,
+        "_token_tracker": token_tracker,
     }
 
     # ── Planning step ──
@@ -1008,12 +1269,13 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "message": f"Summarizing conversation ({chain_size} chars → compressed)",
                 "timestamp": time.strftime("%H:%M:%S"),
             })
-            messages = _summarize_chain(client, messages)
+            messages = _summarize_chain(client, messages, scan_context=scan_context)
 
         # ── Execution monitor ──
         if loop_detector.total_calls > 0 and loop_detector.total_calls % MONITOR_INTERVAL == 0:
             monitor_msg = _run_execution_monitor(
                 client, messages, loop_detector, target, scan_type,
+                scan_context=scan_context,
             )
             if monitor_msg:
                 _log_activity(scan_id, {
@@ -1047,6 +1309,33 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             else:
                 messages.append({"role": "user", "content": f"[HUMAN MESSAGE]: {human_msg}"})
 
+        # ── Check for stop signal ──
+        try:
+            import redis as _redis
+            _r = _redis.from_url(_REDIS_URL)
+            if _r.get(f"scan:stop:{scan_id}"):
+                _r.delete(f"scan:stop:{scan_id}")
+                log.info("Scan %s: stop signal received", scan_id)
+                _post_agent_chat(scan_id, "Scan stopped by user.", "status")
+                report = {
+                    "summary": "Scan stopped by user before completion.",
+                    "risk_score": 0,
+                    "findings": [],
+                    "scan_metadata": {
+                        "duration_seconds": int(time.time() - start_time),
+                        "commands_executed": commands_executed,
+                        "total_tool_calls": loop_detector.total_calls,
+                        "scan_id": scan_id, "target": target, "scan_type": scan_type,
+                        "stopped_by_user": True,
+                        **token_tracker.summary(),
+                    },
+                }
+                if scan_context.get("_attack_surface"):
+                    report["attack_surface"] = scan_context["_attack_surface"]
+                break
+        except Exception:
+            pass
+
         # ── Main LLM call ──
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -1055,6 +1344,15 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             tools=all_tools,
             messages=messages,
         )
+        token_tracker.record(response, caller="main")
+
+        # Publish token usage in progress events
+        if token_tracker.calls % 3 == 0:  # every 3rd API call
+            queue.publish(f"scan-progress:{scan_id}", {
+                "scan_id": scan_id,
+                "status": "running",
+                "token_usage": token_tracker.summary(),
+            })
 
         if response.stop_reason == "tool_use":
             reflector_attempts = 0  # reset on successful tool use
@@ -1141,9 +1439,18 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             "scan_id": scan_id,
                             "target": target,
                             "scan_type": scan_type,
+                            **token_tracker.summary(),
                         }
                         if plan:
                             report["scan_metadata"]["plan"] = plan[:2000]
+                        # Include attack surface and plan evolution from adaptive scanning
+                        if scan_context.get("_attack_surface"):
+                            report["attack_surface"] = {
+                                **report.get("attack_surface", {}),
+                                **scan_context["_attack_surface"],
+                            }
+                        if scan_context.get("_plan_history"):
+                            report["scan_metadata"]["plan_evolution"] = scan_context["_plan_history"]
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -1180,7 +1487,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                     "timestamp": time.strftime("%H:%M:%S"),
                 })
 
-                redirect = _run_reflector(client, text, system_prompt, all_tools)
+                redirect = _run_reflector(client, text, system_prompt, all_tools, scan_context=scan_context)
                 if redirect:
                     messages.append({"role": "assistant", "content": response.content})
                     messages.append({"role": "user", "content": (
@@ -1203,6 +1510,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                         "scan_id": scan_id,
                         "target": target,
                         "scan_type": scan_type,
+                        **token_tracker.summary(),
                     },
                 }
             break
@@ -1222,6 +1530,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "target": target,
                 "scan_type": scan_type,
                 "warning": "max iterations reached",
+                **token_tracker.summary(),
             },
         }
 
@@ -1293,7 +1602,24 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "risk_score": report.get("risk_score", 0),
         "findings_count": len(report.get("findings", [])),
         "total_tool_calls": loop_detector.total_calls,
+        "token_usage": token_tracker.summary(),
     })
+
+    # Index token usage to Elasticsearch
+    try:
+        from modules.infra.elasticsearch import index_doc
+        from datetime import datetime, timezone
+        es_token_doc = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "scan_id": scan_id,
+            "target": target,
+            "scan_type": scan_type,
+            **token_tracker.summary(),
+            "duration_seconds": int(time.time() - start_time),
+        }
+        index_doc("scanner-token-usage", es_token_doc)
+    except Exception:
+        pass
 
     log.info(
         "Scan %s completed: %d findings, risk %s, %d tool calls in %ds",

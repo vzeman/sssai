@@ -1,0 +1,41 @@
+## API Security Testing Methodology
+
+### Discovery
+- Check `/api/`, `/v1/`, `/v2/`, `/swagger`, `/openapi.json`, `/graphql`, `/.well-known/`
+- `ffuf -u {target}/api/FUZZ -w /usr/share/wordlists/dirb/common.txt -o /output/ffuf-api.json -of json`
+- Look for API versioning and deprecated endpoints
+
+### Authentication Testing
+- Test JWT handling: algorithm confusion, weak secrets, token expiry
+- Check for missing authentication on endpoints
+- Test token refresh and revocation
+- `hydra -l admin -P /usr/share/wordlists/common-passwords.txt {target} http-post-form '/api/login:user=^USER^&pass=^PASS^:Invalid' -t 4`
+
+### Authorization Testing (IDOR)
+- Modify IDs in URL paths and parameters to access other users' data
+- Test horizontal and vertical privilege escalation
+- Check if unauthenticated requests can access authenticated endpoints
+
+### Input Validation
+- SQL injection on parameters: `sqlmap -u '{target}/api/users?id=1' --batch --output-dir=/output/sqlmap/`
+- NoSQL injection, command injection
+- `wapiti -u {target} -o /output/wapiti/ -f json`
+
+### Rate Limiting
+- Test brute force protections: `hey -n 100 -c 10 {target}/api/login`
+- Check if rate limits apply per-IP, per-user, or per-endpoint
+
+### CORS
+- `python3 corsy.py -u {target} -j > /output/corsy.json`
+- Test with `curl -H "Origin: https://evil.com" -I {target}/api/`
+
+### Data Exposure
+- Check for excessive data in responses (PII, internal IDs, debug info)
+- Test error messages for information disclosure
+- Check API responses with OPTIONS method
+
+### API Fuzzing Tools
+- **cats**: REST API fuzzer from OpenAPI specs (140+ fuzzers)
+- **stepci**: REST, GraphQL, gRPC testing
+- **apifuzzer**: OpenAPI/Swagger fuzzer
+- **nuclei**: `nuclei -u {target} -t http/vulnerabilities/ -j -o /output/nuclei-api.json`

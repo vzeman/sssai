@@ -1,0 +1,44 @@
+## Compliance Audit Methodology
+
+### OWASP Top 10 2021
+Test each A01-A10 category (load owasp_testing knowledge for full details).
+Map every finding to specific OWASP category.
+
+### PCI DSS 4.0 (if payment processing detected)
+- Req 2: No default passwords/settings
+- Req 4: Encrypt transmission of cardholder data (TLS)
+- Req 6: Secure systems and software (patching, secure coding)
+- Req 7: Restrict access by business need-to-know
+- Req 8: Identify and authenticate access
+- Req 11: Test security of systems and networks regularly
+
+### GDPR Compliance Signals
+- Cookie consent banner presence and functionality
+- Privacy policy link and content
+- Data processing notices
+- Cookie classification (necessary vs analytics vs marketing)
+- Right to access/delete mechanisms
+- Data minimization in forms
+
+### CIS Controls v8
+- Basic security hygiene checks
+- Asset inventory, access control
+- Malware defenses, data recovery
+
+### TLS/SSL Best Practices (Mozilla)
+- `testssl --json /output/testssl.json {target}`
+- `sslyze {target} --json_out /output/sslyze.json`
+- Protocol versions, cipher suites, certificate chain
+
+### Accessibility (WCAG 2.1 AA)
+- `pa11y {target} --standard WCAG2AA --reporter json > /output/pa11y.json`
+- `axe {target} --tags wcag2a,wcag2aa --save /output/axe-results.json`
+- Color contrast, ARIA labels, keyboard navigation
+
+### Security Headers
+- `drheader scan single {target} --json > /output/drheader.json`
+- CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy
+
+### Reporting
+Map EVERY finding to specific compliance control (e.g., "PCI DSS 6.2", "OWASP A05:2021").
+Include `compliance_summary` with owasp_top10, pci_dss, gdpr, tls_best_practices status.

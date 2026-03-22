@@ -1,26 +1,65 @@
-"""Prompt loader — reads scan-type prompt templates and fills in variables."""
+"""Prompt loader — AI-first adaptive prompt system.
+
+Loads the master prompt with scan-type focus hints instead of static templates.
+Falls back to legacy {scan_type}.txt if master.txt is not found.
+"""
 
 import json
 import os
 
 _DIR = os.path.dirname(__file__)
 
+# Focus hints — scan_type becomes a steering hint, not a straitjacket
+_FOCUS_HINTS = {
+    "adaptive": "Run a fully adaptive scan. Discover everything and test what you find.",
+    "security": "Focus primarily on security vulnerabilities, but still do full discovery.",
+    "pentest": "Focus on exploitable vulnerabilities and attack chains. Be aggressive in testing.",
+    "chatbot": "The user believes there is a chatbot on this target. Prioritize chatbot discovery and testing.",
+    "api_security": "The user wants API security testing prioritized. Discover and test all API endpoints.",
+    "seo": "Focus primarily on SEO, performance, and accessibility after discovery.",
+    "performance": "Focus primarily on performance and load testing after discovery.",
+    "compliance": "Focus on compliance frameworks (OWASP, PCI-DSS, GDPR) after discovery.",
+    "full": "This is a comprehensive scan. Test EVERYTHING you discover. Be thorough.",
+    "owasp": "Map all findings to OWASP Top 10 categories. Systematically test each A01-A10.",
+    "recon": "Focus on deep reconnaissance and attack surface mapping. Be exhaustive in discovery.",
+    "cloud": "Focus on cloud security and infrastructure after discovery.",
+    "privacy": "Focus on privacy, data protection, cookie compliance, and GDPR signals.",
+    "uptime": "Focus on availability, response times, and monitoring endpoints.",
+}
+
 
 def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> str:
-    """Return the system prompt for a given scan type with variables substituted."""
+    """Return the system prompt for a given scan type with variables substituted.
+
+    Uses the master prompt (AI-first adaptive) with a focus hint from scan_type.
+    Falls back to legacy {scan_type}.txt if master.txt doesn't exist.
+    """
     config = config or {}
 
     # Extract retry_context before passing to template format (it has curly braces)
     retry_context = config.pop("retry_context", None)
 
-    path = os.path.join(_DIR, f"{scan_type}.txt")
-    if not os.path.exists(path):
-        path = os.path.join(_DIR, "security.txt")
+    # Try master prompt first (AI-first adaptive mode)
+    master_path = os.path.join(_DIR, "master.txt")
+    if os.path.exists(master_path):
+        with open(master_path) as f:
+            template = f.read()
 
-    with open(path) as f:
-        template = f.read()
+        prompt = template.format(target=target, **config)
 
-    prompt = template.format(target=target, **config)
+        # Add focus hint based on scan_type
+        hint = _FOCUS_HINTS.get(scan_type, _FOCUS_HINTS["security"])
+        prompt += f"\n\n## Scan Focus\n{hint}\n"
+    else:
+        # Fallback to legacy per-type templates
+        path = os.path.join(_DIR, f"{scan_type}.txt")
+        if not os.path.exists(path):
+            path = os.path.join(_DIR, "security.txt")
+
+        with open(path) as f:
+            template = f.read()
+
+        prompt = template.format(target=target, **config)
 
     # Append retry instructions if this is a retry scan
     if retry_context:

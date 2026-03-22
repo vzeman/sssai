@@ -44,6 +44,9 @@ class ScanResponse(BaseModel):
     findings_count: int = 0
     created_at: datetime
     completed_at: datetime | None = None
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    estimated_cost: float = 0.0
 
     model_config = {"from_attributes": True}
 

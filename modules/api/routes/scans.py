@@ -1,4 +1,5 @@
 import json
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -8,6 +9,10 @@ from modules.api.models import Scan, User
 from modules.api.schemas import ScanCreate, ScanResponse
 from modules.api.auth import get_current_user
 from modules.infra import get_queue, get_storage
+
+import redis as _redis
+
+_REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
 router = APIRouter()
 
@@ -132,3 +137,21 @@ def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session
         "status": "queued",
         "target": new_scan.target,
     }
+
+
+@router.post("/{scan_id}/stop")
+def stop_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Stop a running scan by setting a Redis signal that the agent checks each iteration."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if scan.status not in ("running", "queued"):
+        raise HTTPException(status_code=400, detail="Scan is not running")
+
+    try:
+        r = _redis.from_url(_REDIS_URL)
+        r.set(f"scan:stop:{scan_id}", "1", ex=3600)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not signal stop: {e}")
+
+    return {"scan_id": scan_id, "status": "stopping"}

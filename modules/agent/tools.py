@@ -342,6 +342,152 @@ TOOLS = [
             "required": ["summary", "risk_score", "findings"],
         },
     },
+    # ── AI-first adaptive tools ──────────────────────────────────────────────
+    {
+        "name": "adapt_plan",
+        "description": (
+            "Revise your scan plan based on discoveries. Call this after Phase 0 (discovery) "
+            "to create your initial test plan, and again whenever a major discovery changes "
+            "what should be tested. This creates an audit trail of how the scan evolved."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Why the plan is being created or revised (e.g., 'Initial plan after discovery', 'Found chatbot on /chat endpoint')",
+                },
+                "discoveries": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Key discoveries that inform this plan",
+                },
+                "plan_steps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "step": {"type": "string", "description": "What to test"},
+                            "tools": {"type": "array", "items": {"type": "string"}, "description": "Tools to use"},
+                            "priority": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+                            "triggered_by": {"type": "string", "description": "What discovery triggered this step"},
+                        },
+                        "required": ["step", "priority"],
+                    },
+                    "description": "Ordered test steps with tools and priority",
+                },
+                "knowledge_needed": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                },
+            },
+            "required": ["reason", "plan_steps"],
+        },
+    },
+    {
+        "name": "load_knowledge",
+        "description": (
+            "Load a specialized testing knowledge module with detailed methodology. "
+            "Load these WHEN RELEVANT based on what you discover, not upfront. "
+            "Each module contains specific tools, commands, and testing procedures."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "module": {
+                    "type": "string",
+                    "description": "Knowledge module name",
+                    "enum": [
+                        "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
+                        "recon_advanced", "performance", "seo", "compliance", "cloud",
+                        "form_testing", "auth_testing",
+                    ],
+                },
+            },
+            "required": ["module"],
+        },
+    },
+    {
+        "name": "update_attack_surface",
+        "description": (
+            "Update the structured attack surface map with discoveries. "
+            "Call after reconnaissance and whenever you discover new components. "
+            "Returns suggestions for what to test next based on discoveries."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "technologies": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Detected technologies (e.g., 'nginx 1.24', 'React', 'WordPress 6.4')",
+                },
+                "chatbots": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "description": "Platform (Intercom, Drift, custom, etc.)"},
+                            "endpoint": {"type": "string", "description": "Chat API endpoint URL"},
+                            "details": {"type": "string", "description": "Additional details"},
+                        },
+                    },
+                    "description": "Detected chatbots/AI assistants",
+                },
+                "api_endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "method": {"type": "string"},
+                            "auth_required": {"type": "boolean"},
+                            "description": {"type": "string"},
+                        },
+                    },
+                    "description": "Discovered API endpoints",
+                },
+                "forms": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "type": {"type": "string", "description": "login, registration, search, contact, upload, etc."},
+                            "fields": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
+                    "description": "Discovered HTML forms",
+                },
+                "auth_mechanisms": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Auth types found (cookies, JWT, OAuth, API keys, etc.)",
+                },
+                "infrastructure": {
+                    "type": "object",
+                    "properties": {
+                        "waf": {"type": "string"},
+                        "cdn": {"type": "string"},
+                        "cloud_provider": {"type": "string"},
+                        "server": {"type": "string"},
+                    },
+                    "description": "Infrastructure details",
+                },
+                "open_ports": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Open ports discovered",
+                },
+                "subdomains": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Discovered subdomains",
+                },
+            },
+        },
+    },
 ]
 
 

@@ -59,7 +59,8 @@ VALIDATION_QUEUE = "validation-jobs"
 _DB_URL = os.environ.get("DATABASE_URL", "")
 
 
-def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_count=None):
+def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_count=None,
+                        token_usage=None):
     """Update scan status in the database via direct DB connection."""
     if not _DB_URL:
         return
@@ -79,6 +80,11 @@ def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_cou
             if status == "completed":
                 sql += ", completed_at = :completed_at"
                 params["completed_at"] = datetime.now(timezone.utc)
+            if token_usage:
+                sql += ", total_input_tokens = :input_tokens, total_output_tokens = :output_tokens, estimated_cost = :cost"
+                params["input_tokens"] = token_usage.get("total_input_tokens", 0)
+                params["output_tokens"] = token_usage.get("total_output_tokens", 0)
+                params["cost"] = token_usage.get("estimated_cost_usd", 0.0)
             sql += " WHERE id = :scan_id"
             conn.execute(text(sql), params)
             conn.commit()
@@ -117,8 +123,14 @@ def main():
                 report = run_scan(scan_id, target, scan_type, config)
                 findings = len(report.get("findings", []))
                 score = report.get("risk_score", 0)
+                # Extract token usage from report metadata
+                token_usage = None
+                meta = report.get("scan_metadata", {})
+                if meta and meta.get("total_input_tokens"):
+                    token_usage = meta
                 log.info("Scan %s completed: %d findings, risk score %s", scan_id, findings, score)
-                _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings)
+                _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings,
+                                    token_usage=token_usage)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")

@@ -42,6 +42,9 @@ class Scan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     schedule_id: Mapped[str | None] = mapped_column(ForeignKey("scheduled_scans.id"), nullable=True)
+    total_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    total_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
 
     user: Mapped["User"] = relationship(back_populates="scans")
 

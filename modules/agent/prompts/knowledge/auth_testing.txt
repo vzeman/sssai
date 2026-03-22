@@ -1,0 +1,41 @@
+## Authentication & Session Security Testing
+
+### Login Form Testing
+- Test password policy (weak password acceptance)
+- Brute force protection: `hydra -l admin -P /usr/share/wordlists/rockyou.txt {target} http-form-post`
+- Account lockout mechanism (does it exist? How many attempts?)
+- Error message enumeration (different messages for valid/invalid users?)
+- Credential stuffing protection
+
+### Session Management
+- Cookie flags: Secure, HttpOnly, SameSite attributes
+- Session fixation: Can you set session before auth and reuse after?
+- Session timeout: How long until session expires?
+- Concurrent session handling
+- Session invalidation on logout
+
+### JWT Testing
+- Algorithm confusion (RS256 → HS256, none algorithm)
+- Weak signing secrets (brute force with jwt-cracker)
+- Token expiry validation
+- Token refresh mechanism
+- Token revocation/blacklist
+- Claims manipulation (modify sub, role, admin claims)
+
+### OAuth/SSO Testing
+- Open redirect in OAuth callback URLs
+- CSRF in OAuth flow (state parameter)
+- Token leakage via referrer headers
+- Scope escalation
+
+### Multi-Factor Authentication
+- 2FA bypass techniques
+- Backup code handling
+- Rate limiting on 2FA verification
+- Session management after 2FA
+
+### Password Reset
+- Token predictability
+- Token expiry
+- Account enumeration via reset
+- Email header injection

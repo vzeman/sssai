@@ -41,6 +41,23 @@ try:
 except Exception:
     pass
 
+# Add token tracking columns to scans table if missing (migration)
+try:
+    from sqlalchemy import text as _text
+    with engine.connect() as conn:
+        for col, col_type in [
+            ("total_input_tokens", "INTEGER DEFAULT 0"),
+            ("total_output_tokens", "INTEGER DEFAULT 0"),
+            ("estimated_cost", "REAL DEFAULT 0.0"),
+        ]:
+            try:
+                conn.execute(_text(f"ALTER TABLE scans ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
+        conn.commit()
+except Exception:
+    pass
+
 # Set up Elasticsearch indices on startup
 try:
     from modules.infra import setup_es

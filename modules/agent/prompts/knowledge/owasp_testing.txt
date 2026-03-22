@@ -1,0 +1,63 @@
+## OWASP Top 10 (2021) Testing Methodology
+
+### A01: Broken Access Control
+- Test IDOR: modify IDs in URLs/parameters
+- Missing function-level access control (access admin endpoints as regular user)
+- CORS misconfiguration: `curl -H "Origin: https://evil.com" -I {target}`
+- Directory traversal: `../` in file paths
+- Forced browsing to admin/debug pages
+- `nuclei -u {target} -t misconfiguration/ -t exposed-panels/ -o /output/access-control.txt`
+
+### A02: Cryptographic Failures
+- TLS analysis: `testssl --json /output/testssl.json {target}`
+- Certificate validation: `openssl s_client -connect {target}:443 -servername {target}`
+- Sensitive data in clear text (passwords, tokens in URLs)
+- Weak ciphers and deprecated protocols
+
+### A03: Injection
+- SQL Injection: `sqlmap -u "{target}" --batch --level 3 --risk 2 --output-dir=/output/sqlmap`
+- XSS payloads on forms and parameters
+- Command injection: backticks, semicolons, pipes in inputs
+- `wapiti -u {target} -o /output/wapiti/ -f json -m sql,xss,exec,xxe`
+
+### A04: Insecure Design
+- Rate limiting: `hey -n 100 -c 10 {target}/api/login`
+- CAPTCHA bypass, business logic flaws
+- Error messages for information disclosure
+
+### A05: Security Misconfiguration
+- Security headers: `drheader scan {target} -j > /output/headers.json`
+- `nuclei -u {target} -t misconfiguration/ -t technologies/ -severity info,low,medium,high,critical`
+- Default credentials on admin panels
+- Exposed debug endpoints, stack traces
+- HTTP methods: `curl -X OPTIONS -v {target}`
+
+### A06: Vulnerable and Outdated Components
+- Technology detection: `whatweb {target} -a 3 --log-json=/output/whatweb.json`
+- JavaScript libraries: `retire --outputformat json --outputpath /output/retire.json`
+- `nuclei -u {target} -t cves/ -severity critical,high -o /output/cves.txt`
+
+### A07: Identification and Authentication Failures
+- Password policy (weak password acceptance)
+- Cookie flags (Secure, HttpOnly, SameSite)
+- Session fixation, JWT implementation issues
+
+### A08: Software and Data Integrity Failures
+- Subresource Integrity (SRI) on external scripts
+- Insecure deserialization patterns
+- `trufflehog filesystem --directory /output/ --json > /output/secrets.json`
+
+### A09: Security Logging and Monitoring Failures
+- Test if failed logins are logged
+- Exposed log files
+- Security event alerting
+
+### A10: Server-Side Request Forgery (SSRF)
+- Test URL parameters for SSRF: internal IPs (127.0.0.1, 169.254.169.254, 10.0.0.1)
+- File upload for SSRF via URL
+- Open redirect to SSRF chains
+- `nuclei -u {target} -t vulnerabilities/ssrf/ -o /output/ssrf.txt`
+
+## Report Requirements
+For EACH category (A01-A10) report: Status (Pass/Fail/Partial), Findings, Evidence, Severity, Remediation.
+Include `compliance_summary` with pass/fail for each A01-A10 category.

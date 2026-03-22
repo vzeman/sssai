@@ -1,0 +1,35 @@
+## Cloud & Infrastructure Security Testing
+
+### Asset Discovery
+- Identify cloud services from DNS: `dig {target} CNAME` (look for amazonaws.com, cloudfront, azure, gcp)
+- Technology detection: `whatweb {target}` for cloud service headers
+- Check for exposed storage buckets, container registries
+
+### Container Security
+- **trivy**: `trivy image --format json --output /output/trivy.json {image}`
+- **grype**: `grype {image} -o json > /output/grype.json`
+- Check for embedded secrets, misconfigurations
+
+### IaC Analysis
+- **checkov**: `checkov -d ./terraform --output json > /output/checkov.json`
+- **kics**: `kics scan -p ./infrastructure --report-formats json -o /output/kics/`
+- Dockerfile security: `checkov -f Dockerfile --output json`
+
+### Secret Detection
+- **trufflehog**: `trufflehog filesystem /path --json > /output/trufflehog.json`
+- **gitleaks**: `gitleaks detect --source=. --report-format=json --report-path=/output/gitleaks.json`
+
+### Supply Chain & SBOM
+- **syft**: `syft {image} -o spdx-json=/output/sbom.spdx.json`
+- **retire**: `retire --outputformat json --outputpath /output/retire.json`
+
+### SAST
+- **semgrep**: `semgrep scan --config p/security-audit --json --output /output/semgrep.json .`
+
+### Cloud Compliance
+- **prowler**: `prowler aws --output-modes json-ocsf --output-directory /output/prowler/`
+- CIS benchmarks, NIST, SOC2
+
+### Cloud Metadata SSRF
+- Test for metadata endpoint access: http://169.254.169.254/latest/meta-data/
+- Check if cloud IAM roles are exposed

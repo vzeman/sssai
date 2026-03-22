@@ -1,0 +1,37 @@
+## Performance Testing Methodology
+
+### Core Web Vitals (Lighthouse)
+- Desktop: `lighthouse {target} --output json --output-path /output/lighthouse.json --chrome-flags="--headless --no-sandbox"`
+- Mobile: `lighthouse {target} --emulated-form-factor mobile --output json --output-path /output/lighthouse-mobile.json --chrome-flags="--headless --no-sandbox"`
+
+### Response Timing
+- `curl -s -o /dev/null -w 'HTTP %{{http_code}} | TTFB: %{{time_starttransfer}}s | Total: %{{time_total}}s | DNS: %{{time_namelookup}}s | Connect: %{{time_connect}}s | TLS: %{{time_appconnect}}s' {target}`
+
+### Load Testing
+Write k6 script to /output/loadtest.js:
+```javascript
+import http from 'k6/http';
+import {{ check, sleep }} from 'k6';
+export default function () {{
+    let res = http.get('{target}');
+    check(res, {{ 'status is 200': (r) => r.status === 200 }});
+    sleep(1);
+}}
+```
+Run: `k6 run --vus 10 --duration 30s /output/loadtest.js`
+Keep load tests reasonable (max 50 VUs for 30s).
+
+### Front-End Quality
+- **yellowlabtools**: `yellowlabtools {target} > /output/yellowlab.json`
+- Page weight, DOM complexity, CSS efficiency, unused code
+
+### Caching & CDN
+- Check Cache-Control, ETag, Last-Modified headers via http_request
+- CDN detection from response headers
+- Static asset optimization
+
+### Bottleneck Identification
+- Compare desktop vs mobile scores
+- Identify render-blocking resources
+- Check third-party script impact
+- Image optimization opportunities

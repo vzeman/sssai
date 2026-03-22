@@ -1,0 +1,46 @@
+## SEO Audit Methodology
+
+### Crawlability
+- Check robots.txt: `http_request` to `/robots.txt`
+- XML sitemap: check `/sitemap.xml`, `/sitemap_index.xml`
+- Crawl depth and internal linking structure
+
+### Indexability
+- Canonical tags, noindex/nofollow directives
+- Hreflang for international, pagination handling
+- Meta robots tags
+
+### Performance (SEO Signal)
+- Lighthouse: `lighthouse {target} --only-categories=seo,accessibility --output json --output-path /output/lighthouse-seo.json --chrome-flags="--headless --no-sandbox"`
+- Core Web Vitals (LCP, CLS, INP)
+
+### Content & Structure
+- Title tags (length 50-60 chars, uniqueness)
+- Meta descriptions (length 150-160 chars)
+- Heading hierarchy (single H1, proper H2-H6 nesting)
+- Structured data (JSON-LD, microdata): check page source
+- Open Graph and Twitter Card meta tags
+- Image alt text
+
+### Links
+- **blc**: `blc {target} --ordered --recursive --exclude-external -o /output/broken-links.txt`
+- Redirect chains (3xx hops)
+- Internal linking structure
+
+### Mobile
+- Viewport meta tag
+- Responsive design
+- Mobile Lighthouse: `lighthouse {target} --emulated-form-factor mobile`
+
+### Accessibility (SEO Signal)
+- **pa11y**: `pa11y {target} --standard WCAG2AA --reporter json > /output/pa11y.json`
+- **axe**: `axe {target} --tags wcag2a,wcag2aa --save /output/axe-results.json`
+
+### Security Signals
+- HTTPS everywhere (affects rankings)
+- HSTS header
+- No mixed content
+
+### Email Deliverability
+- SPF, DKIM, DMARC records via dns_lookup
+- `checkdmarc {target} -f json -o /output/checkdmarc.json`
