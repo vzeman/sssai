@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from modules.config import AI_MODEL
 from modules.sandbox.openshell import OpenShellPolicy
 
 log = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class NemoClawConfig:
 
     # Inference configuration
     inference_provider: str = "anthropic"  # "anthropic" | "nemotron" | "local"
-    model: str = "claude-sonnet-4-20250514"
+    model: str = AI_MODEL
     nemotron_model: str = "nemotron-3-super-120b"
     local_inference_port: int = 8081
 

@@ -100,9 +100,27 @@ def health():
 
 
 # ─── Worker logs endpoint (reads from Redis pub/sub or Docker logs) ────
+import json as _json
 import redis as _redis
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
+
+
+@app.get("/api/heartbeat")
+def heartbeat_messages():
+    """Return recent heartbeat status messages."""
+    try:
+        r = _redis.from_url(_REDIS_URL)
+        raw = r.lrange("heartbeat:messages", -20, -1)
+        messages = []
+        for item in raw:
+            try:
+                messages.append(_json.loads(item.decode() if isinstance(item, bytes) else item))
+            except Exception:
+                pass
+        return {"messages": messages}
+    except Exception:
+        return {"messages": []}
 
 
 @app.get("/api/logs/worker")
@@ -136,13 +154,13 @@ def scan_activity(scan_id: str):
 
 
 # ─── Chat endpoints (human ↔ agent communication) ───────────────────
-import json as _json
 import time as _time
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel
 from modules.api.auth import get_current_user
 from modules.api.models import User, Scan
+from modules.config import AI_MODEL
 from modules.api.database import get_db
 from sqlalchemy.orm import Session
 
@@ -271,7 +289,7 @@ def _answer_chat_with_ai(scan_id: str, scan, question: str, r):
 
             client = anthropic.Anthropic()
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=AI_MODEL,
                 max_tokens=4000,
                 system=system,
                 messages=merged,
@@ -561,7 +579,7 @@ def _answer_global_chat(user, question: str, r, db):
 
             client = anthropic.Anthropic()
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=AI_MODEL,
                 max_tokens=4000,
                 system=system,
                 messages=merged,

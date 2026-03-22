@@ -13,6 +13,8 @@ services:
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-claude-haiku-4-5-20251001}
+      - AI_MODEL_LIGHT=${AI_MODEL_LIGHT:-claude-haiku-4-5-20251001}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
       postgres:
@@ -35,6 +37,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-claude-haiku-4-5-20251001}
+      - AI_MODEL_LIGHT=${AI_MODEL_LIGHT:-claude-haiku-4-5-20251001}
       - NOTIFICATION_CHANNELS=${NOTIFICATION_CHANNELS:-[]}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     depends_on:
@@ -74,6 +78,29 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./modules:/app/modules
+
+  heartbeat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.heartbeat
+    environment:
+      - RUNTIME=local
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://scanner:scanner@postgres:5432/scanner
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL_LIGHT=${AI_MODEL_LIGHT:-claude-haiku-4-5-20251001}
+      - API_URL=http://api:8000
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - HEARTBEAT_INTERVAL=${HEARTBEAT_INTERVAL:-120}
     depends_on:
       postgres:
         condition: service_healthy

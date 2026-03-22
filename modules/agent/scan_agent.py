@@ -23,6 +23,7 @@ import httpx
 
 from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
+from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
 
 log = logging.getLogger(__name__)
@@ -36,9 +37,8 @@ KEEP_RECENT = 6                # messages to keep un-summarized
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
-# Claude Sonnet 4 pricing (per million tokens) as of 2025
-_COST_PER_1M_INPUT = 3.00
-_COST_PER_1M_OUTPUT = 15.00
+# Pricing from central config
+_COST_PER_1M_INPUT, _COST_PER_1M_OUTPUT = get_cost_per_1m(AI_MODEL)
 
 
 class TokenTracker:
@@ -618,7 +618,7 @@ def _handle_subagent(agent_type: str, input: dict, scan_context: dict | None) ->
 
         for _ in range(max_iterations):
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=AI_MODEL,
                 max_tokens=8000,
                 system=system_prompt,
                 tools=agent_tools,
@@ -963,7 +963,7 @@ def _run_execution_monitor(client, messages: list, loop_detector: LoopDetector,
         )
 
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=AI_MODEL_LIGHT,
             max_tokens=500,
             messages=[{"role": "user", "content": monitor_prompt}],
         )
@@ -1059,7 +1059,7 @@ def _summarize_chain(client, messages: list, scan_context: dict | None = None) -
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=AI_MODEL_LIGHT,
             max_tokens=2000,
             messages=[{
                 "role": "user",
@@ -1123,7 +1123,7 @@ def _run_reflector(client, text_output: str, system_prompt: str, tools: list,
         )
 
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=AI_MODEL_LIGHT,
             max_tokens=500,
             messages=[{"role": "user", "content": reflector_prompt}],
         )
@@ -1338,7 +1338,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
         # ── Main LLM call ──
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=AI_MODEL,
             max_tokens=16000,
             system=system_prompt,
             tools=all_tools,
@@ -1817,7 +1817,7 @@ def run_validation(task_id: str, user_id: str, request: dict):
     for iteration in range(max_iterations):
         try:
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=AI_MODEL,
                 max_tokens=8000,
                 system=system_prompt,
                 tools=VALIDATION_TOOLS,

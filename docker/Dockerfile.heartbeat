@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir \
+    sqlalchemy psycopg2-binary redis boto3 httpx anthropic "elasticsearch>=8.13,<9"
+
+COPY modules/ /app/modules/
+COPY config/ /app/config/
+WORKDIR /app
+
+ENV RUNTIME=local
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python3", "-m", "modules.heartbeat.consumer"]

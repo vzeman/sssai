@@ -152,6 +152,28 @@
   .chat-typing { padding: 0.4rem 0.75rem; font-size: 0.75rem; color: var(--purple); display: none; flex-shrink: 0; }
   .chat-typing.visible { display: block; animation: pulse 1.5s infinite; }
 
+  /* ─── Heartbeat ─── */
+  .heartbeat-panel { border-bottom: 1px solid var(--border); max-height: 200px; overflow-y: auto; }
+  .heartbeat-toggle { padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.78rem; color: var(--muted); }
+  .heartbeat-toggle:hover { color: var(--text); }
+  .heartbeat-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .heartbeat-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .heartbeat-dot.warn { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .heartbeat-dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .heartbeat-msgs { padding: 0 0.75rem 0.5rem; display: none; }
+  .heartbeat-msgs.open { display: block; }
+  .hb-msg { font-size: 0.75rem; color: var(--muted); padding: 0.35rem 0; border-bottom: 1px solid rgba(51,65,85,0.3); line-height: 1.4; }
+  .hb-msg:last-child { border-bottom: none; }
+  .hb-msg .hb-time { color: var(--accent); font-size: 0.68rem; margin-right: 0.4rem; }
+  .hb-msg .hb-ok { color: var(--green); }
+  .hb-msg .hb-warn { color: var(--yellow); }
+  .hb-checks { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.25rem; }
+  .hb-chip { font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; }
+  .hb-chip.up { background: rgba(34,197,94,0.15); color: var(--green); }
+  .hb-chip.down { background: rgba(239,68,68,0.15); color: var(--red); }
+  .hb-chip.idle { background: rgba(148,163,184,0.15); color: var(--muted); }
+  .hb-chip.unknown { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
   /* ─── Action buttons in scan rows ─── */
   .row-actions { display: flex; gap: 3px; flex-wrap: wrap; }
   .row-actions .btn { white-space: nowrap; }
@@ -298,6 +320,16 @@
       <h3>AI Security Assistant</h3>
       <button class="chat-clear" onclick="clearChat()">Clear</button>
     </div>
+    <!-- Heartbeat Panel -->
+    <div class="heartbeat-panel" id="heartbeat-panel" style="display:none">
+      <div class="heartbeat-toggle" onclick="toggleHeartbeat()">
+        <span class="heartbeat-dot ok" id="hb-dot"></span>
+        <span id="hb-label">Platform Status</span>
+        <span style="margin-left:auto;font-size:0.68rem" id="hb-time"></span>
+        <span id="hb-arrow" style="font-size:0.6rem">&#9660;</span>
+      </div>
+      <div class="heartbeat-msgs" id="hb-messages"></div>
+    </div>
     <div class="chat-messages" id="chat-messages">
       <div class="chat-empty">
         I'm your AI security assistant. I can help you:<br><br>
@@ -351,9 +383,16 @@ var PHASES = {
   'lighthouse':'Performance & SEO','pa11y':'Accessibility','curl':'HTTP Analysis',
   'dig':'DNS & Email Security','checkdmarc':'DNS & Email Security',
 };
+var ACTIVITY_NAMES = {
+  'plan_adaptation':'Plan Revision','knowledge_loaded':'Knowledge Module Loaded',
+  'attack_surface_update':'Attack Surface Updated','phase':'Phase Transition',
+  'agent':'AI Agent','thinking':'AI Reasoning','error':'Error',
+  'plan':'Planning','summary':'Summary','delegation':'Sub-Agent Delegation',
+  'unknown':'Agent Activity',
+};
 function getToolName(cmd) { if(!cmd) return 'unknown'; var p=cmd.trim().split(/\s+/); var n=p[0]; if(n==='timeout'&&p.length>2) n=p[2]; return n.replace(/^.*\//,''); }
-function getPhase(t) { return PHASES[t]||'Other'; }
-function getFriendlyName(t) { return TOOL_NAMES[t]||t; }
+function getPhase(t) { return PHASES[t]||(ACTIVITY_NAMES[t]?'AI Agent':'Other'); }
+function getFriendlyName(t) { return TOOL_NAMES[t]||ACTIVITY_NAMES[t]||t||'Agent Activity'; }
 
 // ═══ AUTH ═══
 var tokenRefreshTimer = null;
@@ -597,8 +636,9 @@ function renderChecks(activities) {
     var isLast = idx===activities.length-1;
     var toolName, phase, friendlyName, cmd;
     if (a.type==='command') { toolName=getToolName(a.command); cmd=a.command; }
-    else { toolName=a.tool; cmd=a.input||''; }
-    phase=getPhase(toolName); friendlyName=getFriendlyName(toolName);
+    else if (a.type==='tool_call'||a.tool) { toolName=a.tool||'unknown'; cmd=a.input||''; }
+    else { toolName=a.type||'agent'; cmd=a.message||a.reason||a.module||''; }
+    phase=getPhase(toolName); friendlyName=getFriendlyName(toolName||'agent');
     if (phase!==currentPhase) { currentPhase=phase; html+='<div class="phase-header">'+phase+'</div>'; }
     var iconCls=isLast?'running':'pass', icon=isLast?'&#9658;':'&#10003;';
     var badge=isLast?'<span class="badge active">running</span>':'<span class="badge done">done</span>';
@@ -833,6 +873,7 @@ async function refresh() {
   await loadLogs();
   await loadChecks();
   await loadUptimeWidget();
+  await loadHeartbeat();
 }
 
 // ═══ GLOBAL CHAT ═══
@@ -980,6 +1021,54 @@ async function clearChat() {
     chatLastCount = 0;
     loadGlobalChat();
   } catch(e) {}
+}
+
+// ═══ HEARTBEAT ═══
+var hbOpen = false;
+function toggleHeartbeat() {
+  hbOpen = !hbOpen;
+  var el = document.getElementById('hb-messages');
+  el.classList.toggle('open', hbOpen);
+  document.getElementById('hb-arrow').innerHTML = hbOpen ? '&#9650;' : '&#9660;';
+}
+
+async function loadHeartbeat() {
+  if (!token) return;
+  try {
+    var res = await fetch(API + '/api/heartbeat', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var msgs = data.messages || [];
+    if (!msgs.length) return;
+    document.getElementById('heartbeat-panel').style.display = 'block';
+    var latest = msgs[msgs.length - 1];
+    // Update dot
+    var dot = document.getElementById('hb-dot');
+    dot.className = 'heartbeat-dot ' + (latest.all_ok ? 'ok' : 'err');
+    document.getElementById('hb-label').textContent = latest.all_ok ? 'All Systems Operational' : 'Issues Detected';
+    document.getElementById('hb-time').textContent = latest.display_time || '';
+    // Render messages (most recent first)
+    var html = '';
+    for (var i = msgs.length - 1; i >= Math.max(0, msgs.length - 10); i--) {
+      var m = msgs[i];
+      html += '<div class="hb-msg">';
+      html += '<span class="hb-time">' + (m.display_time || '') + '</span>';
+      html += '<span class="' + (m.all_ok ? 'hb-ok' : 'hb-warn') + '">' + (m.summary || '') + '</span>';
+      if (m.checks) {
+        html += '<div class="hb-checks">';
+        for (var j = 0; j < m.checks.length; j++) {
+          var c = m.checks[j];
+          var cls = c.status === 'up' ? 'up' : c.status === 'idle' ? 'idle' : c.status === 'down' ? 'down' : 'unknown';
+          html += '<span class="hb-chip ' + cls + '">' + c.name + '</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    document.getElementById('hb-messages').innerHTML = html;
+  } catch (e) {}
 }
 
 // ═══ INIT ═══
