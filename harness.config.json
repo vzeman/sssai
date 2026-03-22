@@ -1,0 +1,284 @@
+{
+  "version": "1.0.0",
+  "riskTiers": {
+    "tier1": {
+      "name": "low",
+      "description": "Documentation-only changes, typo fixes, comments, non-code config edits",
+      "patterns": [
+        "docs/**",
+        "*.md",
+        "**/*.md",
+        "CHANGELOG*",
+        "LICENSE*",
+        ".editorconfig",
+        ".gitignore"
+      ],
+      "requiredChecks": [
+        "lint"
+      ],
+      "mergePolicy": {
+        "minApprovals": 0,
+        "requireReviewAgent": false,
+        "allowSelfMerge": true
+      },
+      "evidenceRequirements": [
+        "lint-clean"
+      ]
+    },
+    "tier2": {
+      "name": "medium",
+      "description": "Business logic, new features, refactors, test changes",
+      "patterns": [
+        "src/**",
+        "lib/**",
+        "tests/**",
+        "test/**",
+        "scripts/**",
+        "*.json",
+        "*.yaml",
+        "*.yml"
+      ],
+      "requiredChecks": [
+        "lint",
+        "test",
+        "build"
+      ],
+      "mergePolicy": {
+        "minApprovals": 1,
+        "requireReviewAgent": true,
+        "allowSelfMerge": false
+      },
+      "evidenceRequirements": [
+        "tests-pass",
+        "lint-clean"
+      ]
+    },
+    "tier3": {
+      "name": "high",
+      "description": "Critical paths, infrastructure, auth, payments, CI/CD pipelines, deployment configs",
+      "patterns": [
+        ".github/**",
+        "Dockerfile*",
+        "docker-compose*",
+        "**/Dockerfile*",
+        "harness.config.json",
+        "scripts/structural-tests.sh"
+      ],
+      "requiredChecks": [
+        "lint",
+        "test",
+        "build",
+        "structural-tests",
+        "harness-smoke",
+        "manual-approval"
+      ],
+      "mergePolicy": {
+        "minApprovals": 1,
+        "requireReviewAgent": true,
+        "allowSelfMerge": false
+      },
+      "evidenceRequirements": [
+        "tests-pass",
+        "lint-clean",
+        "manual-review"
+      ]
+    }
+  },
+  "commands": {
+    "test": "echo \"no test command detected\"",
+    "build": "echo \"no build command detected\"",
+    "lint": "echo \"no lint command detected\"",
+    "typeCheck": null
+  },
+  "docsDrift": {
+    "trackedDocs": [
+      "README.md",
+      "docs/**"
+    ],
+    "maxStaleDays": 30,
+    "requireUpdateWithCodeChange": false,
+    "exemptPatterns": [
+      "tests/**",
+      "test/**",
+      "**/*.generated.*"
+    ]
+  },
+  "shaDiscipline": {
+    "enabled": true,
+    "enforceExactSha": true,
+    "rejectStaleReviews": true,
+    "description": "All CI gates pin to exact commit SHA from the risk policy gate"
+  },
+  "evidenceConfig": {
+    "screenshotDir": ".harness/evidence",
+    "retentionDays": 30,
+    "requiredForUI": false,
+    "browserTool": null
+  },
+  "architecturalBoundaries": {},
+  "monorepo": {
+    "enabled": false,
+    "packages": [],
+    "sharedChecks": [
+      "lint",
+      "structural-tests",
+      "harness-smoke"
+    ]
+  },
+  "generatedAt": "2026-03-22T00:00:00.000Z",
+  "lastUpdated": "2026-03-22T18:42:37.546Z",
+  "repoRoot": ".",
+  "aiPlatform": "claude",
+  "detection": {
+    "primaryLanguage": "unknown",
+    "framework": null,
+    "packageManager": null,
+    "ciProvider": null,
+    "monorepo": false
+  },
+  "harnesses": [
+    {
+      "name": "risk-contract",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "harness.config.json"
+      ]
+    },
+    {
+      "name": "claude-md",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/CLAUDE.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/.mcp.json"
+      ]
+    },
+    {
+      "name": "docs-structure",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/docs/architecture.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/docs/conventions.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/docs/layers.md"
+      ]
+    },
+    {
+      "name": "pre-commit-hooks",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/Projects/harness-skeleton/.githooks/pre-commit",
+        "/Users/viktorzeman/Projects/harness-skeleton/scripts/install-hooks.sh"
+      ]
+    },
+    {
+      "name": "risk-policy-gate",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/risk-policy-gate.sh",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/risk-policy-gate.ts",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/risk-policy-gate.yml"
+      ]
+    },
+    {
+      "name": "ci-pipeline",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/ci.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/structural-tests.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/harness-smoke.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/structural-tests.sh"
+      ]
+    },
+    {
+      "name": "review-agent",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/code-review-agent.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/review-agent-rerun.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/auto-resolve-threads.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/review-agent-utils.ts",
+        "/Users/viktorzeman/work/sssai/security-scanner/.codefactory/prompts/review-agent.md"
+      ]
+    },
+    {
+      "name": "remediation-loop",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/remediation-agent.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/remediation-agent-prompt.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/remediation-guard.ts"
+      ]
+    },
+    {
+      "name": "pr-templates",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/PULL_REQUEST_TEMPLATE.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/PULL_REQUEST_TEMPLATE/agent-pr.md"
+      ]
+    },
+    {
+      "name": "garbage-collection",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/doc-gardening.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/doc-gardening-prompt.md"
+      ]
+    },
+    {
+      "name": "incident-harness-loop",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/ISSUE_TEMPLATE/harness-gap.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/docs/harness-gaps.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/weekly-metrics.yml"
+      ]
+    },
+    {
+      "name": "issue-triage",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/issue-triage.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/issue-triage-guard.ts",
+        "/Users/viktorzeman/work/sssai/security-scanner/.codefactory/prompts/issue-triage.md"
+      ]
+    },
+    {
+      "name": "issue-planner",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/issue-planner.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/issue-planner-guard.ts",
+        "/Users/viktorzeman/work/sssai/security-scanner/.codefactory/prompts/issue-planner.md"
+      ]
+    },
+    {
+      "name": "issue-implementer",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": [
+        "/Users/viktorzeman/work/sssai/security-scanner/.github/workflows/issue-implementer.yml",
+        "/Users/viktorzeman/work/sssai/security-scanner/.codefactory/prompts/issue-implementer.md",
+        "/Users/viktorzeman/work/sssai/security-scanner/scripts/issue-implementer-guard.ts"
+      ]
+    },
+    {
+      "name": "skills-installer",
+      "enabled": true,
+      "generatedAt": "2026-03-22T18:42:37.546Z",
+      "files": []
+    }
+  ]
+}

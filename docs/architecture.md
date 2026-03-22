@@ -1,291 +1,202 @@
 # Architecture
 
-SSSAI uses Claude AI as an autonomous agent that plans, executes, and reports on security scans. This document explains the system architecture, the AI agent loop, and how the platform's services work together.
+SSSAI is an AI-powered autonomous security scanning platform written in Python (backend) with a React frontend. Claude AI drives scan planning, tool execution, result interpretation, and report generation without manual configuration.
 
-## System Overview
-
-```
-                                    ┌─────────────────────────────────────────┐
-                                    │            Worker Container             │
-                                    │                                         │
-User → Dashboard (HTML) ──┐         │  ┌─────────┐    ┌──────────────────┐   │
-                          │         │  │ Primary  │───→│ 69+ Scan Tools   │   │
-Browser → API (FastAPI) ──┼── Redis │  │ Agent    │    │ nmap, nuclei,    │   │
-                          │  Queue  │  │ (Claude) │    │ nikto, testssl...│   │
-CLI → API ────────────────┘         │  └────┬─────┘    └──────────────────┘   │
-                                    │       │                                  │
-                                    │  ┌────┴──────────────────────────┐      │
-                                    │  │ Sub-Agents                    │      │
-                                    │  │ ┌───────────┐ ┌──────────┐   │      │
-                                    │  │ │ Pentester │ │ Searcher │   │      │
-                                    │  │ └───────────┘ └──────────┘   │      │
-                                    │  │ ┌───────────┐                │      │
-                                    │  │ │ Coder     │                │      │
-                                    │  │ └───────────┘                │      │
-                                    │  └───────────────────────────────┘      │
-                                    └─────────────────────────────────────────┘
-                                              │
-                              ┌────────────────┼────────────────┐
-                              ▼                ▼                ▼
-                         PostgreSQL         Redis          Storage
-                         (scans, users,    (queue, logs,   (reports,
-                          schedules,        activity,       agent logs)
-                          memory)           pub/sub)
-                              ▲                ▲
-                              │                │
-                         ┌────┴────────────────┴────┐
-                         │   Heartbeat Service       │
-                         │   (health checks every    │
-                         │   120s + AI summary)      │
-                         └───────────────────────────┘
-```
-
-## Services
-
-### API Service
-
-The FastAPI-based REST API serves both the web dashboard and programmatic access.
-
-**Responsibilities:**
-- User authentication (JWT + optional 2FA)
-- Scan creation and status tracking
-- Report generation (JSON, HTML, PDF)
-- Scheduled scan management
-- Uptime monitor management
-- Notification channel configuration
-- Live scan activity streaming
-- Tool registry queries
-
-**Tech:** FastAPI, SQLAlchemy, Pydantic, Jinja2, WeasyPrint
-
-### Worker Service
-
-The core of the platform. An Ubuntu 22.04 container with 69+ security scanning tools and the AI agent runtime.
-
-**Responsibilities:**
-- Consuming scan jobs from the Redis queue
-- Running the AI agent loop (Claude API calls)
-- Executing scanning tools via shell commands
-- Storing reports and findings
-- Dispatching notifications on completion
-
-**How it processes a scan:**
-1. Picks up a scan job from the Redis queue
-2. Loads the appropriate scan type prompt
-3. Starts the AI agent loop with Claude
-4. Agent calls tools (nmap, nuclei, etc.) via `run_command`
-5. Agent interprets results and decides next steps
-6. Agent calls the `report` tool with structured findings
-7. Report is saved and notifications dispatched
-
-### Scheduler Service
-
-Polls the database every 30 seconds for scheduled scans that are due.
-
-**Supported schedules:** `hourly`, `daily`, `weekly`, `monthly`, `12h`, `30m`, `2d`
-
-When a scheduled scan is due, it creates a new scan job and pushes it to the Redis queue, just like a manually triggered scan.
-
-### Monitor Service
-
-Runs uptime checks at configured intervals for each active monitor.
-
-**Check types:**
-- **HTTP** — Makes an HTTP request and checks status code, response time
-- **TCP** — Tests TCP port connectivity
-- **DNS** — Verifies DNS resolution
-- **TLS** — Validates SSL certificate, checks expiry
-
-Results update the monitor's status (`up`, `down`, `degraded`) and trigger notifications when status changes.
-
-### Heartbeat Service
-
-Periodically checks the health of all platform modules and generates AI-powered status summaries.
-
-**Checked modules:** API, Worker, Scheduler, Monitor, Redis, PostgreSQL, Elasticsearch
-
-**How it works:**
-1. Every 120 seconds (configurable), probes each module
-2. Checks Redis connectivity, memory usage, connected clients
-3. Checks PostgreSQL connectivity, scan/user counts, running scans
-4. Checks Elasticsearch cluster health and node count
-5. Checks API health endpoint response time
-6. Checks Worker activity and queue depth
-7. Checks Monitor status and active monitors
-8. Claude Haiku generates a concise natural-language summary
-9. Results stored in Redis and Elasticsearch
-
-The heartbeat panel appears at the top of the dashboard with a green/red status indicator.
-
----
-
-## AI Agent Loop
-
-The scanning engine uses Claude as an autonomous agent. Inspired by [PentAGI](https://github.com/vxcontrol/pentagi) architecture patterns.
-
-### Execution Flow
+## Project Structure
 
 ```
-1. PLAN      → Agent generates 3-7 step scan plan
-2. EXECUTE   → Agent calls tools, interprets results
-3. MONITOR   → Execution monitor reviews progress every 10 tool calls
-4. SUMMARIZE → Chain summarization compresses old messages when > 80K chars
-5. REFLECT   → Reflector redirects agent back to tools if it produces only text
-6. REPORT    → Agent submits structured report with findings
+security-scanner/
+├── modules/                  # All backend Python source code
+│   ├── agent/                # AI scan agent — Claude-driven autonomous scanning
+│   │   ├── scan_agent.py     # Agent loop, sub-agents, summarization, checkpointing
+│   │   ├── tools.py          # Tool definitions registered with the Anthropic SDK
+│   │   ├── checkpoint.py     # Mid-scan checkpoint save/resume for crash recovery
+│   │   └── prompts/          # System prompts per scan type + knowledge modules
+│   ├── api/                  # FastAPI REST API
+│   │   ├── main.py           # App bootstrap, routes, chat endpoints, dashboard
+│   │   ├── auth.py           # JWT auth, bcrypt, rate limiting, 2FA (TOTP)
+│   │   ├── database.py       # SQLAlchemy engine + session factory
+│   │   ├── models.py         # ORM models (User, Scan, Monitor, Schedule, etc.)
+│   │   ├── schemas.py        # Pydantic request/response models
+│   │   ├── routes/           # Route modules: scans, auth, monitors, schedules, etc.
+│   │   └── static/           # Server-rendered HTML dashboards
+│   ├── worker/               # Queue consumer — picks scan jobs, runs agent
+│   ├── scheduler/            # Cron-like service for recurring scans
+│   ├── monitor/              # Uptime monitoring (HTTP, TCP, DNS, TLS checks)
+│   ├── heartbeat/            # Platform health checks with AI-generated summaries
+│   ├── infra/                # Infrastructure abstraction (local vs AWS)
+│   │   ├── local_queue.py    # Redis-backed queue (BRPOP/LPUSH)
+│   │   ├── aws_queue.py      # SQS queue implementation
+│   │   ├── local_storage.py  # Filesystem storage (/output/)
+│   │   ├── aws_storage.py    # S3 storage implementation
+│   │   ├── elasticsearch.py  # Elasticsearch client, index setup, ILM
+│   │   └── *_secrets.py      # Secrets from env vars or AWS Secrets Manager
+│   ├── notifications/        # Multi-channel alert dispatcher (Slack, Discord, email, webhook)
+│   ├── reports/              # HTML/PDF/JSON report generation (Jinja2 + WeasyPrint)
+│   ├── tools/                # Tool registry — metadata for 80+ scanning tools
+│   ├── sandbox/              # NemoClaw/OpenClaw/OpenShell sandboxed execution
+│   └── config.py             # Central AI model selection and pricing
+├── frontend/                 # React 19 + Vite SPA (in development)
+├── docker/                   # Dockerfiles per service (api, worker, scheduler, monitor, heartbeat)
+├── config/                   # NemoClaw/OpenClaw/OpenShell configuration YAML
+├── scripts/                  # Utility scripts
+├── templates/                # (reserved)
+├── output/                   # Scan output files (mounted volume)
+├── logs/                     # Application logs
+├── reports/                  # Generated reports
+└── docker-compose.yml        # Full stack orchestration (7 services + 3 data stores)
 ```
 
-### Agent Tools
+## Architectural Pattern
 
-The agent has 16 tools available:
+SSSAI follows a **service-oriented architecture with an AI agent core**. Five independent services communicate through Redis queues and a shared PostgreSQL database.
 
-| Tool | Description |
-|------|-------------|
-| `run_command` | Execute shell commands with 300s timeout |
-| `read_file` | Read files from the output directory |
-| `write_file` | Write files to the output directory |
-| `http_request` | HTTP requests with full header/body inspection |
-| `dns_lookup` | DNS record queries (A, MX, TXT, NS, etc.) |
-| `parse_json` | Extract data from JSON using jq expressions |
-| `compare_results` | Compare current vs. previous scan results |
-| `screenshot` | Capture web page screenshots (desktop + mobile) |
-| `web_search` | Search the web via DuckDuckGo |
-| `exploit_search` | Search NVD + Exploit-DB for CVEs and exploits |
-| `delegate_to_pentester` | Delegate to pentester sub-agent |
-| `delegate_to_searcher` | Delegate to searcher sub-agent |
-| `delegate_to_coder` | Delegate to coder sub-agent |
-| `search_memory` | Query cross-scan memory |
-| `store_memory` | Save knowledge for future scans |
-| `report` | Submit the final structured report |
+This pattern suits the project because:
 
-### Sub-Agent Delegation
+- **Scan isolation**: The worker container runs 69+ security tools with `NET_RAW` capabilities, isolated from the API.
+- **Independent scaling**: Workers, monitors, and the scheduler scale independently.
+- **Fault tolerance**: Each service handles its own lifecycle (SIGTERM, graceful shutdown). The heartbeat service detects and auto-recovers stuck scans.
+- **AI autonomy**: The agent loop needs long-running, stateful execution that would block a request-response API.
 
-The primary agent can delegate specialized tasks to focused sub-agents, each with their own Claude call, system prompt, and limited tool set:
+Key design principles:
 
-| Sub-Agent | Role | Available Tools | Max Iterations |
-|-----------|------|-----------------|----------------|
-| **Pentester** | Deep vulnerability analysis, exploit verification, attack chains | run_command, http_request, dns_lookup, screenshot, read/write_file | 20 |
-| **Searcher** | CVE research, exploit lookup, vulnerability details | web_search, exploit_search, http_request, read_file | 20 |
-| **Coder** | Custom scripts, data processing, tool configurations | run_command, read/write_file | 20 |
+- **Infrastructure abstraction**: Factory functions (`get_queue()`, `get_storage()`, `get_secrets()`) switch between local (Redis/filesystem) and AWS (SQS/S3) based on a single `RUNTIME` env var.
+- **Fail-soft execution**: Non-critical failures (ES writes, notifications) are caught and logged without aborting the operation.
+- **Agent self-correction**: Loop detection, execution monitoring, chain summarization, and the reflector pattern keep the AI agent on track across long scans.
+- **Checkpoint recovery**: Scans save progress every 5 iterations; orphaned scans are auto-recovered on worker restart.
 
-### Loop Detection
+## Component Diagram
 
-The agent loop tracks every tool call and detects problematic patterns:
+```mermaid
+graph TD
+    User[User / Browser] --> Dashboard[Dashboard HTML]
+    User --> API[FastAPI API :8000]
+    Dashboard --> API
 
-- **Repeated calls:** Same tool + same arguments called 3+ times → warning injected
-- **Oscillation:** A→B→A→B pattern detection → agent redirected
-- **Stuck detection:** Agent producing text but no tool calls → reflector engaged
+    API -->|scan jobs| Redis[(Redis)]
+    API -->|CRUD| Postgres[(PostgreSQL)]
+    API -->|dual-write| ES[(Elasticsearch)]
 
-### Execution Monitor
+    Redis -->|BRPOP| Worker[Worker Service]
+    Worker -->|Claude API| Anthropic[Anthropic API]
+    Worker -->|shell exec| Tools[69+ Scan Tools]
+    Worker -->|sub-agents| SubAgents[Pentester / Searcher / Coder]
+    Worker -->|reports| Storage[Storage filesystem/S3]
+    Worker -->|status updates| Postgres
+    Worker -->|activity stream| Redis
 
-Every 10 tool calls, a separate LLM call reviews the agent's progress:
-- Detects stuck or looping behavior
-- Identifies missed scan areas
-- Recommends strategy pivots
-- Feedback is injected into the conversation
+    Scheduler[Scheduler Service] -->|poll| Postgres
+    Scheduler -->|enqueue jobs| Redis
 
-### Chain Summarization
+    Monitor[Monitor Service] -->|checks| Targets[External Targets]
+    Monitor -->|results| Postgres
+    Monitor -->|dual-write| ES
 
-When the conversation exceeds 80K characters:
-- Older messages are summarized via a separate LLM call
-- The most recent 6 messages are kept intact
-- Summary preserves: key findings, tools run, vulnerabilities discovered
-- A "Summarization Awareness Protocol" in every prompt teaches agents to interpret summaries
-
-### Reflector Pattern
-
-When the agent produces text instead of tool calls (up to 3 attempts):
-1. A "reflector" agent analyzes the text output
-2. Determines what tool call should come next
-3. Redirects the agent back to structured tool use
-4. If the agent is genuinely done, directs it to call the `report` tool
-
-### Cross-Scan Memory
-
-PostgreSQL-backed memory store that persists across scans:
-
-| Memory Type | Purpose |
-|-------------|---------|
-| `guide` | Scanning methodologies that worked well |
-| `finding` | Important findings about a target |
-| `answer` | Research answers reusable in future scans |
-
-The agent uses `search_memory` before running redundant research and `store_memory` to save reusable knowledge.
-
-### Search Integration
-
-| Tool | Source | Data |
-|------|--------|------|
-| `web_search` | DuckDuckGo HTML | General vulnerability research, documentation |
-| `exploit_search` | NVD + Exploit-DB | CVE IDs, CVSS scores, exploit references |
-
-No API keys needed — both use HTML scraping.
-
----
-
-## Infrastructure Abstraction
-
-The codebase supports both local and AWS deployment via the `RUNTIME` environment variable:
-
-| Component | `RUNTIME=local` | `RUNTIME=aws` |
-|-----------|-----------------|---------------|
-| Queue | Redis (BRPOP/LPUSH) | SQS |
-| Storage | Filesystem (`/output/`) | S3 |
-| Secrets | `.env` file | AWS Secrets Manager |
-| Compute | Docker Compose | ECS Fargate |
-| Database | Local PostgreSQL | RDS PostgreSQL |
-
-This abstraction is handled by factory functions in `modules/infra/`:
-- `get_queue()` — Returns Redis or SQS queue
-- `get_storage()` — Returns filesystem or S3 storage
-- `get_secrets()` — Returns env var or Secrets Manager reader
-
----
+    Heartbeat[Heartbeat Service] -->|probe| API
+    Heartbeat -->|probe| Redis
+    Heartbeat -->|probe| Postgres
+    Heartbeat -->|probe| ES
+    Heartbeat -->|AI summary| Anthropic
+    Heartbeat -->|stuck scan recovery| Redis
+```
 
 ## Data Flow
 
 ### Scan Lifecycle
 
+1. **Creation**: User submits target + scan type via Dashboard or API. API validates, creates a `Scan` record (status: `queued`), and pushes a job to the `scan-jobs` Redis queue.
+2. **Pickup**: Worker `BRPOP`s the job. Updates status to `running`.
+3. **Agent loop**: Claude receives a scan-type-specific system prompt. It plans 3–7 steps, then iterates: calling tools, interpreting results, delegating to sub-agents, adapting the plan based on discoveries.
+4. **Safety rails**: Every 10 tool calls, an execution monitor LLM reviews progress. When conversation exceeds 80K chars, old messages are summarized. Loop detection flags repeated/oscillating tool calls. The reflector redirects text-only responses back to tool use.
+5. **Checkpointing**: Every 5 iterations, scan state is saved. On worker crash, orphaned scans are re-queued with checkpoint context.
+6. **Completion**: Agent calls the `report` tool with structured findings. Report is saved to storage. Scan status → `completed`. Notifications dispatched via configured channels.
+
+### Chat Flow
+
+- **Live scan chat**: Human messages pushed to `scan:chat:inbox:{scan_id}` in Redis. The running agent polls this inbox via the `ask_human` tool.
+- **Post-scan chat**: Claude answers questions using the saved report as context, in a background thread.
+- **Global chat**: A central AI brain with access to all user scans. Can trigger new scans and validate findings via action blocks in responses.
+
+### Uptime Monitoring
+
+The Monitor service polls active monitors at their configured intervals (default 300s). Check types: HTTP, TCP, DNS, TLS. State changes (`up` → `down`, `down` → `up`) trigger notifications. History stored in PostgreSQL + Elasticsearch.
+
+## External Dependencies
+
+| Dependency | Purpose | Abstraction |
+|---|---|---|
+| **Anthropic Claude API** | AI agent brain (scans, chat, heartbeat summaries) | Direct SDK (`anthropic` package) |
+| **PostgreSQL 16** | Persistent data (users, scans, monitors, schedules, memory) | SQLAlchemy ORM via `modules/api/database.py` |
+| **Redis 7** | Job queue, pub/sub, activity streaming, chat, caching | `modules/infra/local_queue.py` (RedisQueue) |
+| **Elasticsearch 8.13** | Dual-write for logs, heartbeat, monitor checks, chat messages | `modules/infra/elasticsearch.py` |
+| **DuckDuckGo** | Web search (HTML scraping, no API key) | `web_search` agent tool |
+| **NVD + Exploit-DB** | CVE/exploit lookup (HTML scraping) | `exploit_search` agent tool |
+| **SMTP** | Email notifications | `modules/notifications/dispatcher.py` |
+| **Slack/Discord webhooks** | Alert notifications | `modules/notifications/dispatcher.py` |
+| **OpenClaw/NemoClaw** | Optional sandboxed agent execution | `modules/sandbox/` |
+
+## Infrastructure Abstraction
+
+The `RUNTIME` env var (`local` or `aws`) switches all infrastructure via factory functions in `modules/infra/__init__.py`:
+
+| Component | `RUNTIME=local` | `RUNTIME=aws` |
+|---|---|---|
+| Queue | Redis (BRPOP/LPUSH) | SQS |
+| Storage | Filesystem (`/output/`) | S3 |
+| Secrets | Environment variables | AWS Secrets Manager |
+| Compute | Docker Compose | ECS Fargate |
+| Database | Local PostgreSQL | RDS PostgreSQL |
+
+## Architecture Decision Records
+
+### ADR-001: Claude as Autonomous Agent (Not Pipeline)
+
+**Status**: Accepted
+
+**Context**: Security scanning traditionally uses fixed pipelines (run tool A, then B, then C). This produces rigid, non-adaptive scans.
+
+**Decision**: Use Claude as an autonomous agent that plans its own scan strategy, adapts to discoveries, and delegates to sub-agents.
+
+**Rationale**: AI-driven scanning adapts to what it finds — discovering a WordPress site triggers CMS-specific tools. A chatbot endpoint triggers prompt injection testing. This produces more thorough, targeted results than fixed pipelines.
+
+**Consequences**: Scans are non-deterministic. Cost scales with scan complexity. Requires safety rails (loop detection, execution monitoring, token limits).
+
+### ADR-002: Redis as Message Bus (Not HTTP Callbacks)
+
+**Status**: Accepted
+
+**Context**: Services need to communicate scan jobs, activity streams, and chat messages.
+
+**Decision**: Use Redis as the central message bus with BRPOP/LPUSH for job queues and lists for activity streaming.
+
+**Rationale**: Redis provides both reliable queue semantics and low-latency pub/sub. The worker already needs Redis for activity streaming, so adding job queues avoids introducing another dependency.
+
+**Consequences**: Single point of failure if Redis goes down. Mitigated by the heartbeat service detecting Redis health and the infrastructure abstraction allowing SQS swap.
+
+### ADR-003: Dual-Write to Elasticsearch
+
+**Status**: Accepted
+
+**Context**: PostgreSQL handles transactional data well, but searching across logs, chat messages, and monitor checks needs full-text search and time-series capabilities.
+
+**Decision**: Dual-write key events to Elasticsearch alongside PostgreSQL. ES writes are fire-and-forget — failures don't block operations.
+
+**Rationale**: Keeps the primary data path reliable (PostgreSQL) while adding search/analytics capabilities. The fail-soft pattern means ES outages don't impact scanning.
+
+**Consequences**: Data can drift between PostgreSQL and ES. Acceptable because ES is used for search/analytics, not as a source of truth.
+
+### Template for Future ADRs
+
+```markdown
+### ADR-NNN: [Title]
+
+**Status**: Proposed | Accepted | Deprecated | Superseded by ADR-XXX
+
+**Context**: What is the issue that we're seeing that is motivating this decision?
+
+**Decision**: What is the change that we're proposing and/or doing?
+
+**Rationale**: Why is this the best choice given the constraints?
+
+**Consequences**: What trade-offs does this decision introduce?
 ```
-User creates scan (Dashboard/API)
-        │
-        ▼
-API validates request, saves to PostgreSQL (status: queued)
-        │
-        ▼
-Scan job pushed to Redis queue
-        │
-        ▼
-Worker picks up job from queue
-        │
-        ▼
-AI agent loop starts (Claude API)
-        │
-        ├── Agent calls tools (nmap, nuclei, etc.)
-        ├── Results interpreted by Claude
-        ├── Sub-agents delegated as needed
-        ├── Execution monitor checks every 10 calls
-        └── Chain summarization if conversation grows
-        │
-        ▼
-Agent calls report tool with findings
-        │
-        ▼
-Report saved to storage (filesystem/S3)
-Scan status updated to completed
-Notifications dispatched
-```
-
-### Live Activity
-
-During a scan, the worker streams activity to Redis pub/sub. The dashboard subscribes to these events and displays real-time progress including:
-- Tool calls and their results
-- Agent decisions and reasoning
-- Sub-agent delegations
-- Scan milestones and findings
-
-## Further Reading
-
-- [Security Checks](security-checks.md) — What each scan type does
-- [Scanning Tools](scanning-tools.md) — All 69+ tools in the worker container
-- [Configuration](configuration.md) — AI model and infrastructure settings
-- [Deployment](deployment.md) — Production deployment guide

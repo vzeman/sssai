@@ -1,0 +1,477 @@
+name: Remediation Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to remediate
+        required: true
+        type: number
+      head_sha:
+        description: Commit SHA to fix against (SHA discipline)
+        required: true
+        type: string
+      findings:
+        description: JSON array of actionable review findings
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: remediation-${{ inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  remediate:
+    name: Remediation Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Get PR branch info
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_JSON=$(gh pr view ${{ inputs.pr_number }} --repo "${{ github.repository }}" --json headRefName,headRefOid,state)
+          BRANCH=$(echo "$PR_JSON" | jq -r '.headRefName')
+          CURRENT_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          STATE=$(echo "$PR_JSON" | jq -r '.state')
+
+          if [[ "$STATE" != "OPEN" ]]; then
+            echo "::error::PR #${{ inputs.pr_number }} is ${STATE}, not OPEN. Aborting."
+            exit 1
+          fi
+
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "current-sha=${CURRENT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: SHA discipline check
+        run: |
+          CURRENT="${{ steps.pr-info.outputs.current-sha }}"
+          EXPECTED="${{ inputs.head_sha }}"
+          if [[ "${CURRENT,,}" != "${EXPECTED,,}" ]]; then
+            echo "::error::SHA discipline violation: PR HEAD (${CURRENT}) ≠ expected (${EXPECTED}). Branch was updated since dispatch."
+            exit 1
+          fi
+          echo "✔ SHA verified: ${CURRENT:0:12}"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.pr-info.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify checkout SHA
+        run: |
+          ACTUAL="$(git rev-parse HEAD)"
+          EXPECTED="${{ inputs.head_sha }}"
+          if [[ "${ACTUAL,,}" != "${EXPECTED,,}" ]]; then
+            echo "::error::Post-checkout SHA mismatch: ${ACTUAL} ≠ ${EXPECTED}"
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+
+      - name: Install tsx globally
+        run: npm install -g tsx
+
+      - name: Run remediation guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          FINDINGS: ${{ inputs.findings }}
+          STRICTNESS: relaxed
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          DECISION=$(tsx scripts/remediation-guard.ts --evaluate)
+          echo "decision<<GUARD_EOF" >> "$GITHUB_OUTPUT"
+          echo "$DECISION" >> "$GITHUB_OUTPUT"
+          echo "GUARD_EOF" >> "$GITHUB_OUTPUT"
+
+          SHOULD=$(echo "$DECISION" | jq -r '.shouldRemediate')
+          ATTEMPT=$(echo "$DECISION" | jq -r '.attemptNumber')
+          REASON=$(echo "$DECISION" | jq -r '.reason')
+          echo "should-remediate=${SHOULD}" >> "$GITHUB_OUTPUT"
+          echo "attempt=${ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
+
+          echo "Guard: shouldRemediate=${SHOULD}, attempt=${ATTEMPT}"
+
+      - name: Post guard rejection comment
+        if: steps.guard.outputs.should-remediate == 'false'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          DECISION: ${{ steps.guard.outputs.decision }}
+        with:
+          script: |
+            const prNumber = ${{ inputs.pr_number }};
+            const headSha = '${{ inputs.head_sha }}';
+            const decision = JSON.parse(process.env.DECISION);
+            const marker = `<!-- remediation-blocked: ${headSha} -->`;
+
+            const sections = [
+              marker,
+              '## 🛑 Remediation Agent — Blocked',
+              '',
+              `**Reason**: ${decision.reason}`,
+              `**Attempt**: ${decision.attemptNumber}`,
+              `**SHA**: \`${headSha.slice(0, 12)}\``,
+            ];
+
+            if (decision.securityBlockers.length > 0) {
+              sections.push('', '### Security Findings (require human review)');
+              for (const s of decision.securityBlockers) sections.push(`- ${s}`);
+            }
+
+            if (decision.skippedFindings.length > 0) {
+              sections.push('', '### Skipped Findings');
+              for (const s of decision.skippedFindings) sections.push(`- ${s}`);
+            }
+
+            sections.push(
+              '',
+              '---',
+              '*🤖 Remediation agent — auto-fix blocked.*',
+            );
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: sections.join('\n'),
+            });
+
+      - name: Baseline validation
+        if: steps.guard.outputs.should-remediate == 'true'
+        id: baseline
+        run: |
+          echo "=== Baseline: Frontend Lint ==="
+          LINT_BASELINE="skip"
+          if [[ -f frontend/package.json ]]; then
+            cd frontend && npm ci --ignore-scripts 2>/dev/null && npm run lint 2>&1 && LINT_BASELINE="pass" || LINT_BASELINE="fail"
+            cd ..
+          fi
+          echo "lint=${LINT_BASELINE}" >> "$GITHUB_OUTPUT"
+          echo "Baseline lint: ${LINT_BASELINE}"
+
+      - name: Build remediation prompt
+        if: steps.guard.outputs.should-remediate == 'true'
+        id: build-prompt
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          FINDINGS_JSON: ${{ inputs.findings }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          BASELINE_LINT: ${{ steps.baseline.outputs.lint }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            let template = '';
+            try { template = fs.readFileSync('scripts/remediation-agent-prompt.md', 'utf-8'); } catch {}
+
+            let conventions = '';
+            try { conventions = fs.readFileSync('CLAUDE.md', 'utf-8').slice(0, 6000); } catch {}
+
+            let config = '';
+            try { config = fs.readFileSync('harness.config.json', 'utf-8'); } catch {}
+
+            const findings = process.env.FINDINGS_JSON;
+            const sha = process.env.HEAD_SHA;
+            const baselineLint = process.env.BASELINE_LINT;
+
+            const prompt = [
+              template,
+              '',
+              '## Project Conventions (from CLAUDE.md)',
+              '',
+              conventions || 'No CLAUDE.md found.',
+              '',
+              '## Harness Configuration',
+              '',
+              '```json',
+              config || '{}',
+              '```',
+              '',
+              '## Baseline State',
+              '',
+              `- Frontend lint: ${baselineLint}`,
+              '- Tests: not configured',
+              '- Build: not configured',
+              '',
+              '## Findings to Fix',
+              '',
+              '```json',
+              findings,
+              '```',
+              '',
+              `## HEAD SHA: \`${sha}\``,
+              '',
+              'Fix ONLY the findings listed above. Edit each file directly.',
+              'After all fixes, output a JSON object:',
+              '```json',
+              '{',
+              '  "fixed": [{ "file": "path", "finding": "description", "change": "what changed" }],',
+              '  "skipped": [{ "file": "path", "finding": "description", "reason": "why" }],',
+              '  "filesModified": ["path1", "path2"]',
+              '}',
+              '```',
+            ].join('\n');
+
+            core.setOutput('prompt', prompt);
+            core.info(`Prompt built (${prompt.length} chars)`);
+
+      - name: Run AI remediation
+        if: steps.guard.outputs.should-remediate == 'true'
+        id: ai-remediate
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.build-prompt.outputs.prompt }}
+          claude_args: '--max-turns 15'
+
+      - name: Check for file changes
+        if: steps.guard.outputs.should-remediate == 'true'
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only 2>/dev/null || echo "")
+          if [[ -z "$CHANGED" ]]; then
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No files were modified by the remediation agent."
+          else
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            COUNT=$(echo "$CHANGED" | wc -l)
+            echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+            {
+              echo "files<<FILES_EOF"
+              echo "$CHANGED"
+              echo "FILES_EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "✔ ${COUNT} file(s) modified"
+          fi
+
+      - name: Verify no protected files modified
+        if: steps.changes.outputs.has-changes == 'true'
+        id: protected
+        run: |
+          MODIFIED=$(git diff --name-only)
+          VIOLATIONS=""
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              .github/workflows/*|harness.config.json|CLAUDE.md|docker-compose.yml|docker-compose.yaml|.env|.env.*)
+                VIOLATIONS="${VIOLATIONS}  - ${file}\n"
+                git checkout -- "$file"
+                echo "::warning::Reverted protected file: ${file}"
+                ;;
+              docker/Dockerfile*)
+                VIOLATIONS="${VIOLATIONS}  - ${file}\n"
+                git checkout -- "$file"
+                echo "::warning::Reverted protected file: ${file}"
+                ;;
+              frontend/package-lock.json)
+                git checkout -- "$file"
+                echo "::warning::Reverted lock file: ${file}"
+                ;;
+              modules/api/auth.py|modules/sandbox/*)
+                # Critical paths — only allow if finding explicitly targets them
+                VIOLATIONS="${VIOLATIONS}  - ${file} (critical path)\n"
+                git checkout -- "$file"
+                echo "::warning::Reverted critical path file: ${file}"
+                ;;
+            esac
+          done <<< "$MODIFIED"
+
+          if [[ -n "$VIOLATIONS" ]]; then
+            echo "reverted=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Reverted modifications to protected files."
+          else
+            echo "reverted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          REMAINING=$(git diff --name-only 2>/dev/null || echo "")
+          if [[ -z "$REMAINING" ]]; then
+            echo "::notice::No changes remain after reverting protected files."
+            echo "has-remaining=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-remaining=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run validation — Frontend Lint
+        if: steps.changes.outputs.has-changes == 'true' && steps.protected.outputs.has-remaining == 'true'
+        id: lint
+        run: |
+          if [[ -f frontend/package.json ]]; then
+            cd frontend
+            npm ci --ignore-scripts 2>/dev/null
+            if npm run lint; then
+              echo "passed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "passed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Evaluate validation results
+        if: steps.changes.outputs.has-changes == 'true' && steps.protected.outputs.has-remaining == 'true'
+        id: validation
+        run: |
+          LINT="${{ steps.lint.outputs.passed }}"
+          BASELINE_LINT="${{ steps.baseline.outputs.lint }}"
+
+          echo "lint=${LINT} (baseline: ${BASELINE_LINT})"
+
+          # Only fail if lint was passing at baseline and now fails
+          if [[ "$LINT" == "false" && "$BASELINE_LINT" == "pass" ]]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Remediation broke lint — reverting all changes."
+            git checkout -- .
+          else
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.validation.outputs.passed == 'true'
+        id: commit
+        run: |
+          git config user.name "remediation-bot[bot]"
+          git config user.email "remediation-bot[bot]@users.noreply.github.com"
+
+          ATTEMPT="${{ steps.guard.outputs.attempt }}"
+          MODIFIED=$(git diff --name-only)
+
+          if [[ -z "$MODIFIED" ]]; then
+            echo "::notice::No changes to commit."
+            exit 0
+          fi
+
+          git add $MODIFIED
+
+          FILE_COUNT=$(echo "$MODIFIED" | wc -l | tr -d ' ')
+
+          git commit -m "$(cat <<COMMIT_EOF
+          fix: [remediation] auto-fix review finding(s) (attempt ${ATTEMPT})
+
+          Remediation agent auto-fix for PR #${{ inputs.pr_number }}.
+          SHA: ${{ inputs.head_sha }}
+
+          Files modified: ${FILE_COUNT}
+          Files: $(echo "$MODIFIED" | tr '\n' ',')
+          COMMIT_EOF
+          )"
+
+          git push
+          NEW_SHA=$(git rev-parse HEAD)
+          echo "new-sha=${NEW_SHA}" >> "$GITHUB_OUTPUT"
+          echo "✔ Pushed remediation commit: ${NEW_SHA:0:12}"
+
+      - name: Add remediation attempt label
+        if: steps.guard.outputs.should-remediate == 'true'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          ATTEMPT: ${{ steps.guard.outputs.attempt }}
+        with:
+          script: |
+            const prNumber = ${{ inputs.pr_number }};
+            const attempt = parseInt(process.env.ATTEMPT);
+            const label = `remediation-attempt-${attempt}`;
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+                color: 'FFA500',
+                description: `Remediation agent attempt ${attempt}`,
+              });
+            } catch {
+              // Label already exists
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: [label],
+            });
+
+      - name: Post audit comment
+        if: always() && steps.guard.outputs.should-remediate == 'true'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          HAS_CHANGES: ${{ steps.changes.outputs.has-changes }}
+          CHANGED_FILES: ${{ steps.changes.outputs.files }}
+          VALIDATION_PASSED: ${{ steps.validation.outputs.passed }}
+          LINT_PASSED: ${{ steps.lint.outputs.passed }}
+          NEW_SHA: ${{ steps.commit.outputs.new-sha }}
+          ATTEMPT: ${{ steps.guard.outputs.attempt }}
+          BASELINE_LINT: ${{ steps.baseline.outputs.lint }}
+        with:
+          script: |
+            const prNumber = ${{ inputs.pr_number }};
+            const headSha = '${{ inputs.head_sha }}';
+            const attempt = process.env.ATTEMPT;
+            const marker = `<!-- remediation-audit: ${headSha} -->`;
+
+            const hasChanges = process.env.HAS_CHANGES === 'true';
+            const validationPassed = process.env.VALIDATION_PASSED === 'true';
+            const newSha = process.env.NEW_SHA || '';
+
+            const lintOk = process.env.LINT_PASSED === 'true';
+            const baselineLint = process.env.BASELINE_LINT || 'unknown';
+
+            const statusEmoji = validationPassed && newSha ? '✅' : hasChanges ? '⚠️' : '💬';
+            const statusText = validationPassed && newSha
+              ? 'Fixes Applied'
+              : hasChanges
+                ? 'Fixes Failed Validation'
+                : 'No Changes Made';
+
+            const changedFiles = (process.env.CHANGED_FILES || '').trim();
+            const filesSection = changedFiles ? [
+              '### Files Modified',
+              '',
+              ...changedFiles.split('\n').map((f) => `- \`${f}\``),
+            ].join('\n') : '';
+
+            const validationSection = hasChanges ? [
+              '### Validation',
+              '',
+              `| Check | Status | Baseline |`,
+              `|-------|--------|----------|`,
+              `| Frontend Lint | ${lintOk ? '✅' : '❌'} | ${baselineLint} |`,
+              `| Tests | ⬜ N/A | — |`,
+              `| Build | ⬜ N/A | — |`,
+            ].join('\n') : '';
+
+            const body = [
+              marker,
+              `## ${statusEmoji} Remediation Agent — ${statusText}`,
+              '',
+              `**Attempt**: ${attempt}`,
+              `**Source SHA**: \`${headSha.slice(0, 12)}\``,
+              newSha ? `**New SHA**: \`${newSha.slice(0, 12)}\`` : '',
+              '',
+              filesSection,
+              validationSection,
+              '',
+              '---',
+              '*🤖 Remediation agent — automated code fix.*',
+            ].filter(Boolean).join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });

@@ -1,0 +1,60 @@
+name: Structural Tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  structural-tests:
+    name: Architectural Boundary Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate architectural boundaries
+        run: bash scripts/structural-tests.sh
+
+      - name: Validate Python dependency rules
+        run: |
+          echo "Checking dependency rules from CLAUDE.md..."
+          violations=0
+
+          # api/ must never import from worker/ or agent/
+          if grep -rn "from modules\.worker\|from modules\.agent\|import modules\.worker\|import modules\.agent" modules/api/ 2>/dev/null; then
+            echo "::error::modules/api/ must not import from worker/ or agent/"
+            ((violations++))
+          fi
+
+          # infra/ must have no internal dependencies
+          if grep -rn "from modules\.api\|from modules\.worker\|from modules\.agent\|from modules\.scheduler\|from modules\.monitor" modules/infra/ 2>/dev/null; then
+            echo "::error::modules/infra/ must have no internal dependencies"
+            ((violations++))
+          fi
+
+          if (( violations > 0 )); then
+            echo "✘ Found ${violations} dependency rule violation(s)"
+            exit 1
+          fi
+          echo "✔ Python dependency rules respected"
+
+      - name: Check Python naming conventions
+        run: |
+          echo "Checking Python file naming (must be snake_case)..."
+          violations=0
+          while IFS= read -r -d '' file; do
+            basename=$(basename "$file" .py)
+            if [[ "$basename" =~ [A-Z] ]]; then
+              echo "::warning file=${file#./}::Python file uses PascalCase: $basename.py (should be snake_case)"
+              ((violations++))
+            fi
+          done < <(find modules -name '*.py' -type f -print0)
+
+          if (( violations > 0 )); then
+            echo "⚠ Found ${violations} naming convention warning(s)"
+          else
+            echo "✔ All Python files use snake_case naming"
+          fi
