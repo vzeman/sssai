@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -49,3 +51,84 @@ def get_report(scan_id: str, user: User = Depends(get_current_user), db: Session
     if not report:
         raise HTTPException(status_code=404, detail="Report not ready")
     return report
+
+
+@router.post("/{scan_id}/retry")
+def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Retry a failed or completed scan.
+
+    For failed scans: re-queues the entire scan.
+    For completed scans with errors: creates a follow-up scan that focuses on
+    failed steps, providing the previous report as context so the AI agent can
+    diagnose what went wrong and try alternative approaches.
+    """
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    storage = get_storage()
+    queue = get_queue()
+
+    # Get existing report and error info
+    report = storage.get_json(f"scans/{scan_id}/report.json")
+    error = storage.get_json(f"scans/{scan_id}/error.json")
+
+    # Build retry context for the AI agent
+    retry_context = {
+        "retry_of": scan_id,
+        "original_status": scan.status,
+    }
+
+    if error:
+        retry_context["previous_error"] = error.get("error", "Unknown error")
+
+    if report:
+        # Extract what succeeded and what failed/was missed
+        retry_context["previous_findings_count"] = len(report.get("findings", []))
+        retry_context["previous_risk_score"] = report.get("risk_score", 0)
+        retry_context["previous_summary"] = report.get("summary", "")[:2000]
+
+        # Get activity log to find failed tool calls
+        import redis as _redis
+        import os
+        try:
+            r = _redis.from_url(os.environ.get("REDIS_URL", "redis://redis:6379"))
+            activities = r.lrange(f"scan:activity:{scan_id}", 0, -1)
+            failed_steps = []
+            for act_raw in activities:
+                act = json.loads(act_raw)
+                if "ERROR" in str(act.get("result", "")):
+                    failed_steps.append(act)
+            if failed_steps:
+                retry_context["failed_steps"] = failed_steps[:20]
+        except Exception:
+            pass
+
+    # Create a new scan for the retry
+    new_scan = Scan(
+        user_id=user.id,
+        target=scan.target,
+        scan_type=scan.scan_type,
+        config={
+            **(scan.config or {}),
+            "retry_context": retry_context,
+        },
+    )
+    db.add(new_scan)
+    db.commit()
+    db.refresh(new_scan)
+
+    # Queue it
+    queue.send("scan-jobs", {
+        "scan_id": new_scan.id,
+        "target": new_scan.target,
+        "scan_type": new_scan.scan_type,
+        "config": new_scan.config or {},
+    })
+
+    return {
+        "id": new_scan.id,
+        "retry_of": scan_id,
+        "status": "queued",
+        "target": new_scan.target,
+    }

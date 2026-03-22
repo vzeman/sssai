@@ -648,14 +648,46 @@ def _estimate_chain_size(messages: list) -> int:
     return total
 
 
+def _find_safe_split(messages: list, keep_recent: int) -> int:
+    """Find a safe split point that doesn't break tool_use/tool_result pairs.
+
+    Returns the index where 'to_keep' should start. The message at this index
+    must be a 'user' message with plain text content (not tool_results), so
+    the Anthropic API sees a clean conversation boundary.
+    """
+    # Start from the desired split point and walk backwards to find a safe boundary
+    ideal_split = max(1, len(messages) - keep_recent)
+
+    for i in range(ideal_split, 0, -1):
+        msg = messages[i]
+        content = msg.get("content", "")
+        # Safe if it's a user message with plain string content (not tool_results)
+        if msg.get("role") == "user" and isinstance(content, str):
+            return i
+        # Also safe if it's an assistant message with plain text (no tool_use blocks)
+        if msg.get("role") == "assistant" and isinstance(content, str):
+            return i
+
+    return ideal_split  # fallback
+
+
 def _summarize_chain(client, messages: list) -> list:
-    """Summarize older messages to reduce context size, keeping recent ones intact."""
+    """Summarize older messages to reduce context size, keeping recent ones intact.
+
+    Critical: maintains tool_use/tool_result pairing in the kept portion to avoid
+    Anthropic API 400 errors ('unexpected tool_use_id found in tool_result blocks').
+    """
     if len(messages) <= KEEP_RECENT + 1:
         return messages
 
-    # Split: old messages to summarize, recent to keep
-    to_summarize = messages[1:-KEEP_RECENT]  # skip first user message
-    to_keep = messages[-KEEP_RECENT:]
+    # Find a safe split point that doesn't break tool_use/tool_result pairs
+    split_idx = _find_safe_split(messages, KEEP_RECENT)
+
+    to_summarize = messages[1:split_idx]  # skip first user message
+    to_keep = messages[split_idx:]
+
+    if not to_summarize:
+        return messages  # nothing to summarize
 
     # Build a text representation of old messages
     old_text_parts = []
@@ -694,7 +726,8 @@ def _summarize_chain(client, messages: list) -> list:
     except Exception:
         summary = old_text[:3000] + "\n... [summarization failed, truncated]"
 
-    # Reconstruct message chain with summary
+    # Reconstruct: original user msg + summary pair + kept messages
+    # Ensure alternating user/assistant pattern
     summarized_messages = [
         messages[0],  # original user message
         {"role": "assistant", "content": f"[CONVERSATION SUMMARY — earlier actions compressed]\n{summary}"},
@@ -702,9 +735,22 @@ def _summarize_chain(client, messages: list) -> list:
             "This is a summary of your earlier work. Continue the scan from where you left off. "
             "Do NOT repeat tools you have already run. Focus on areas not yet covered."
         )},
-    ] + to_keep
+    ]
 
-    log.info("Chain summarized: %d messages → %d messages", len(messages), len(summarized_messages))
+    # Only append to_keep if it starts with an assistant message (to maintain alternation)
+    if to_keep and to_keep[0].get("role") == "assistant":
+        summarized_messages.extend(to_keep)
+    elif to_keep and to_keep[0].get("role") == "user":
+        # Merge the first user message into our summary prompt
+        first_content = to_keep[0].get("content", "")
+        if isinstance(first_content, str):
+            summarized_messages[-1]["content"] += "\n\n" + first_content
+        summarized_messages.extend(to_keep[1:])
+    else:
+        summarized_messages.extend(to_keep)
+
+    log.info("Chain summarized: %d messages → %d messages (split at %d)",
+             len(messages), len(summarized_messages), split_idx)
     return summarized_messages
 
 

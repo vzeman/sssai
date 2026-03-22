@@ -377,7 +377,7 @@ async function loadScans() {
         <td><span class="badge ${s.status}">${s.status}</span></td>
         <td>${risk}</td>
         <td style="font-size:0.8rem;color:var(--muted)">${new Date(s.created_at).toLocaleTimeString()}</td>
-        <td>${s.status==='completed'?'<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>':''}</td>
+        <td>${s.status==='completed'?'<button class="btn sm orange" onclick="event.stopPropagation();viewReport(\''+s.id+'\')">Report</button>':''}${(s.status==='failed'||s.status==='completed')?'<button class="btn sm" style="background:var(--purple);margin-left:4px" onclick="event.stopPropagation();retryScan(\''+s.id+'\')">Retry</button>':''}</td>
       </tr>`;
     }).join('');
     document.getElementById('stat-total').textContent = scans.length;
@@ -519,6 +519,23 @@ function renderReport(r, scanId) {
 }
 
 async function viewReport(scanId) { window.open('/api/reports/'+scanId+'/html?token='+encodeURIComponent(token),'_blank'); }
+
+async function retryScan(scanId) {
+  try {
+    var res = await fetch(API+'/api/scans/'+scanId+'/retry', {
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    });
+    if (res.ok) {
+      var data = await res.json();
+      alert('Retry queued as scan '+data.id.substring(0,8)+'... AI agent will analyze what failed and try alternative approaches.');
+      refresh();
+    } else {
+      var err = await res.json().catch(function(){return {};});
+      alert('Retry failed: '+(err.detail||'Unknown error'));
+    }
+  } catch(e) { alert('Could not retry: '+e.message); }
+}
 
 // ═══ TOOLS ═══
 async function loadTools() {
