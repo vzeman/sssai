@@ -78,17 +78,17 @@ def search_logs(
         must.append({"match": {"message": {"query": q, "fuzziness": "AUTO"}}})
     filters = [{"range": {"timestamp": {"gte": f"now-{hours}h"}}}]
     if level:
-        filters.append({"terms": {"level": level.upper().split(",")}})
+        filters.append({"terms": {"level.keyword": level.upper().split(",")}})
     if service:
-        filters.append({"term": {"service": service}})
+        filters.append({"term": {"service.keyword": service}})
     if scan_id:
-        filters.append({"term": {"scan_id": scan_id}})
+        filters.append({"term": {"scan_id.keyword": scan_id}})
 
     query = {"bool": {"must": must or [{"match_all": {}}], "filter": filters}}
     result = search(
         "scanner-worker-logs", query,
         size=size, sort=[{"timestamp": "desc"}],
-        aggs={"level_counts": {"terms": {"field": "level"}}},
+        aggs={"level_counts": {"terms": {"field": "level.keyword"}}},
     )
 
     hits = result.get("hits", {})
