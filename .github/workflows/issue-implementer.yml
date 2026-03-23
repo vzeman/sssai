@@ -525,7 +525,28 @@ jobs:
             });
 
       # ================================================================
-      # Step 17: Post PR link on issue
+      # Step 17: Trigger code review agent
+      # ================================================================
+      - name: Trigger code review agent
+        if: steps.changes.outputs.has-changes == 'true' && (steps.create-pr.outputs.pr-url || steps.mode.outputs.mode == 'review-fix')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.create-pr.outputs.pr-url && github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          # Extract PR number from URL if created in this run
+          if [[ -n "${{ steps.create-pr.outputs.pr-url }}" ]]; then
+            PR_NUM=$(echo "${{ steps.create-pr.outputs.pr-url }}" | grep -o '[0-9]*$')
+          else
+            PR_NUM="${{ inputs.pr_number }}"
+          fi
+          echo "Dispatching code review agent for PR #${PR_NUM}..."
+          gh workflow run code-review-agent.yml \
+            --repo "${{ github.repository }}" \
+            --field pr_number="${PR_NUM}"
+          echo "✔ Dispatched code-review-agent.yml for PR #${PR_NUM}"
+
+      # ================================================================
+      # Step 18: Post PR link on issue
       # ================================================================
       - name: Post PR link on issue
         if: steps.create-pr.outputs.pr-url
