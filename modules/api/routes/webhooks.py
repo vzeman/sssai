@@ -45,6 +45,13 @@ class WebhookConfigCreate(BaseModel):
     gates: QualityGates | None = None
 
 
+class WebhookConfigUpdate(BaseModel):
+    name: str | None = None
+    scan_type: str | None = None
+    gates: QualityGates | None = None
+    is_active: bool | None = None
+
+
 class WebhookConfigResponse(BaseModel):
     id: str
     name: str
@@ -130,7 +137,7 @@ def delete_webhook_config(
 @router.patch("/{webhook_id}")
 def update_webhook_config(
     webhook_id: str,
-    body: dict,
+    body: WebhookConfigUpdate,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -142,14 +149,14 @@ def update_webhook_config(
     if not wh:
         raise HTTPException(status_code=404, detail="Webhook config not found")
 
-    if "name" in body:
-        wh.name = body["name"]
-    if "scan_type" in body:
-        wh.scan_type = body["scan_type"]
-    if "gates" in body:
-        wh.gates = body["gates"]
-    if "is_active" in body:
-        wh.is_active = body["is_active"]
+    if body.name is not None:
+        wh.name = body.name
+    if body.scan_type is not None:
+        wh.scan_type = body.scan_type
+    if body.gates is not None:
+        wh.gates = body.gates.model_dump()
+    if body.is_active is not None:
+        wh.is_active = body.is_active
 
     db.commit()
     db.refresh(wh)

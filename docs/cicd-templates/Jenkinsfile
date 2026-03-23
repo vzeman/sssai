@@ -34,22 +34,16 @@ pipeline {
                     // Trigger scan
                     def triggerResponse = sh(
                         script: """
+                            jq -n \\
+                              --arg target "${targetUrl}" \\
+                              --arg commit_sha "${env.GIT_COMMIT}" \\
+                              --arg branch "${env.BRANCH_NAME}" \\
+                              --arg scan_type "${params.SCAN_TYPE}" \\
+                              '{target: \$target, commit_sha: \$commit_sha, branch: \$branch, environment: "production", deployer: "jenkins", scan_type: \$scan_type, gates: {max_critical: 0, max_high: 3, max_risk_score: 60}}' | \\
                             curl -s -X POST "${SSSAI_API_URL}/api/webhooks/scan" \\
                               -H "X-API-Key: ${SSSAI_API_KEY}" \\
                               -H "Content-Type: application/json" \\
-                              -d '{
-                                "target": "${targetUrl}",
-                                "commit_sha": "${env.GIT_COMMIT}",
-                                "branch": "${env.BRANCH_NAME}",
-                                "environment": "production",
-                                "deployer": "jenkins",
-                                "scan_type": "${params.SCAN_TYPE}",
-                                "gates": {
-                                  "max_critical": 0,
-                                  "max_high": 3,
-                                  "max_risk_score": 60
-                                }
-                              }'
+                              -d @-
                         """,
                         returnStdout: true
                     ).trim()

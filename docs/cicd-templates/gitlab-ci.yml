@@ -18,27 +18,29 @@ sssai-security-scan:
   stage: security-scan
   image: alpine:latest
   before_script:
-    - apk add --no-cache curl python3
+    - apk add --no-cache curl python3 jq
   script:
     # Step 1: Trigger the scan
     - |
       echo "Triggering SSSAI security scan for $SSSAI_TARGET_URL..."
+      PAYLOAD=$(jq -n \
+        --arg target "$SSSAI_TARGET_URL" \
+        --arg commit_sha "$CI_COMMIT_SHA" \
+        --arg branch "$CI_COMMIT_REF_NAME" \
+        --arg environment "${CI_ENVIRONMENT_NAME:-production}" \
+        '{
+          target: $target,
+          commit_sha: $commit_sha,
+          branch: $branch,
+          environment: $environment,
+          deployer: "gitlab-ci",
+          scan_type: "security",
+          gates: { max_critical: 0, max_high: 3, max_risk_score: 60 }
+        }')
       RESPONSE=$(curl -s -X POST "${SSSAI_API_URL}/api/webhooks/scan" \
         -H "X-API-Key: ${SSSAI_API_KEY}" \
         -H "Content-Type: application/json" \
-        -d "{
-          \"target\": \"${SSSAI_TARGET_URL}\",
-          \"commit_sha\": \"${CI_COMMIT_SHA}\",
-          \"branch\": \"${CI_COMMIT_REF_NAME}\",
-          \"environment\": \"${CI_ENVIRONMENT_NAME:-production}\",
-          \"deployer\": \"gitlab-ci\",
-          \"scan_type\": \"security\",
-          \"gates\": {
-            \"max_critical\": 0,
-            \"max_high\": 3,
-            \"max_risk_score\": 60
-          }
-        }")
+        -d "$PAYLOAD")
 
       echo "Trigger response: $RESPONSE"
       SCAN_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['scan_id'])")
