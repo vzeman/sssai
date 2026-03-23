@@ -341,14 +341,13 @@ jobs:
       - name: Run AI agent
         if: steps.guard.outputs.should-implement == 'true'
         id: agent
-        env:
-          AGENT_PROMPT: ${{ steps.build-prompt.outputs.prompt }}
         run: |
           echo "::notice::AI agent execution would run here"
-          echo "Prompt length: $(echo "$AGENT_PROMPT" | wc -c) chars"
           
           # For now, create a placeholder indicating agent would execute
-          echo "$AGENT_PROMPT" > /tmp/agent-prompt.txt
+          cat > /tmp/agent-prompt.txt << 'EOF'
+          ${{ steps.build-prompt.outputs.prompt }}
+          EOF
           
           echo "Prompt saved for reference"
           exit 0
