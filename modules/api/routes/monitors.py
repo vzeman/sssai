@@ -17,18 +17,32 @@ router = APIRouter()
 
 @router.post("/", response_model=MonitorResponse)
 def create_monitor(body: MonitorCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    monitor = Monitor(
-        user_id=user.id,
-        name=body.name or body.target,
-        target=body.target,
-        check_type=body.check_type,
-        interval_seconds=body.interval_seconds,
-        expected_status=body.expected_status,
-    )
-    db.add(monitor)
-    db.commit()
-    db.refresh(monitor)
-    return monitor
+    try:
+        # Check if monitor for this target already exists
+        existing = db.query(Monitor).filter(
+            Monitor.user_id == user.id,
+            Monitor.target == body.target
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Monitor for '{body.target}' already exists")
+        
+        monitor = Monitor(
+            user_id=user.id,
+            name=body.name or body.target,
+            target=body.target,
+            check_type=body.check_type,
+            interval_seconds=body.interval_seconds,
+            expected_status=body.expected_status,
+        )
+        db.add(monitor)
+        db.commit()
+        db.refresh(monitor)
+        return monitor
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create monitor: {str(e)}")
 
 
 @router.get("/", response_model=list[MonitorResponse])

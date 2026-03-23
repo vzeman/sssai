@@ -128,6 +128,41 @@ class MonitorCreate(BaseModel):
     check_type: str = "http"
     interval_seconds: int = 300
     expected_status: int = 200
+    
+    @field_validator('target')
+    @classmethod
+    def validate_target(cls, v):
+        """Validate that target is a valid URL or domain."""
+        v = v.strip()
+        if not v:
+            raise ValueError('Target cannot be empty')
+        
+        # Allow URLs, domains, IPs
+        if not (v.startswith('http://') or v.startswith('https://')):
+            # If no scheme, add https:// for validation
+            test_url = f'https://{v}'
+        else:
+            test_url = v
+        
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(test_url)
+            if not result.netloc:
+                raise ValueError('Invalid target URL or domain')
+        except Exception as e:
+            raise ValueError(f'Invalid target: {str(e)}')
+        
+        return v
+    
+    @field_validator('interval_seconds')
+    @classmethod
+    def validate_interval(cls, v):
+        """Ensure interval is at least 10 seconds."""
+        if v < 10:
+            raise ValueError('Interval must be at least 10 seconds')
+        if v > 3600:
+            raise ValueError('Interval must be at most 1 hour')
+        return v
 
 
 class MonitorUpdate(BaseModel):
