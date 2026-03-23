@@ -47,6 +47,14 @@ Look for chatbot/AI widgets by analyzing the HTML source of the homepage:
 - Cloud provider identification from DNS CNAME records
 - SSL/TLS certificate analysis
 
+#### 7. Breach & Dark Web Exposure (Security/Pentest Scans)
+For security and pentest scan types, check for breach exposure as part of initial discovery:
+- Call `breach_check` with the target domain — checks HIBP and other breach databases
+- Call `credential_leak_check` with the target domain — identifies exposed email accounts
+- If breaches are found: include in Phase 4 report `breach_exposure` field and as findings with appropriate severity
+- New breaches = high severity finding; old known breaches = medium/low depending on data types exposed
+- Load `breach_monitoring` knowledge module if significant exposure is found
+
 ### Phase 1: Attack Surface Mapping
 
 After discovery, call `update_attack_surface` with ALL your findings as structured data. Include:
@@ -124,6 +132,7 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 ### Visual: backstopjs
 ### Auth: hydra
 ### Cloud: prowler
+### Breach Monitoring: holehe, breach-parse
 ### Utility: curl, wget, jq, python3, node
 
 ### Direct Tools (no shell):
@@ -134,6 +143,8 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 - **compare_results**: Compare with previous scan results
 
 ### AI Tools:
+- **breach_check**: Check domain for known data breaches (HIBP API)
+- **credential_leak_check**: Search for exposed credentials / account registrations
 - **adapt_plan**: Revise your scan plan based on discoveries
 - **load_knowledge**: Load specialized testing methodology on demand
 - **update_attack_surface**: Record structured attack surface data

@@ -244,6 +244,12 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
         except Exception as e:
             return f"ERROR: {e}"
 
+    elif name == "breach_check":
+        return _handle_breach_check(input, scan_context)
+
+    elif name == "credential_leak_check":
+        return _handle_credential_leak_check(input, scan_context)
+
     elif name == "web_search":
         return _handle_web_search(input)
 
@@ -281,6 +287,221 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
         return "__REPORT__"
 
     return "Unknown tool"
+
+
+# ── Breach & dark web monitoring handlers ────────────────────────────────
+
+def _handle_breach_check(input: dict, scan_context: dict | None) -> str:
+    """Query Have I Been Pwned and other sources for domain breach exposure."""
+    domain = input.get("domain", "").strip().lower()
+    if not domain:
+        return "ERROR: domain is required"
+
+    save_path = input.get("save_path", "/output/breach_check.json")
+    results = {
+        "domain": domain,
+        "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "breaches": [],
+        "sources_checked": [],
+        "errors": [],
+    }
+
+    # ── 1. Have I Been Pwned domain search ──────────────────────────────
+    hibp_api_key = os.environ.get("HIBP_API_KEY", "")
+    if hibp_api_key:
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.get(
+                    f"https://haveibeenpwned.com/api/v3/breacheddomain/{domain}",
+                    headers={
+                        "hibp-api-key": hibp_api_key,
+                        "user-agent": "SSSAI-Security-Scanner/1.0",
+                    },
+                )
+            if resp.status_code == 200:
+                emails = resp.json()
+                # HIBP breacheddomain returns {email: [breach_names]}
+                breach_names: set[str] = set()
+                for breach_list in emails.values():
+                    breach_names.update(breach_list)
+
+                # Fetch breach details for each found breach name
+                for breach_name in list(breach_names)[:20]:  # cap to 20
+                    try:
+                        detail_resp = client.get(
+                            f"https://haveibeenpwned.com/api/v3/breach/{breach_name}",
+                            headers={
+                                "hibp-api-key": hibp_api_key,
+                                "user-agent": "SSSAI-Security-Scanner/1.0",
+                            },
+                        )
+                        if detail_resp.status_code == 200:
+                            b = detail_resp.json()
+                            results["breaches"].append({
+                                "breach_name": b.get("Name", breach_name),
+                                "breach_date": b.get("BreachDate", "unknown"),
+                                "data_types": b.get("DataClasses", []),
+                                "affected_accounts": b.get("PwnCount", 0),
+                                "source": "HIBP",
+                                "description": b.get("Description", "")[:500],
+                                "is_verified": b.get("IsVerified", False),
+                            })
+                    except Exception as e:
+                        results["errors"].append(f"HIBP breach detail {breach_name}: {e}")
+
+                results["sources_checked"].append("HIBP")
+            elif resp.status_code == 404:
+                results["sources_checked"].append("HIBP")
+                results["note"] = "No breaches found in HIBP for this domain"
+            elif resp.status_code == 401:
+                results["errors"].append("HIBP: Invalid API key")
+            else:
+                results["errors"].append(f"HIBP: HTTP {resp.status_code}")
+        except Exception as e:
+            results["errors"].append(f"HIBP request failed: {e}")
+    else:
+        results["errors"].append("HIBP_API_KEY not configured — skipping HIBP check")
+
+    # ── 2. Public HIBP breach list (no key needed) for reference ────────
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(
+                "https://haveibeenpwned.com/api/v3/breaches",
+                headers={"user-agent": "SSSAI-Security-Scanner/1.0"},
+            )
+        if resp.status_code == 200 and not hibp_api_key:
+            # Without API key we can't do domain lookup, but log availability
+            results["errors"].append(
+                "HIBP_API_KEY not set. Set HIBP_API_KEY env var for domain-level breach lookup. "
+                "Public API available at haveibeenpwned.com."
+            )
+        results["sources_checked"].append("HIBP-public")
+    except Exception as e:
+        results["errors"].append(f"HIBP public check failed: {e}")
+
+    # ── 3. Save results ──────────────────────────────────────────────────
+    try:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_text(json.dumps(results, indent=2))
+    except Exception as e:
+        results["errors"].append(f"Failed to save results: {e}")
+
+    # Cache in scan context for report aggregation
+    if scan_context is not None:
+        scan_context.setdefault("_breach_results", {})
+        scan_context["_breach_results"][domain] = results
+
+    breach_count = len(results["breaches"])
+    total_affected = sum(b.get("affected_accounts", 0) for b in results["breaches"])
+    summary_lines = [
+        f"Breach check complete for {domain}.",
+        f"Breaches found: {breach_count}",
+        f"Total affected accounts: {total_affected:,}",
+    ]
+    if results["breaches"]:
+        summary_lines.append("Breaches:")
+        for b in results["breaches"][:10]:
+            summary_lines.append(
+                f"  - {b['breach_name']} ({b['breach_date']}): "
+                f"{', '.join(b['data_types'][:5])} — {b['affected_accounts']:,} accounts"
+            )
+    if results["errors"]:
+        summary_lines.append(f"Errors: {'; '.join(results['errors'][:3])}")
+    summary_lines.append(f"Full results saved to {save_path}")
+    return "\n".join(summary_lines)
+
+
+def _handle_credential_leak_check(input: dict, scan_context: dict | None) -> str:
+    """Check for exposed credentials/account registrations associated with a domain."""
+    domain = input.get("domain", "").strip().lower()
+    if not domain:
+        return "ERROR: domain is required"
+
+    save_path = input.get("save_path", "/output/credential_leak.json")
+    emails = input.get("emails", [])
+
+    # Default common email prefixes if none provided
+    if not emails:
+        emails = [
+            f"admin@{domain}",
+            f"info@{domain}",
+            f"security@{domain}",
+            f"contact@{domain}",
+        ]
+
+    results = {
+        "domain": domain,
+        "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "emails_checked": emails,
+        "credential_leaks": [],
+        "holehe_results": [],
+        "errors": [],
+    }
+
+    # ── 1. Run holehe for email account discovery ────────────────────────
+    for email in emails[:5]:  # cap to 5 emails to avoid rate limiting
+        try:
+            result = subprocess.run(
+                f"holehe {email} --only-used --no-color 2>/dev/null",
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            output = (result.stdout + result.stderr).strip()
+            if output and "command not found" not in output.lower():
+                services_found = []
+                for line in output.splitlines():
+                    # holehe marks found accounts with [+]
+                    if "[+]" in line:
+                        service = line.split("[+]")[-1].strip()
+                        if service:
+                            services_found.append(service)
+
+                if services_found:
+                    results["holehe_results"].append({
+                        "email": email,
+                        "services_registered": services_found,
+                        "service_count": len(services_found),
+                    })
+                    results["credential_leaks"].append({
+                        "email": email,
+                        "services_exposed": services_found,
+                        "risk_level": "high" if len(services_found) > 5 else "medium",
+                    })
+            else:
+                results["errors"].append(f"holehe not available or no output for {email}")
+        except subprocess.TimeoutExpired:
+            results["errors"].append(f"holehe timed out for {email}")
+        except Exception as e:
+            results["errors"].append(f"holehe failed for {email}: {e}")
+
+    # ── 2. Save results ──────────────────────────────────────────────────
+    try:
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(save_path).write_text(json.dumps(results, indent=2))
+    except Exception as e:
+        results["errors"].append(f"Failed to save results: {e}")
+
+    if scan_context is not None:
+        scan_context.setdefault("_credential_leak_results", {})
+        scan_context["_credential_leak_results"][domain] = results
+
+    leak_count = len(results["credential_leaks"])
+    summary_lines = [
+        f"Credential leak check complete for {domain}.",
+        f"Emails checked: {len(emails)}",
+        f"Emails with exposed accounts: {leak_count}",
+    ]
+    for leak in results["credential_leaks"][:5]:
+        summary_lines.append(
+            f"  - {leak['email']}: found on {len(leak['services_exposed'])} services "
+            f"({', '.join(leak['services_exposed'][:5])})"
+        )
+    if results["errors"]:
+        summary_lines.append(f"Errors: {'; '.join(results['errors'][:3])}")
+    summary_lines.append(f"Full results saved to {save_path}")
+    return "\n".join(summary_lines)
 
 
 # ── AI-first adaptive tool handlers ─────────────────────────────────────

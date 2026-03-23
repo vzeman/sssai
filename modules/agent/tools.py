@@ -37,6 +37,7 @@ TOOLS = [
             "  Visual: backstopjs\n"
             "  Auth: hydra\n"
             "  Cloud: prowler\n"
+            "  Breach Monitoring: holehe, breach-parse\n"
             "  Utility: curl, wget, jq, python3, node\n"
             "Save output files to /output/ for later reference."
         ),
@@ -313,6 +314,54 @@ TOOLS = [
                         "entry_points": {"type": "array", "items": {"type": "string"}},
                     },
                 },
+                "breach_exposure": {
+                    "type": "object",
+                    "description": "Breach Exposure Summary — populate if breach_check or credential_leak_check was run",
+                    "properties": {
+                        "breaches_found": {
+                            "type": "array",
+                            "description": "List of data breaches involving this domain",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "breach_name": {"type": "string"},
+                                    "breach_date": {"type": "string", "description": "Date of breach (YYYY-MM-DD)"},
+                                    "data_types": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Types of data exposed (e.g., 'Passwords', 'Email addresses', 'Phone numbers')",
+                                    },
+                                    "affected_accounts": {"type": "integer", "description": "Number of affected accounts"},
+                                    "source": {"type": "string", "description": "Data source (e.g., 'HIBP', 'DeHashed')"},
+                                },
+                            },
+                        },
+                        "credential_leaks": {
+                            "type": "array",
+                            "description": "Exposed credential or account indicators",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "email": {"type": "string"},
+                                    "services_exposed": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "Services where this email was found registered",
+                                    },
+                                    "risk_level": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+                                },
+                            },
+                        },
+                        "total_breaches": {"type": "integer"},
+                        "total_affected_accounts": {"type": "integer"},
+                        "new_since_last_scan": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Breach names that are new since the last scheduled check",
+                        },
+                        "summary": {"type": "string", "description": "Human-readable breach exposure summary"},
+                    },
+                },
                 "improvement_roadmap": {
                     "type": "array",
                     "description": "Prioritized list of improvements",
@@ -340,6 +389,56 @@ TOOLS = [
                 },
             },
             "required": ["summary", "risk_score", "findings"],
+        },
+    },
+    # ── Breach & Dark Web Monitoring ─────────────────────────────────────────
+    {
+        "name": "breach_check",
+        "description": (
+            "Check if a domain has appeared in known data breaches using the Have I Been Pwned API "
+            "and other breach intelligence sources. Returns breach names, dates, data types exposed, "
+            "and affected account counts. Always run this during Phase 0 Discovery for security scans."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for breaches (e.g., 'example.com')",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/breach_check.json)",
+                },
+            },
+            "required": ["domain"],
+        },
+    },
+    {
+        "name": "credential_leak_check",
+        "description": (
+            "Search for exposed credentials and account registrations associated with a domain. "
+            "Uses holehe and related tools to identify which services domain emails are registered on, "
+            "indicating potential credential exposure surface. Run during Phase 0 Discovery."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for credential leaks (e.g., 'example.com')",
+                },
+                "emails": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific email addresses to check (if known). If not provided, uses common patterns like admin@domain, info@domain.",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/credential_leak.json)",
+                },
+            },
+            "required": ["domain"],
         },
     },
     # ── AI-first adaptive tools ──────────────────────────────────────────────
@@ -379,7 +478,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'breach_monitoring')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -401,7 +500,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "breach_monitoring",
                     ],
                 },
             },
