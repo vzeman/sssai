@@ -1658,6 +1658,22 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Clean up checkpoint ──
     delete_checkpoint(scan_id)
 
+    # ── Auto-triage: enrich findings with priority scores and bucket them ──
+    try:
+        from modules.agent.triage import apply_triage
+        report = apply_triage(report)
+    except Exception:
+        pass
+
+    # ── Smart scheduling: recommend scan interval based on history ──
+    try:
+        from modules.agent.scheduling import recommend_scan_interval
+        scheduling = recommend_scan_interval(target, report)
+        report["recommended_scan_interval"] = scheduling["recommended_scan_interval"]
+        report["interval_reasoning"] = scheduling["interval_reasoning"]
+    except Exception:
+        pass
+
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
 
@@ -1683,6 +1699,10 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "tool": f.get("tool"),
                 "evidence": f.get("evidence", ""),
                 "risk_score": report.get("risk_score"),
+                "exploitability": f.get("exploitability"),
+                "business_impact": f.get("business_impact"),
+                "exposure": f.get("exposure"),
+                "priority_score": f.get("priority_score"),
             })
         if es_findings:
             bulk_index("scanner-scan-findings", es_findings)

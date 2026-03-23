@@ -327,6 +327,46 @@ TOOLS = [
                         },
                     },
                 },
+                "triage": {
+                    "type": "object",
+                    "description": (
+                        "Auto-triage buckets grouping findings by action urgency. "
+                        "Populated automatically after report submission — no need to include manually."
+                    ),
+                    "properties": {
+                        "immediate_action": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Critical findings requiring immediate remediation",
+                        },
+                        "this_sprint": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "High/medium findings to address in current sprint",
+                        },
+                        "backlog": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Low-priority findings for future backlog",
+                        },
+                    },
+                },
+                "recommended_scan_interval": {
+                    "type": "string",
+                    "description": (
+                        "AI-recommended interval for the next scan. "
+                        "One of: 'daily', 'weekly', 'biweekly', 'monthly'. "
+                        "Populated automatically after report submission."
+                    ),
+                    "enum": ["daily", "weekly", "biweekly", "monthly"],
+                },
+                "interval_reasoning": {
+                    "type": "string",
+                    "description": (
+                        "Human-readable explanation of why the scan interval was recommended. "
+                        "Populated automatically after report submission."
+                    ),
+                },
                 "scan_metadata": {
                     "type": "object",
                     "properties": {
