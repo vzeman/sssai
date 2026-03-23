@@ -341,15 +341,7 @@ jobs:
       - name: Run AI agent
         if: steps.guard.outputs.should-implement == 'true'
         id: agent
-        run: |
-          echo "::notice::AI agent execution would run here"
-          
-          # For now, create a placeholder indicating agent would execute
-          echo "Prompt would be:" > /tmp/agent-prompt.txt
-          echo "Agent task ready for Issue #${{ env.ISSUE_NUMBER }}" >> /tmp/agent-prompt.txt
-          
-          echo "Placeholder saved for reference"
-          exit 0
+        run: echo "::notice::AI agent execution would run here"
 
       # ================================================================
       # Step 12: Check for file changes
