@@ -1654,8 +1654,21 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     })
 
     iteration = 0
+    SCAN_MAX_TIME = 3600  # 1-hour absolute max per scan
     while iteration < MAX_ITERATIONS:
         iteration += 1
+
+        # ── Check scan timeout ──
+        elapsed = time.time() - start_time
+        if elapsed > SCAN_MAX_TIME:
+            log.warning("Scan %s exceeded max time (%d > %d seconds), wrapping up", 
+                       scan_id, int(elapsed), SCAN_MAX_TIME)
+            _log_activity(scan_id, {
+                "type": "system",
+                "message": f"Scan max time ({SCAN_MAX_TIME}s) reached, finalizing report",
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            break
 
         # ── Heartbeat ping ──
         _ping_heartbeat(scan_id)
