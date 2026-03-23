@@ -1,7 +1,6 @@
 """Campaign scanning routes — multi-target scanning with cross-target analysis."""
 import json
 import logging
-import threading
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,7 +35,8 @@ def create_campaign(body: CampaignCreate, user: User = Depends(get_current_user)
     db.commit()
     db.refresh(campaign)
 
-    queue = get_queue()
+    # Create all scan rows first, then enqueue — prevents dangling scans if queue fails
+    scans = []
     for target in body.targets:
         scan = Scan(
             user_id=user.id,
@@ -46,14 +46,31 @@ def create_campaign(body: CampaignCreate, user: User = Depends(get_current_user)
             campaign_id=campaign.id,
         )
         db.add(scan)
+        scans.append(scan)
+
+    try:
         db.commit()
-        db.refresh(scan)
-        queue.send("scan-jobs", {
-            "scan_id": scan.id,
-            "target": scan.target,
-            "scan_type": scan.scan_type,
-            "config": scan.config or {},
-        })
+        for scan in scans:
+            db.refresh(scan)
+    except Exception:
+        campaign.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail="Failed to create scan records")
+
+    queue = get_queue()
+    try:
+        for scan in scans:
+            queue.send("scan-jobs", {
+                "scan_id": scan.id,
+                "target": scan.target,
+                "scan_type": scan.scan_type,
+                "config": scan.config or {},
+            })
+    except Exception as e:
+        log.error("Failed to enqueue campaign scans for campaign %s: %s", campaign.id, e)
+        campaign.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=500, detail="Failed to enqueue scan jobs")
 
     db.refresh(campaign)
     return campaign
@@ -113,7 +130,6 @@ def _refresh_campaign_status(campaign: Campaign, scans: list[Scan], db: Session)
     """Update campaign status based on constituent scan statuses."""
     if not scans:
         return
-    statuses = {s.status for s in scans}
     if all(s.status in ("completed", "failed") for s in scans):
         new_status = "completed" if any(s.status == "completed" for s in scans) else "failed"
         if campaign.status != new_status:
@@ -230,11 +246,15 @@ def _run_ai_cross_target_analysis(campaign: Campaign, scan_reports: dict) -> dic
     if len(context) > 60000:
         context = context[:60000] + "\n... [truncated]"
 
+    # Sanitize user-controlled fields before interpolation to limit prompt injection surface
+    safe_name = (campaign.name or "Unnamed Campaign")[:200].replace("\n", " ").replace("\r", " ")
+    safe_targets = ", ".join(t[:253].replace("\n", " ").replace("\r", " ") for t in campaign.targets[:50])
+
     prompt = f"""You are a security analyst performing cross-target analysis for a multi-target security campaign.
 
-Campaign name: {campaign.name or "Unnamed Campaign"}
+Campaign name: {safe_name}
 Scan type: {campaign.scan_type}
-Targets: {", ".join(campaign.targets)}
+Targets: {safe_targets}
 
 Individual scan reports:
 {context}
