@@ -31,6 +31,9 @@ FRAMEWORK_CATALOGS: dict[str, dict] = {
             {"id": "8.3.6",  "title": "Passwords meet minimum complexity requirements", "weight": "medium"},
             {"id": "8.4.2",  "title": "MFA implemented for all access into the CDE", "weight": "high"},
             {"id": "11.3.2", "title": "External vulnerability scans performed regularly", "weight": "medium"},
+            {"id": "3.4.1",  "title": "PAN masked when displayed (first six/last four digits maximum)", "weight": "critical"},
+            {"id": "6.4.3",  "title": "All payment page scripts managed and authorized (SRI / integrity controls)", "weight": "high"},
+            {"id": "2.2.5",  "title": "Unnecessary functionality is removed or disabled on system components", "weight": "medium"},
         ],
     },
     "soc2": {

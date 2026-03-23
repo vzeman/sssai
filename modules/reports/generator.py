@@ -5,7 +5,7 @@ Uses Jinja2 for templating and WeasyPrint for PDF.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -24,7 +24,6 @@ class ReportGenerator:
             autoescape=True,
         )
         self.env.filters["severity_color"] = self._severity_color
-        self.env.filters["severity_badge"] = self._severity_badge
         self.env.filters["risk_color"] = self._risk_color
 
     @staticmethod
@@ -36,11 +35,6 @@ class ReportGenerator:
             "low": "#17a2b8",
             "info": "#6c757d",
         }.get(severity, "#6c757d")
-
-    @staticmethod
-    def _severity_badge(severity: str) -> str:
-        color = ReportGenerator._severity_color(severity)
-        return f'<span style="background:{color};color:white;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold">{severity.upper()}</span>'
 
     @staticmethod
     def _risk_color(score: float) -> str:
@@ -90,7 +84,7 @@ class ReportGenerator:
         context = {
             "report": report,
             "scan": scan_info or {},
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "findings_by_severity": by_severity,
             "severity_order": ["critical", "high", "medium", "low", "info"],
             "total_findings": len(findings),
@@ -114,7 +108,7 @@ class ReportGenerator:
     def generate_json(self, report: dict, scan_info: dict | None = None) -> str:
         """Generate a formatted JSON report."""
         output = {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "scan_info": scan_info or {},
             **report,
         }
