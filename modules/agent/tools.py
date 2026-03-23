@@ -303,12 +303,52 @@ TOOLS = [
                 },
                 "compliance_summary": {
                     "type": "object",
-                    "description": "Compliance status per framework",
+                    "description": "High-level compliance status per framework",
                     "properties": {
                         "owasp_top10": {"type": "string", "enum": ["pass", "partial", "fail"]},
                         "pci_dss": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "gdpr": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "soc2": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "iso27001": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "hipaa": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "tls_best_practices": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                    },
+                },
+                "compliance_reports": {
+                    "type": "object",
+                    "description": (
+                        "Detailed per-requirement compliance reports for each framework. "
+                        "Include this when performing a compliance_audit scan or when findings "
+                        "map to specific compliance requirements. Each key is a framework ID "
+                        "(pci_dss_4, soc2, iso27001, hipaa, gdpr, owasp_top10)."
+                    ),
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "overall": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                            "framework_name": {"type": "string"},
+                            "requirements": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "string", "description": "Requirement ID, e.g. '6.2.4'"},
+                                        "title": {"type": "string"},
+                                        "status": {"type": "string", "enum": ["pass", "fail", "partial"]},
+                                        "findings": {
+                                            "type": "array",
+                                            "items": {"type": "string"},
+                                            "description": "Finding IDs (e.g. F-001) that caused this requirement to fail",
+                                        },
+                                        "evidence": {"type": "string", "description": "Evidence text for the failure"},
+                                        "remediation": {"type": "string"},
+                                    },
+                                    "required": ["id", "title", "status"],
+                                },
+                            },
+                            "pass_rate": {"type": "number", "description": "0.0–1.0 fraction of requirements passing"},
+                            "critical_gaps": {"type": "integer", "description": "Count of critical/high-weight failing requirements"},
+                        },
                     },
                 },
                 "attack_surface": {
