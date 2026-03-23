@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search
+from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, webhooks
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -58,6 +58,23 @@ try:
 except Exception:
     pass
 
+# Add webhook_configs columns if missing (migration)
+try:
+    from sqlalchemy import text as _wh_text
+    with engine.connect() as conn:
+        # Create webhook_configs table if it doesn't exist via Base.metadata, but also
+        # ensure any new columns are added to existing tables gracefully.
+        for col, col_type in [
+            ("last_used_at", "TIMESTAMP NULL"),
+        ]:
+            try:
+                conn.execute(_wh_text(f"ALTER TABLE webhook_configs ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
+        conn.commit()
+except Exception:
+    pass
+
 # Set up Elasticsearch indices on startup
 try:
     from modules.infra import setup_es
@@ -92,6 +109,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 
 @app.get("/health")

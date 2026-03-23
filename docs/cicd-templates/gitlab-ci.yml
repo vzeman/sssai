@@ -1,0 +1,114 @@
+# SSSAI Security Scan — GitLab CI Integration
+#
+# This template triggers a security scan after deployment and blocks
+# the pipeline if quality gates fail.
+#
+# Setup:
+#   1. Create a webhook API key in SSSAI dashboard (Settings → Webhooks)
+#   2. Add SSSAI_API_URL and SSSAI_API_KEY as GitLab CI/CD variables (masked)
+#   3. Add SSSAI_TARGET_URL as a CI/CD variable for the deployment target URL
+#   4. Include or copy this into your .gitlab-ci.yml
+
+stages:
+  - build
+  - deploy
+  - security-scan
+
+sssai-security-scan:
+  stage: security-scan
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl python3
+  script:
+    # Step 1: Trigger the scan
+    - |
+      echo "Triggering SSSAI security scan for $SSSAI_TARGET_URL..."
+      RESPONSE=$(curl -s -X POST "${SSSAI_API_URL}/api/webhooks/scan" \
+        -H "X-API-Key: ${SSSAI_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"target\": \"${SSSAI_TARGET_URL}\",
+          \"commit_sha\": \"${CI_COMMIT_SHA}\",
+          \"branch\": \"${CI_COMMIT_REF_NAME}\",
+          \"environment\": \"${CI_ENVIRONMENT_NAME:-production}\",
+          \"deployer\": \"gitlab-ci\",
+          \"scan_type\": \"security\",
+          \"gates\": {
+            \"max_critical\": 0,
+            \"max_high\": 3,
+            \"max_risk_score\": 60
+          }
+        }")
+
+      echo "Trigger response: $RESPONSE"
+      SCAN_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['scan_id'])")
+      echo "SCAN_ID=$SCAN_ID" > scan.env
+      cat scan.env
+
+    # Step 2: Poll for result
+    - |
+      source scan.env
+      MAX_WAIT=600
+      POLL_INTERVAL=15
+      ELAPSED=0
+
+      echo "Polling for scan result (scan_id=$SCAN_ID)..."
+
+      while [ $ELAPSED -lt $MAX_WAIT ]; do
+        RESPONSE=$(curl -s "${SSSAI_API_URL}/api/webhooks/scan/${SCAN_ID}/result" \
+          -H "X-API-Key: ${SSSAI_API_KEY}")
+
+        STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+        GATE_PASSED=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(str(d.get('gate_passed','')).lower())")
+
+        echo "[${ELAPSED}s] Status: $STATUS | Gate passed: $GATE_PASSED"
+
+        if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+          echo "$RESPONSE" | python3 -m json.tool || true
+          echo "GATE_PASSED=$GATE_PASSED" >> scan.env
+          break
+        fi
+
+        sleep $POLL_INTERVAL
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+      done
+
+      if [ $ELAPSED -ge $MAX_WAIT ]; then
+        echo "Scan timed out after ${MAX_WAIT}s"
+        echo "GATE_PASSED=false" >> scan.env
+      fi
+
+    # Step 3: Enforce gate
+    - |
+      source scan.env
+      echo "=== Quality Gate Result: $GATE_PASSED ==="
+      if [ "$GATE_PASSED" != "true" ]; then
+        echo "FAIL: Security quality gate did not pass. Review findings and fix critical/high issues."
+        exit 1
+      fi
+      echo "PASS: All security quality gates passed."
+
+  artifacts:
+    reports:
+      dotenv: scan.env
+    paths:
+      - scan.env
+    expire_in: 1 week
+    when: always
+
+  # Only run after successful deploy
+  # needs:
+  #   - job: deploy
+  #     artifacts: false
+
+  # Control which branches trigger security scanning
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH =~ /^(main|master|production|release\/.*)$/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+  # Allow failure to not block MR — remove to enforce hard gate
+  # allow_failure: true
+
+  environment:
+    name: $CI_ENVIRONMENT_NAME

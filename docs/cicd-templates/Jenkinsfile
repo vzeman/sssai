@@ -1,0 +1,115 @@
+// SSSAI Security Scan — Jenkins Pipeline Integration
+//
+// Setup:
+//   1. Create a webhook API key in the SSSAI dashboard (Settings → Webhooks)
+//   2. Add SSSAI_API_URL and SSSAI_API_KEY as Jenkins credentials (Secret Text)
+//   3. Add SSSAI_TARGET_URL as a Jenkins parameter or environment variable
+//   4. Include this stage in your Jenkinsfile after the deploy stage
+
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'TARGET_URL', defaultValue: '', description: 'URL of the deployed application to scan')
+        string(name: 'SCAN_TYPE', defaultValue: 'security', description: 'Scan type: security, pentest, full, compliance')
+    }
+
+    environment {
+        SSSAI_API_URL = credentials('sssai-api-url')
+        SSSAI_API_KEY = credentials('sssai-api-key')
+        MAX_WAIT = '600'
+        POLL_INTERVAL = '15'
+    }
+
+    stages {
+        // ... your existing build and deploy stages ...
+
+        stage('SSSAI Security Scan') {
+            steps {
+                script {
+                    def targetUrl = params.TARGET_URL ?: env.DEPLOY_URL
+
+                    echo "Triggering SSSAI security scan for: ${targetUrl}"
+
+                    // Trigger scan
+                    def triggerResponse = sh(
+                        script: """
+                            curl -s -X POST "${SSSAI_API_URL}/api/webhooks/scan" \\
+                              -H "X-API-Key: ${SSSAI_API_KEY}" \\
+                              -H "Content-Type: application/json" \\
+                              -d '{
+                                "target": "${targetUrl}",
+                                "commit_sha": "${env.GIT_COMMIT}",
+                                "branch": "${env.BRANCH_NAME}",
+                                "environment": "production",
+                                "deployer": "jenkins",
+                                "scan_type": "${params.SCAN_TYPE}",
+                                "gates": {
+                                  "max_critical": 0,
+                                  "max_high": 3,
+                                  "max_risk_score": 60
+                                }
+                              }'
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    def triggerJson = readJSON text: triggerResponse
+                    def scanId = triggerJson.scan_id
+                    echo "Scan triggered: ${scanId}"
+
+                    // Poll for result
+                    def elapsed = 0
+                    def gatePassed = false
+                    def scanResult = [:]
+
+                    while (elapsed < MAX_WAIT.toInteger()) {
+                        sleep(POLL_INTERVAL.toInteger())
+                        elapsed += POLL_INTERVAL.toInteger()
+
+                        def pollResponse = sh(
+                            script: """
+                                curl -s "${SSSAI_API_URL}/api/webhooks/scan/${scanId}/result" \\
+                                  -H "X-API-Key: ${SSSAI_API_KEY}"
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        scanResult = readJSON text: pollResponse
+                        def status = scanResult.status
+                        def gp = scanResult.gate_passed
+
+                        echo "[${elapsed}s] Status: ${status} | Gate: ${gp}"
+
+                        if (status == 'completed' || status == 'failed') {
+                            gatePassed = (gp == true)
+                            break
+                        }
+                    }
+
+                    // Print summary
+                    echo "=== SSSAI Scan Summary ==="
+                    echo "Risk Score:     ${scanResult.risk_score}"
+                    echo "Findings Count: ${scanResult.findings_count}"
+                    echo "Gate Passed:    ${gatePassed}"
+                    if (scanResult.gate_details) {
+                        echo "Gate Details:   ${scanResult.gate_details}"
+                    }
+
+                    // Enforce gate
+                    if (!gatePassed) {
+                        error("SSSAI security quality gate FAILED. Fix critical/high findings before deploying.")
+                    }
+
+                    echo "SSSAI security quality gate PASSED."
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Security scan complete.'
+        }
+    }
+}
