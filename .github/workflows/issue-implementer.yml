@@ -345,11 +345,10 @@ jobs:
           echo "::notice::AI agent execution would run here"
           
           # For now, create a placeholder indicating agent would execute
-          cat > /tmp/agent-prompt.txt << 'EOF'
-          ${{ steps.build-prompt.outputs.prompt }}
-          EOF
+          echo "Prompt would be:" > /tmp/agent-prompt.txt
+          echo "Agent task ready for Issue #${{ env.ISSUE_NUMBER }}" >> /tmp/agent-prompt.txt
           
-          echo "Prompt saved for reference"
+          echo "Placeholder saved for reference"
           exit 0
 
       # ================================================================
