@@ -164,8 +164,8 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             domain = input["domain"]
             record_type = input.get("record_type", "ANY")
             result = subprocess.run(
-                f"dig {domain} {record_type} +noall +answer +authority",
-                shell=True,
+                ["dig", domain, record_type, "+noall", "+answer", "+authority"],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -179,8 +179,8 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             path = input["path"]
             query = input.get("query", ".")
             result = subprocess.run(
-                f"jq '{query}' {path}",
-                shell=True,
+                ["jq", query, path],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -229,14 +229,15 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             if mobile:
                 width, height = 375, 812
 
-            cmd = (
-                f"chromium-browser --headless --disable-gpu --no-sandbox "
-                f"--screenshot={output_path} "
-                f"--window-size={width},{height} "
-                f"'{url}'"
-            )
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=60,
+                [
+                    "chromium-browser", "--headless", "--disable-gpu", "--no-sandbox",
+                    f"--screenshot={output_path}", f"--window-size={width},{height}", url,
+                ],
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if Path(output_path).exists():
                 return f"Screenshot saved to {output_path}"
