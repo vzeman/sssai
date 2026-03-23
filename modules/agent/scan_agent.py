@@ -318,45 +318,45 @@ def _handle_breach_check(input: dict, scan_context: dict | None) -> str:
                         "user-agent": "SSSAI-Security-Scanner/1.0",
                     },
                 )
-            if resp.status_code == 200:
-                emails = resp.json()
-                # HIBP breacheddomain returns {email: [breach_names]}
-                breach_names: set[str] = set()
-                for breach_list in emails.values():
-                    breach_names.update(breach_list)
+                if resp.status_code == 200:
+                    emails = resp.json()
+                    # HIBP breacheddomain returns {email: [breach_names]}
+                    breach_names: set[str] = set()
+                    for breach_list in emails.values():
+                        breach_names.update(breach_list)
 
-                # Fetch breach details for each found breach name
-                for breach_name in list(breach_names)[:20]:  # cap to 20
-                    try:
-                        detail_resp = client.get(
-                            f"https://haveibeenpwned.com/api/v3/breach/{breach_name}",
-                            headers={
-                                "hibp-api-key": hibp_api_key,
-                                "user-agent": "SSSAI-Security-Scanner/1.0",
-                            },
-                        )
-                        if detail_resp.status_code == 200:
-                            b = detail_resp.json()
-                            results["breaches"].append({
-                                "breach_name": b.get("Name", breach_name),
-                                "breach_date": b.get("BreachDate", "unknown"),
-                                "data_types": b.get("DataClasses", []),
-                                "affected_accounts": b.get("PwnCount", 0),
-                                "source": "HIBP",
-                                "description": b.get("Description", "")[:500],
-                                "is_verified": b.get("IsVerified", False),
-                            })
-                    except Exception as e:
-                        results["errors"].append(f"HIBP breach detail {breach_name}: {e}")
+                    # Fetch breach details for each found breach name
+                    for breach_name in list(breach_names)[:20]:  # cap to 20
+                        try:
+                            detail_resp = client.get(
+                                f"https://haveibeenpwned.com/api/v3/breach/{breach_name}",
+                                headers={
+                                    "hibp-api-key": hibp_api_key,
+                                    "user-agent": "SSSAI-Security-Scanner/1.0",
+                                },
+                            )
+                            if detail_resp.status_code == 200:
+                                b = detail_resp.json()
+                                results["breaches"].append({
+                                    "breach_name": b.get("Name", breach_name),
+                                    "breach_date": b.get("BreachDate", "unknown"),
+                                    "data_types": b.get("DataClasses", []),
+                                    "affected_accounts": b.get("PwnCount", 0),
+                                    "source": "HIBP",
+                                    "description": b.get("Description", "")[:500],
+                                    "is_verified": b.get("IsVerified", False),
+                                })
+                        except Exception as e:
+                            results["errors"].append(f"HIBP breach detail {breach_name}: {e}")
 
-                results["sources_checked"].append("HIBP")
-            elif resp.status_code == 404:
-                results["sources_checked"].append("HIBP")
-                results["note"] = "No breaches found in HIBP for this domain"
-            elif resp.status_code == 401:
-                results["errors"].append("HIBP: Invalid API key")
-            else:
-                results["errors"].append(f"HIBP: HTTP {resp.status_code}")
+                    results["sources_checked"].append("HIBP")
+                elif resp.status_code == 404:
+                    results["sources_checked"].append("HIBP")
+                    results["note"] = "No breaches found in HIBP for this domain"
+                elif resp.status_code == 401:
+                    results["errors"].append("HIBP: Invalid API key")
+                else:
+                    results["errors"].append(f"HIBP: HTTP {resp.status_code}")
         except Exception as e:
             results["errors"].append(f"HIBP request failed: {e}")
     else:
