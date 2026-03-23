@@ -194,7 +194,8 @@ def main():
 
             try:
                 report = run_scan(scan_id, target, scan_type, config)
-                findings = len(report.get("findings", []))
+                raw_findings = report.get("findings", [])
+                findings = len(raw_findings)
                 score = report.get("risk_score", 0)
                 # Extract token usage from report metadata
                 token_usage = None
