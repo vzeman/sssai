@@ -249,7 +249,7 @@ class CveCheckerService:
                     if alert.cvss_score and alert.cvss_score >= 9.0:
                         sev = "critical"
                     elif alert.cvss_score and alert.cvss_score >= 7.0:
-                        sev = "critical"
+                        sev = "warning"
                     elif alert.cvss_score and alert.cvss_score >= 4.0:
                         sev = "warning"
                     else:
