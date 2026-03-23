@@ -29,6 +29,7 @@ class User(Base):
     campaigns: Mapped[list["Campaign"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     assets: Mapped[list["Asset"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     webhook_configs: Mapped[list["WebhookConfig"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Campaign(Base):
@@ -176,3 +177,36 @@ class WebhookConfig(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="webhook_configs")
+
+
+class AuditLog(Base):
+    """
+    Immutable audit log for compliance and security monitoring.
+    Records all user actions on resources for SOC 2 / ISO 27001 compliance.
+    """
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    
+    # Action metadata
+    action: Mapped[str] = mapped_column(String, index=True)  # create, read, update, delete, export, download, etc.
+    resource_type: Mapped[str] = mapped_column(String, index=True)  # scan, monitor, campaign, user, asset, etc.
+    resource_id: Mapped[str] = mapped_column(String, index=True)  # ID of the affected resource
+    
+    # Request metadata
+    ip_address: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String, nullable=True)
+    
+    # State changes (JSON-serialized)
+    before_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # Previous values
+    after_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)   # New values
+    
+    # Outcome
+    status: Mapped[str] = mapped_column(String, default="success")  # success, failure
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    # Immutable timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    
+    user: Mapped["User"] = relationship(back_populates="audit_logs")
