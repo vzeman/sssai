@@ -108,7 +108,7 @@ class NotificationChannel(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     name: Mapped[str] = mapped_column(String)
-    channel_type: Mapped[str] = mapped_column(String)  # email, slack, discord, webhook, openclaw
+    channel_type: Mapped[str] = mapped_column(String)  # email, slack, discord, webhook, openclaw, jira, linear, github_issues
     config: Mapped[dict] = mapped_column(JSON)  # channel-specific config (webhook_url, to_email, etc.)
     min_severity: Mapped[str] = mapped_column(String, default="info")  # info, warning, critical
     is_active: Mapped[bool] = mapped_column(default=True)

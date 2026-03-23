@@ -1,6 +1,7 @@
 """
 Multi-channel notification dispatcher.
-Sends alerts via email, Slack, Discord, and webhooks.
+Sends alerts via email, Slack, Discord, webhooks, and issue trackers
+(Jira, Linear, GitHub Issues).
 """
 
 import json
@@ -197,6 +198,27 @@ class NotificationDispatcher:
         smtp.send_message(msg)
         smtp.quit()
         log.info("Email notification sent: %s -> %s", notification.title, config["to_email"])
+
+    async def _send_jira(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Jira channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_linear(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Linear channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_github_issues(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "GitHub Issues channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
 
     async def _send_openclaw(self, config: dict, notification: Notification):
         """Send notification via OpenClaw gateway API for multi-channel distribution."""
