@@ -1,8 +1,10 @@
 """
 Multi-channel notification dispatcher.
-Sends alerts via email, Slack, Discord, and webhooks.
+Sends alerts via email, Slack, Discord, webhooks, and issue trackers
+(Jira, Linear, GitHub Issues).
 """
 
+import html
 import json
 import logging
 from dataclasses import dataclass
@@ -157,6 +159,7 @@ class NotificationDispatcher:
 
     async def _send_email(self, config: dict, notification: Notification):
         """Send email notification via SMTP."""
+        import html
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
@@ -176,15 +179,19 @@ class NotificationDispatcher:
         if notification.report_url:
             text_body += f"\n\nView Report: {notification.report_url}"
 
+        _title = html.escape(notification.title)
+        _message = html.escape(notification.message)
+        _target = html.escape(notification.target) if notification.target else ""
+        _report_url = html.escape(notification.report_url, quote=True) if notification.report_url else ""
         html_body = f"""
-        <h2>{notification.title}</h2>
-        <p>{notification.message}</p>
+        <h2>{_title}</h2>
+        <p>{_message}</p>
         <table>
-            {"<tr><td><b>Target:</b></td><td>" + notification.target + "</td></tr>" if notification.target else ""}
+            {"<tr><td><b>Target:</b></td><td>" + _target + "</td></tr>" if _target else ""}
             {"<tr><td><b>Risk Score:</b></td><td>" + str(notification.risk_score) + "/100</td></tr>" if notification.risk_score is not None else ""}
             {"<tr><td><b>Findings:</b></td><td>" + str(notification.findings_count) + "</td></tr>" if notification.findings_count is not None else ""}
         </table>
-        {"<p><a href='" + notification.report_url + "'>View Full Report</a></p>" if notification.report_url else ""}
+        {"<p><a href='" + _report_url + "'>View Full Report</a></p>" if _report_url else ""}
         """
 
         msg.attach(MIMEText(text_body, "plain"))
@@ -197,6 +204,27 @@ class NotificationDispatcher:
         smtp.send_message(msg)
         smtp.quit()
         log.info("Email notification sent: %s -> %s", notification.title, config["to_email"])
+
+    async def _send_jira(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Jira channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_linear(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Linear channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_github_issues(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "GitHub Issues channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
 
     async def _send_openclaw(self, config: dict, notification: Notification):
         """Send notification via OpenClaw gateway API for multi-channel distribution."""
@@ -222,6 +250,62 @@ class NotificationDispatcher:
             resp = await client.post(f"{gateway_url}/api/v1/messages", json=payload)
             resp.raise_for_status()
             log.info("OpenClaw notification sent: %s -> %s", notification.title, channel)
+
+
+def build_verification_notification(scan_id: str, target: str, report: dict) -> Notification:
+    """Build a notification from a completed verification scan report."""
+    verification_of = report.get("verification_of", "unknown")
+    remediation_rate = report.get("remediation_rate", 0.0)
+    days_since = report.get("days_since_original", 0)
+    results = report.get("verification_results", [])
+
+    fixed = sum(1 for r in results if r.get("status") == "verified_fixed")
+    still_vuln = sum(1 for r in results if r.get("status") == "still_vulnerable")
+    partial = sum(1 for r in results if r.get("status") == "partially_fixed")
+    regression = sum(1 for r in results if r.get("status") == "new_regression")
+    total = len(results)
+
+    if remediation_rate >= 1.0:
+        severity = "info"
+    elif still_vuln > 0 or regression > 0:
+        original_risk = report.get("risk_score", 0)
+        severity = "critical" if original_risk >= 80 else "warning"
+    else:
+        severity = "warning"
+
+    rate_pct = int(remediation_rate * 100)
+    message = (
+        f"Remediation rate: {rate_pct}% ({fixed}/{total} findings fixed). "
+        f"Verified {days_since} day(s) after original scan {verification_of}."
+    )
+    if still_vuln or regression:
+        parts = []
+        if still_vuln:
+            parts.append(f"{still_vuln} still vulnerable")
+        if partial:
+            parts.append(f"{partial} partially fixed")
+        if regression:
+            parts.append(f"{regression} new regression(s)")
+        message += f"\nRemaining issues: {', '.join(parts)}."
+
+    return Notification(
+        title=f"Verification Complete: {target}",
+        message=message,
+        severity=severity,
+        scan_id=scan_id,
+        target=target,
+        risk_score=report.get("risk_score"),
+        findings_count=total,
+        metadata={
+            "verification_of": verification_of,
+            "remediation_rate": remediation_rate,
+            "days_since_original": days_since,
+            "verified_fixed": fixed,
+            "still_vulnerable": still_vuln,
+            "partially_fixed": partial,
+            "new_regression": regression,
+        },
+    )
 
 
 def build_scan_notification(scan_id: str, target: str, report: dict) -> Notification:

@@ -96,10 +96,10 @@ def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_cou
         log.warning("Could not update scan status: %s", e)
 
 
-def _get_scan_user_id(scan_id: str) -> str:
-    """Look up user_id for a scan from the database."""
+def _get_scan_user_id(scan_id: str) -> str | None:
+    """Look up the user_id for a completed scan."""
     if not _DB_URL:
-        return ""
+        return None
     try:
         from sqlalchemy import create_engine, text
         engine = create_engine(_DB_URL)
@@ -108,9 +108,10 @@ def _get_scan_user_id(scan_id: str) -> str:
                 text("SELECT user_id FROM scans WHERE id = :scan_id"),
                 {"scan_id": scan_id},
             ).fetchone()
-            return row[0] if row else ""
-    except Exception:
-        return ""
+            return row[0] if row else None
+    except Exception as e:
+        log.warning("Could not fetch user_id for scan %s: %s", scan_id, e)
+        return None
 
 
 running = True
@@ -205,13 +206,14 @@ def main():
                 _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings,
                                     token_usage=token_usage)
 
-                # Calculate and persist continuous security posture score
+                # Store detected technologies in asset inventory for CVE monitoring
                 try:
                     user_id = _get_scan_user_id(scan_id)
-                    from modules.agent.posture_score import run_posture_update
-                    run_posture_update(scan_id, target, user_id, raw_findings, score)
-                except Exception as posture_err:
-                    log.warning("Posture score update failed for scan %s: %s", scan_id, posture_err)
+                    if user_id:
+                        from modules.cve_monitor.inventory import store_technologies_from_report
+                        store_technologies_from_report(scan_id, user_id, target, report, _DB_URL)
+                except Exception as inv_err:
+                    log.warning("Asset inventory update failed for scan %s: %s", scan_id, inv_err)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")

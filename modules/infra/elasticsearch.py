@@ -162,6 +162,14 @@ INDICES = {
                 "tool": {"type": "keyword"},
                 "evidence": {"type": "text"},
                 "risk_score": {"type": "float"},
+                # Lifecycle / deduplication fields
+                "finding_status": {"type": "keyword"},      # new | existing | resolved | regressed
+                "dedup_key": {"type": "keyword"},           # sha1(title+category+url_domain)
+                "affected_url": {"type": "keyword"},        # primary affected URL
+                "first_seen_scan_id": {"type": "keyword"},
+                "first_seen_date": {"type": "date"},
+                "last_seen_scan_id": {"type": "keyword"},
+                "resolved_date": {"type": "date"},
             }
         },
     },
