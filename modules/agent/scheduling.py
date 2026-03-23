@@ -9,6 +9,16 @@ import os
 log = logging.getLogger(__name__)
 
 _DB_URL = os.environ.get("DATABASE_URL", "")
+_engine = None
+
+
+def _get_engine():
+    global _engine
+    if _engine is None:
+        from sqlalchemy import create_engine
+        _engine = create_engine(_DB_URL)
+    return _engine
+
 
 # Interval options in ascending frequency order
 _INTERVALS = ["daily", "weekly", "biweekly", "monthly"]
@@ -47,9 +57,8 @@ def _fetch_scan_history(target: str, limit: int = 10) -> list[dict]:
     if not _DB_URL:
         return []
     try:
-        from sqlalchemy import create_engine, text
-        engine = create_engine(_DB_URL)
-        with engine.connect() as conn:
+        from sqlalchemy import text
+        with _get_engine().connect() as conn:
             rows = conn.execute(text(
                 """
                 SELECT id, risk_score, findings_count, completed_at

@@ -13,6 +13,7 @@ Inspired by PentAGI architecture:
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from collections import Counter
@@ -163,9 +164,14 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
         try:
             domain = input["domain"]
             record_type = input.get("record_type", "ANY")
+            _ALLOWED_RECORD_TYPES = {
+                "A", "AAAA", "ANY", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT"
+            }
+            if record_type not in _ALLOWED_RECORD_TYPES:
+                return f"ERROR: unsupported record_type {record_type!r}"
             result = subprocess.run(
-                f"dig {domain} {record_type} +noall +answer +authority",
-                shell=True,
+                ["dig", domain, record_type, "+noall", "+answer", "+authority"],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -179,8 +185,8 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             path = input["path"]
             query = input.get("query", ".")
             result = subprocess.run(
-                f"jq '{query}' {path}",
-                shell=True,
+                ["jq", query, path],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -229,14 +235,20 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             if mobile:
                 width, height = 375, 812
 
-            cmd = (
-                f"chromium-browser --headless --disable-gpu --no-sandbox "
-                f"--screenshot={output_path} "
-                f"--window-size={width},{height} "
-                f"'{url}'"
-            )
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=60,
+                [
+                    "chromium-browser",
+                    "--headless",
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    f"--screenshot={output_path}",
+                    f"--window-size={width},{height}",
+                    url,
+                ],
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if Path(output_path).exists():
                 return f"Screenshot saved to {output_path}"
@@ -466,7 +478,6 @@ def _handle_web_search(input: dict) -> str:
         # Parse results from HTML
         results = []
         text = resp.text
-        import re
         # Extract result snippets
         links = re.findall(
             r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>',
@@ -527,7 +538,6 @@ def _handle_exploit_search(input: dict) -> str:
                 timeout=15,
                 follow_redirects=True,
             )
-            import re
             links = re.findall(
                 r'<a rel="nofollow" class="result__a" href="([^"]*exploit-db[^"]*)"[^>]*>(.*?)</a>',
                 resp.text,
