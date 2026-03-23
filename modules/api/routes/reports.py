@@ -221,7 +221,10 @@ def get_executive_brief_pdf(
 
     from modules.reports.executive_brief import ExecutiveBriefGenerator
     generator = ExecutiveBriefGenerator()
-    pdf_bytes = generator.generate_pdf(brief)
+    try:
+        pdf_bytes = generator.generate_pdf(brief)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="PDF generation unavailable")
 
     return Response(
         content=pdf_bytes,

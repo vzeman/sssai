@@ -370,7 +370,10 @@ class ExecutiveBriefGenerator:
         previous_scans: list[dict] | None = None,
     ) -> dict:
         """Generate executive brief data dict from scan report."""
-        risk_score = float(report.get("risk_score") or 0)
+        try:
+            risk_score = float(report.get("risk_score") or 0)
+        except (ValueError, TypeError):
+            risk_score = 0.0
         findings = report.get("findings", [])
 
         severity_counts: dict[str, int] = {
