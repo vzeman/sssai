@@ -105,7 +105,7 @@ def deduplicate_findings(
                              no longer present (→ should be marked resolved).
     """
     try:
-        from modules.infra.elasticsearch import search as es_search, get_client
+        from modules.infra.elasticsearch import search as es_search
     except Exception as exc:
         log.warning("finding_dedup: ES import failed: %s", exc)
         return _stamp_all_new(findings, scan_id, now), []

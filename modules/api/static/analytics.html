@@ -502,7 +502,7 @@ async function searchFindings() {
   const aggs = data.aggregations || {};
   const sevAgg = aggs.severity || {};
   document.getElementById('findingsAggs').innerHTML = Object.entries(sevAgg).map(([k, v]) =>
-    `<div class="stat-card ${k}"><div class="val">${v}</div><div class="label">${k}</div></div>`
+    `<div class="stat-card ${esc(k)}"><div class="val">${Number(v)}</div><div class="label">${esc(k)}</div></div>`
   ).join('');
 
   // Results
@@ -513,7 +513,7 @@ async function searchFindings() {
   }
   document.getElementById('findingsResults').innerHTML = findings.map(f => `
     <div class="result-item">
-      <div class="title"><span class="badge ${f.severity}">${f.severity}</span> ${esc(f.title || 'Untitled')}</div>
+      <div class="title"><span class="badge ${esc(f.severity)}">${esc(f.severity)}</span> ${esc(f.title || 'Untitled')}</div>
       <div class="meta">${esc(f.target || '')} &middot; ${f.scan_type || ''} &middot; ${f.timestamp ? f.timestamp.split('T')[0] : ''}</div>
       ${f.description ? `<div class="snippet">${esc(f.description).slice(0, 200)}</div>` : ''}
     </div>
@@ -692,7 +692,7 @@ async function loadUptimeAnalytics() {
       <td>${m.total_checks}</td>
       <td><span class="badge ${statusClass}">${m.uptime_pct != null ? m.uptime_pct + '%' : '-'}</span></td>
       <td>${m.avg_ms ? Math.round(m.avg_ms) + 'ms' : '-'}</td>
-      <td>${Object.entries(m.status_breakdown || {}).map(([k,v]) => `<span class="badge ${k}">${k}: ${v}</span>`).join(' ')}</td>
+      <td>${Object.entries(m.status_breakdown || {}).map(([k,v]) => `<span class="badge ${esc(k)}">${esc(k)}: ${Number(v)}</span>`).join(' ')}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" class="empty">No monitor data yet</td></tr>';
 }
@@ -716,7 +716,7 @@ async function globalSearch() {
     html += items.map(item => `
       <div class="result-item">
         <div class="title">${item.title ? esc(item.title) : esc((item.message || '').slice(0, 80))}</div>
-        <div class="meta">${item.severity ? `<span class="badge ${item.severity}">${item.severity}</span> ` : ''}${item.timestamp || ''} ${item.target ? '&middot; ' + esc(item.target) : ''}</div>
+        <div class="meta">${item.severity ? `<span class="badge ${esc(item.severity)}">${esc(item.severity)}</span> ` : ''}${item.timestamp || ''} ${item.target ? '&middot; ' + esc(item.target) : ''}</div>
         ${item.description ? `<div class="snippet">${esc(item.description).slice(0, 150)}</div>` : ''}
         ${!item.title && item.message ? `<div class="snippet">${esc(item.message).slice(0, 200)}</div>` : ''}
       </div>

@@ -33,7 +33,7 @@ def search_findings(
     if scan_type:
         filters.append({"term": {"scan_type": scan_type}})
     if target:
-        filters.append({"wildcard": {"target": f"*{target}*"}})
+        filters.append({"match_phrase_prefix": {"target": target}})
     if scan_id:
         filters.append({"term": {"scan_id": scan_id}})
 
@@ -298,7 +298,7 @@ def lifecycle_analytics(
     """Finding lifecycle analytics — new/existing/resolved/regressed counts and trends."""
     filters: list[dict] = [{"range": {"timestamp": {"gte": f"now-{days}d"}}}]
     if target:
-        filters.append({"wildcard": {"target": f"*{target}*"}})
+        filters.append({"match_phrase_prefix": {"target": target}})
 
     query = {"bool": {"filter": filters}}
     result = search(
