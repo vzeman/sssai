@@ -159,6 +159,25 @@ class ReportRequest(BaseModel):
     format: str = "json"  # json, html, pdf
 
 
+# ─── Assets ───────────────────────────────────────────────────────────
+class AssetResponse(BaseModel):
+    id: str
+    target: str
+    asset_type: str
+    hostname: str | None = None
+    ip: str | None = None
+    port: int | None = None
+    service: str | None = None
+    technology: str | None = None
+    extra: dict | None = None
+    first_seen: datetime
+    last_seen: datetime
+    is_active: bool
+    scan_id: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 # ─── Tools ────────────────────────────────────────────────────────────
 class ToolInfo(BaseModel):
     name: str

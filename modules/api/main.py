@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search
+from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, assets
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -58,6 +58,34 @@ try:
 except Exception:
     pass
 
+# Add assets table if missing (migration)
+try:
+    from sqlalchemy import text as _atext
+    with engine.connect() as conn:
+        conn.execute(_atext("""
+            CREATE TABLE IF NOT EXISTS assets (
+                id VARCHAR PRIMARY KEY,
+                user_id VARCHAR REFERENCES users(id) ON DELETE CASCADE,
+                target VARCHAR NOT NULL,
+                asset_type VARCHAR NOT NULL,
+                hostname VARCHAR,
+                ip VARCHAR,
+                port INTEGER,
+                service VARCHAR,
+                technology VARCHAR,
+                extra JSON,
+                first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                scan_id VARCHAR
+            )
+        """))
+        conn.execute(_atext("CREATE INDEX IF NOT EXISTS ix_assets_target ON assets (target)"))
+        conn.execute(_atext("CREATE INDEX IF NOT EXISTS ix_assets_hostname ON assets (hostname)"))
+        conn.commit()
+except Exception:
+    pass
+
 # Set up Elasticsearch indices on startup
 try:
     from modules.infra import setup_es
@@ -92,6 +120,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 
 
 @app.get("/health")

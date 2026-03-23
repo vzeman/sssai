@@ -174,6 +174,17 @@
   .hb-chip.idle { background: rgba(148,163,184,0.15); color: var(--muted); }
   .hb-chip.unknown { background: rgba(234,179,8,0.15); color: var(--yellow); }
 
+  /* ─── Asset inventory ─── */
+  .asset-row { background: var(--bg); border-radius: 6px; padding: 0.4rem 0.6rem; margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid rgba(51,65,85,0.4); font-size: 0.78rem; }
+  .asset-type-pill { font-size: 0.68rem; padding: 1px 7px; border-radius: 10px; font-weight: 600; background: rgba(59,130,246,0.15); color: var(--accent); white-space: nowrap; }
+  .asset-type-pill.subdomain { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .asset-type-pill.ip { background: rgba(34,197,94,0.15); color: var(--green); }
+  .asset-type-pill.service { background: rgba(249,115,22,0.15); color: var(--orange); }
+  .asset-type-pill.api_endpoint { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .asset-type-pill.certificate { background: rgba(148,163,184,0.15); color: var(--muted); }
+  .asset-type-pill.dns_record { background: rgba(239,68,68,0.15); color: var(--red); }
+  .asset-new-badge { font-size: 0.65rem; padding: 1px 5px; border-radius: 8px; background: rgba(34,197,94,0.2); color: var(--green); font-weight: 600; white-space: nowrap; }
+
   /* ─── Action buttons in scan rows ─── */
   .row-actions { display: flex; gap: 3px; flex-wrap: wrap; }
   .row-actions .btn { white-space: nowrap; }
@@ -240,6 +251,29 @@
       <h2 style="cursor:pointer" onclick="window.open('/uptime','_blank')">&#128994; Uptime Monitors <span style="margin-left:auto;font-size:0.75rem;color:var(--accent);font-weight:400">Open full view &#8594;</span></h2>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap" id="uptime-badges"></div>
       <div id="uptime-incidents" style="margin-top:0.5rem"></div>
+    </div>
+
+    <!-- ASSET INVENTORY WIDGET -->
+    <div class="card" id="assets-widget" style="display:none">
+      <h2>&#127758; Asset Inventory <span id="assets-new-badge" style="display:none;margin-left:0.5rem;font-size:0.72rem;background:rgba(34,197,94,0.2);color:var(--green);padding:2px 8px;border-radius:12px;font-weight:600"></span>
+        <span style="margin-left:auto;display:flex;gap:0.4rem;align-items:center">
+          <span style="font-size:0.75rem;color:var(--muted)" id="assets-target-label"></span>
+          <select id="assets-type-filter" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 6px;color:var(--text);font-size:0.75rem;" onchange="filterAssets()">
+            <option value="">All types</option>
+            <option value="domain">domain</option>
+            <option value="subdomain">subdomain</option>
+            <option value="ip">ip</option>
+            <option value="api_endpoint">api_endpoint</option>
+            <option value="service">service</option>
+            <option value="certificate">certificate</option>
+            <option value="dns_record">dns_record</option>
+          </select>
+        </span>
+      </h2>
+      <div id="assets-summary" style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem"></div>
+      <div id="assets-list" style="max-height:220px;overflow-y:auto">
+        <div class="empty">No assets discovered yet</div>
+      </div>
     </div>
 
     <!-- SCANS (with new scan form integrated) -->
@@ -655,6 +689,11 @@ async function selectScan(scanId) {
   selectedScan = scanId;
   document.getElementById('scan-detail').style.display = 'block';
   try {
+    // Load asset inventory for this scan's target
+    var scanRes = await apiCall('/api/scans/' + scanId);
+    if (scanRes.ok) { var scanData = await scanRes.json(); if (scanData.target) loadAssets(scanData.target); }
+  } catch(e) {}
+  try {
     var res = await apiCall('/api/scans/'+scanId+'/report');
     if (res.ok) { renderReport(await res.json(), scanId); }
     else {
@@ -867,6 +906,70 @@ async function loadUptimeWidget() {
 }
 
 // ═══ REFRESH ═══
+// ═══ ASSET INVENTORY ═══
+var _allAssets = [];
+var _assetTarget = '';
+
+async function loadAssets(target) {
+  if (!token || !target) return;
+  _assetTarget = target;
+  document.getElementById('assets-target-label').textContent = target;
+  try {
+    var url = '/api/assets/?target=' + encodeURIComponent(target);
+    var res = await apiCall(url);
+    if (!res.ok) { document.getElementById('assets-widget').style.display = 'none'; return; }
+    _allAssets = await res.json();
+    document.getElementById('assets-widget').style.display = 'block';
+
+    // Check diff for "new since last scan" badge
+    try {
+      var dRes = await apiCall('/api/assets/' + encodeURIComponent(target) + '/diff');
+      if (dRes.ok) {
+        var diff = await dRes.json();
+        var newBadge = document.getElementById('assets-new-badge');
+        if (diff.new_count > 0) {
+          newBadge.textContent = '+' + diff.new_count + ' new';
+          newBadge.style.display = 'inline-block';
+        } else {
+          newBadge.style.display = 'none';
+        }
+        document.getElementById('assets-summary').textContent = diff.summary || '';
+      }
+    } catch(e) {}
+
+    renderAssets(_allAssets);
+  } catch(e) { console.error('loadAssets:', e); }
+}
+
+function filterAssets() {
+  var type = document.getElementById('assets-type-filter').value;
+  var filtered = type ? _allAssets.filter(function(a){return a.asset_type===type;}) : _allAssets;
+  renderAssets(filtered);
+}
+
+function renderAssets(assets) {
+  var el = document.getElementById('assets-list');
+  if (!assets || !assets.length) { el.innerHTML = '<div class="empty">No assets discovered yet</div>'; return; }
+  var html = '';
+  for (var i = 0; i < assets.length; i++) {
+    var a = assets[i];
+    var label = a.hostname || a.ip || a.service || a.asset_type;
+    var detail = [];
+    if (a.ip && a.hostname) detail.push(a.ip);
+    if (a.port) detail.push(':' + a.port);
+    if (a.service) detail.push(a.service);
+    if (a.technology) detail.push(a.technology);
+    html += '<div class="asset-row">';
+    html += '<span class="asset-type-pill ' + a.asset_type + '">' + a.asset_type + '</span>';
+    html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (label||'') + '">' + (label||'') + '</span>';
+    if (detail.length) html += '<span style="font-size:0.72rem;color:var(--muted)">' + detail.join('') + '</span>';
+    html += '<span style="font-size:0.68rem;color:var(--muted);margin-left:0.4rem">' + new Date(a.last_seen).toLocaleDateString() + '</span>';
+    html += '</div>';
+  }
+  el.innerHTML = html;
+  document.getElementById('stat-checks').textContent = _allAssets.length;
+}
+
 async function refresh() {
   await checkHealth();
   await loadScans();
@@ -874,6 +977,7 @@ async function refresh() {
   await loadChecks();
   await loadUptimeWidget();
   await loadHeartbeat();
+  if (_assetTarget) await loadAssets(_assetTarget);
 }
 
 // ═══ GLOBAL CHAT ═══

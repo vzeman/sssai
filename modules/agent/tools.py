@@ -207,6 +207,59 @@ TOOLS = [
         },
     },
     {
+        "name": "report_assets",
+        "description": (
+            "Report discovered assets (subdomains, IPs, services, API endpoints, etc.) during Phase 0 Discovery. "
+            "Call this tool as soon as you discover new hosts, IPs, open ports, or services. "
+            "Assets are persisted to the inventory and diffed against previous scans automatically."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "assets": {
+                    "type": "array",
+                    "description": "List of discovered assets",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "asset_type": {
+                                "type": "string",
+                                "description": "Type of asset",
+                                "enum": ["domain", "subdomain", "ip", "api_endpoint", "service", "certificate", "dns_record"],
+                            },
+                            "hostname": {
+                                "type": "string",
+                                "description": "Hostname or domain name (e.g. api.example.com)",
+                            },
+                            "ip": {
+                                "type": "string",
+                                "description": "IP address if known",
+                            },
+                            "port": {
+                                "type": "integer",
+                                "description": "Port number if applicable",
+                            },
+                            "service": {
+                                "type": "string",
+                                "description": "Service name (e.g. nginx, apache, postgresql)",
+                            },
+                            "technology": {
+                                "type": "string",
+                                "description": "Technology or software version (e.g. WordPress 6.4)",
+                            },
+                            "extra": {
+                                "type": "object",
+                                "description": "Any additional metadata (e.g. certificate details, DNS record values)",
+                            },
+                        },
+                        "required": ["asset_type"],
+                    },
+                },
+            },
+            "required": ["assets"],
+        },
+    },
+    {
         "name": "report",
         "description": "Submit the final structured scan report with all findings, risk score, and recommendations.",
         "input_schema": {

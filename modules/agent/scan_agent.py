@@ -277,6 +277,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "update_attack_surface":
         return _handle_update_attack_surface(input, scan_context)
 
+    elif name == "report_assets":
+        return _handle_report_assets(input, scan_context)
+
     elif name == "report":
         return "__REPORT__"
 
@@ -444,6 +447,112 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
 
     except Exception as e:
         return f"ERROR: update_attack_surface failed: {e}"
+
+
+# ── Asset inventory ──────────────────────────────────────────────────────
+
+def _handle_report_assets(input: dict, scan_context: dict | None) -> str:
+    """Persist discovered assets to the DB inventory."""
+    try:
+        assets_data = input.get("assets", [])
+        if not assets_data:
+            return "No assets provided"
+
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        user_id = scan_context.get("user_id", "") if scan_context else ""
+        target = scan_context.get("target", "") if scan_context else ""
+
+        if not target:
+            return "ERROR: Missing target in scan context"
+
+        engine = _get_memory_db()
+        if not engine:
+            return "(asset inventory not available — no database)"
+
+        import uuid as _uuid
+        from sqlalchemy import text
+
+        # Look up user_id from scan if not in context
+        if not user_id and scan_id:
+            try:
+                with engine.connect() as _conn:
+                    row = _conn.execute(text("SELECT user_id FROM scans WHERE id = :sid"), {"sid": scan_id}).fetchone()
+                    if row:
+                        user_id = row[0]
+            except Exception:
+                pass
+
+        if not user_id:
+            return "ERROR: Could not determine user_id for asset inventory"
+
+        upserted = 0
+        with engine.connect() as conn:
+            now = time.strftime("%Y-%m-%dT%H:%M:%S")
+            for a in assets_data:
+                asset_type = a.get("asset_type", "")
+                hostname = a.get("hostname") or None
+                ip = a.get("ip") or None
+                port = a.get("port") or None
+                service = a.get("service") or None
+                technology = a.get("technology") or None
+                extra = a.get("extra") or None
+
+                if not asset_type:
+                    continue
+
+                import json as _json
+                extra_json = _json.dumps(extra) if extra else None
+
+                # Upsert: match on (user_id, target, asset_type, hostname, ip, port)
+                existing = conn.execute(text(
+                    "SELECT id FROM assets "
+                    "WHERE user_id = :uid AND target = :tgt AND asset_type = :atype "
+                    "AND COALESCE(hostname, '') = COALESCE(:hn, '') "
+                    "AND COALESCE(ip, '') = COALESCE(:ip, '') "
+                    "AND COALESCE(port::text, '') = COALESCE(:port, '') "
+                    "LIMIT 1"
+                ), {
+                    "uid": user_id, "tgt": target, "atype": asset_type,
+                    "hn": hostname, "ip": ip, "port": str(port) if port else None,
+                }).fetchone()
+
+                if existing:
+                    conn.execute(text(
+                        "UPDATE assets SET last_seen = :now, service = COALESCE(:svc, service), "
+                        "technology = COALESCE(:tech, technology), is_active = TRUE, "
+                        "scan_id = :sid "
+                        "WHERE id = :id"
+                    ), {
+                        "now": now, "svc": service, "tech": technology,
+                        "sid": scan_id, "id": existing[0],
+                    })
+                else:
+                    conn.execute(text(
+                        "INSERT INTO assets (id, user_id, target, asset_type, hostname, ip, port, "
+                        "service, technology, extra, first_seen, last_seen, is_active, scan_id) "
+                        "VALUES (:id, :uid, :tgt, :atype, :hn, :ip, :port, :svc, :tech, "
+                        "CAST(:extra AS JSON), :now, :now, TRUE, :sid)"
+                    ), {
+                        "id": str(_uuid.uuid4()), "uid": user_id, "tgt": target,
+                        "atype": asset_type, "hn": hostname, "ip": ip, "port": port,
+                        "svc": service, "tech": technology, "extra": extra_json,
+                        "now": now, "sid": scan_id,
+                    })
+                upserted += 1
+            conn.commit()
+
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "assets_reported",
+                "count": upserted,
+                "target": target,
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        return f"Asset inventory updated: {upserted} asset(s) recorded for {target}"
+
+    except Exception as e:
+        return f"ERROR: report_assets failed: {e}"
 
 
 # ── Web search ───────────────────────────────────────────────────────────
