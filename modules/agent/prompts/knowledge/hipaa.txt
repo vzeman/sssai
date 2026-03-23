@@ -1,0 +1,144 @@
+## HIPAA Security Rule — External/Web Testing
+
+HIPAA Security Rule (45 CFR Part 164) applies to Covered Entities and Business Associates
+that create, receive, maintain, or transmit Electronic Protected Health Information (ePHI).
+
+Load this module when healthcare, medical, patient data, or health records are detected.
+
+### 164.308 — Administrative Safeguards
+- 164.308(a)(1)  Security management process
+  - 164.308(a)(1)(ii)(A)  Risk analysis (required)
+  - 164.308(a)(1)(ii)(B)  Risk management (required)
+  - 164.308(a)(1)(ii)(C)  Sanction policy (required)
+  - 164.308(a)(1)(ii)(D)  Information system activity review (required)
+- 164.308(a)(3)  Workforce authorization and supervision
+  - 164.308(a)(3)(ii)(A)  Authorization/supervision (addressable)
+  - 164.308(a)(3)(ii)(B)  Workforce clearance procedure (addressable)
+  - 164.308(a)(3)(ii)(C)  Termination procedures (addressable)
+- 164.308(a)(4)  Information access management
+  - 164.308(a)(4)(ii)(A)  Isolating healthcare clearinghouse functions (required)
+  - 164.308(a)(4)(ii)(B)  Access authorization (addressable)
+  - 164.308(a)(4)(ii)(C)  Access establishment and modification (addressable)
+- 164.308(a)(5)  Security awareness and training
+- 164.308(a)(6)  Security incident procedures
+  - 164.308(a)(6)(ii)  Response and reporting (required)
+- 164.308(a)(7)  Contingency plan
+- 164.308(a)(8)  Evaluation (required)
+
+### 164.310 — Physical Safeguards
+- 164.310(a)(1)  Facility access controls
+- 164.310(b)     Workstation use
+- 164.310(c)     Workstation security
+- 164.310(d)(1)  Device and media controls
+
+CONTEXT: Not directly testable via external web scan.
+
+### 164.312 — Technical Safeguards (PRIMARY FOCUS FOR WEB TESTING)
+- 164.312(a)(1)  Access control
+  - 164.312(a)(2)(i)   Unique user identification (required)
+                       Every user must have a unique ID; no shared accounts
+  - 164.312(a)(2)(ii)  Emergency access procedure (required)
+  - 164.312(a)(2)(iii) Automatic logoff (addressable)
+                       Sessions should time out after inactivity
+  - 164.312(a)(2)(iv)  Encryption and decryption (addressable)
+                       ePHI encrypted at rest
+
+- 164.312(b)     Audit controls (required)
+                 Hardware/software/procedural mechanisms to record activity
+                 Systems with ePHI must maintain audit logs
+
+- 164.312(c)(1)  Integrity (required)
+  - 164.312(c)(2)  Mechanism to authenticate ePHI (addressable)
+                   Ensure ePHI is not altered or destroyed in an unauthorized manner
+
+- 164.312(d)     Person or entity authentication (required)
+                 Verify that a person seeking access is who they claim to be
+                 - Multi-factor authentication recommended
+                 - Account lockout after failed attempts
+                 - Strong password requirements
+
+- 164.312(e)(1)  Transmission security (required)
+  - 164.312(e)(2)(i)   Integrity controls (addressable)
+                       Guard against unauthorized modification during transmission
+  - 164.312(e)(2)(ii)  Encryption (addressable, but highly recommended = effectively required)
+                       Encrypt ePHI in transit: TLS 1.2+ required
+                       No HTTP for any pages involving ePHI
+                       HSTS required
+                       Strong cipher suites only
+
+### Key Test Commands
+
+**164.312(e)(2)(ii) — Transmission Encryption:**
+  testssl --json /output/testssl.json {target}
+  sslyze {target} --json_out /output/sslyze.json
+  curl -sI http://{target} | grep -i location (check for HTTP→HTTPS redirect)
+
+FAIL IF: HTTP accessible without redirect, TLS 1.0/1.1 accepted, weak ciphers,
+         expired/self-signed certificate, missing HSTS, cookies without Secure flag
+
+**164.312(d) — Authentication:**
+  Test login form for: rate limiting, lockout, MFA presence, password strength requirements.
+  Check for: session token entropy, session timeout, secure session cookies.
+
+FAIL IF: No account lockout (test with 11+ failed attempts), weak passwords accepted,
+         no MFA option, session cookies without HttpOnly/Secure flags, no session timeout
+
+**164.312(a)(2)(i) — Unique User Identification:**
+  Check for: shared accounts, anonymous access to ePHI, proper user provisioning indicators.
+  Inspect: API endpoints for proper authentication enforcement.
+
+FAIL IF: Anonymous access to health records endpoints, no user-level access control,
+         patient data accessible without authentication
+
+**164.312(c)(1) — Integrity:**
+  Check for: tampering-prevention mechanisms, checksums, data validation.
+  Test: Can data be modified in transit without detection? (check for TLS without HSTS)
+  Test: Input validation on forms that accept or display ePHI.
+
+FAIL IF: No integrity controls, data modification possible via SQL injection,
+         no CSRF protection on forms that modify health data
+
+**164.308(a)(1)(ii)(D) — System Activity Review:**
+  Check: Does the application expose any audit trail or activity log to users?
+  Check: Verbose error messages that could indicate lack of audit logging.
+
+**Privacy Rule Indicators (45 CFR Part 164.502-164.530):**
+  Check: Privacy notice/policy specific to health information handling.
+  Check: Patient rights mechanisms (access, amendment, accounting of disclosures).
+  Check: Minimum necessary standard indicators.
+
+TOOLS:
+  nuclei -u {target} -t http/misconfiguration/ -json -o /output/nuclei_misconfig.json
+  drheader scan single {target} --json > /output/drheader.json
+  nikto -h {target} -Format json -o /output/nikto.json
+
+### HIPAA-Specific Red Flags
+1. Patient portal accessible over HTTP (no TLS)
+2. Login page without account lockout
+3. Session cookies without Secure and HttpOnly flags
+4. ePHI visible in URL parameters (logged by servers/proxies)
+5. No timeout on authenticated sessions
+6. Error messages revealing ePHI structure
+7. API endpoints returning ePHI without authentication
+8. Outdated SSL/TLS configuration
+9. No CSRF protection on forms modifying ePHI
+10. Directory listing exposing patient files
+
+### Category → HIPAA Control Mapping
+ssl_tls_weakness      → 164.312(e)(2)(ii)
+expired_certificate   → 164.312(e)(2)(ii)
+weak_cipher          → 164.312(e)(2)(ii)
+missing_hsts         → 164.312(e)(2)(ii)
+http_accessible      → 164.312(e)(2)(ii)
+insecure_cookie      → 164.312(d), 164.312(e)(2)(ii)
+no_account_lockout   → 164.312(d)
+weak_authentication  → 164.312(d)
+no_mfa               → 164.312(d)
+no_session_timeout   → 164.312(a)(2)(iii)
+unauthenticated_access → 164.312(a)(2)(i)
+sql_injection        → 164.312(c)(1)
+xss                  → 164.312(c)(1)
+csrf                 → 164.312(c)(1)
+information_disclosure → 164.308(a)(1)
+phi_in_url           → 164.312(e)(1)
+no_privacy_policy    → 164.502 (Privacy Rule)
