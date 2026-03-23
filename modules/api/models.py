@@ -123,6 +123,27 @@ class ScheduledScan(Base):
     user: Mapped["User"] = relationship(back_populates="scheduled_scans")
 
 
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    target: Mapped[str] = mapped_column(String, index=True)  # parent scan target (e.g. example.com)
+    asset_type: Mapped[str] = mapped_column(String)  # domain, subdomain, ip, api_endpoint, service, certificate, dns_record
+    hostname: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    service: Mapped[str | None] = mapped_column(String, nullable=True)
+    technology: Mapped[str | None] = mapped_column(String, nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # additional metadata
+    first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    scan_id: Mapped[str | None] = mapped_column(String, nullable=True)  # last scan that discovered/updated this
+
+    user: Mapped["User"] = relationship(back_populates="assets")
+
+
 class NotificationChannel(Base):
     __tablename__ = "notification_channels"
 
