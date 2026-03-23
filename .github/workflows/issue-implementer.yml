@@ -66,11 +66,9 @@ jobs:
         run: |
           ISSUE_JSON=$(gh issue view "$ISSUE_NUM" --json number,title,body,labels,author \
             | jq '{number, title, body, labels, user: {login: .author.login}}')
-          {
-            echo "json<<ISSUE_EOF"
-            echo "$ISSUE_JSON"
-            echo "ISSUE_EOF"
-          } >> "$GITHUB_OUTPUT"
+          echo "json<<ISSUE_EOF" >> "$GITHUB_OUTPUT"
+          echo "$ISSUE_JSON" >> "$GITHUB_OUTPUT"
+          echo "ISSUE_EOF" >> "$GITHUB_OUTPUT"
           echo "✔ Fetched issue #${ISSUE_NUM}"
 
       # ================================================================
