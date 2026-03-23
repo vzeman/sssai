@@ -13,6 +13,7 @@ Inspired by PentAGI architecture:
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from collections import Counter
@@ -466,7 +467,6 @@ def _handle_web_search(input: dict) -> str:
         # Parse results from HTML
         results = []
         text = resp.text
-        import re
         # Extract result snippets
         links = re.findall(
             r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>',
@@ -527,7 +527,6 @@ def _handle_exploit_search(input: dict) -> str:
                 timeout=15,
                 follow_redirects=True,
             )
-            import re
             links = re.findall(
                 r'<a rel="nofollow" class="result__a" href="([^"]*exploit-db[^"]*)"[^>]*>(.*?)</a>',
                 resp.text,
@@ -1236,11 +1235,8 @@ def _run_attack_chain_analysis(
         text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
 
         # Strip markdown fences if present
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-            text = text.strip()
+        text = re.sub(r'^```\w*\n?', '', text.strip())
+        text = re.sub(r'```$', '', text).strip()
 
         chains = json.loads(text)
         if not isinstance(chains, list):
