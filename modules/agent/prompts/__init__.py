@@ -18,13 +18,20 @@ _FOCUS_HINTS = {
     "api_security": "The user wants API security testing prioritized. Discover and test all API endpoints.",
     "seo": "Focus primarily on SEO, performance, and accessibility after discovery.",
     "performance": "Focus primarily on performance and load testing after discovery.",
-    "compliance": "Focus on compliance frameworks (OWASP, PCI-DSS, GDPR) after discovery.",
+    "compliance": "Focus on compliance frameworks (OWASP, PCI-DSS, GDPR, SOC2, ISO27001, HIPAA) after discovery. Load relevant framework knowledge modules. Generate detailed per-requirement compliance reports with pass/fail status and evidence.",
+    "compliance_audit": "This is a dedicated compliance audit. Load compliance, pci_dss_4, soc2, iso27001, and hipaa knowledge modules. Map every finding to specific compliance requirements. Generate compliance_reports with per-requirement pass/fail status, pass_rate, and critical_gaps for each applicable framework.",
     "full": "This is a comprehensive scan. Test EVERYTHING you discover. Be thorough.",
     "owasp": "Map all findings to OWASP Top 10 categories. Systematically test each A01-A10.",
     "recon": "Focus on deep reconnaissance and attack surface mapping. Be exhaustive in discovery.",
     "cloud": "Focus on cloud security and infrastructure after discovery.",
     "privacy": "Focus on privacy, data protection, cookie compliance, and GDPR signals.",
     "uptime": "Focus on availability, response times, and monitoring endpoints.",
+    "breach_monitoring": (
+        "Focus on breach and dark web exposure. Run breach_check and credential_leak_check first. "
+        "Check HIBP, credential leaks, and exposed account surfaces. "
+        "Load the breach_monitoring knowledge module. "
+        "Produce a detailed Breach Exposure Summary in your report."
+    ),
 }
 
 
@@ -34,10 +41,14 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     Uses the master prompt (AI-first adaptive) with a focus hint from scan_type.
     Falls back to legacy {scan_type}.txt if master.txt doesn't exist.
     """
-    config = config or {}
+    # Work on a shallow copy so we do not mutate the caller's config dict.
+    config = dict(config) if config else {}
 
-    # Extract retry_context before passing to template format (it has curly braces)
+    # Extract keys that must not be passed to template.format() — they contain
+    # nested dicts with curly braces or are not template placeholders.
     retry_context = config.pop("retry_context", None)
+    config.pop("auth", None)          # auth config: nested dict, not a template var
+    config.pop("resume_context", None)  # resume_context also handled separately
 
     # Try master prompt first (AI-first adaptive mode)
     master_path = os.path.join(_DIR, "master.txt")
