@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search
+from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, campaigns
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -37,6 +37,18 @@ try:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             except Exception:
                 pass
+        conn.commit()
+except Exception:
+    pass
+
+# Add campaign_id column to scans table if missing (migration)
+try:
+    from sqlalchemy import text as _text2
+    with engine.connect() as conn:
+        try:
+            conn.execute(_text2("ALTER TABLE scans ADD COLUMN IF NOT EXISTS campaign_id VARCHAR REFERENCES campaigns(id)"))
+        except Exception:
+            pass
         conn.commit()
 except Exception:
     pass
@@ -92,6 +104,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(campaigns.router, prefix="/api/campaigns", tags=["campaigns"])
 
 
 @app.get("/health")

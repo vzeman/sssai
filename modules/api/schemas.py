@@ -154,6 +154,38 @@ class NotificationChannelResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ─── Campaigns ────────────────────────────────────────────────────────
+class CampaignCreate(BaseModel):
+    name: str = ""
+    targets: list[str]
+    scan_type: str = "security"
+    config: dict | None = None
+
+
+class CampaignScanSummary(BaseModel):
+    id: str
+    target: str
+    status: str
+    risk_score: float | None = None
+    findings_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class CampaignResponse(BaseModel):
+    id: str
+    name: str
+    scan_type: str
+    status: str
+    targets: list
+    aggregate_risk_score: float | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+    scans: list[CampaignScanSummary] = []
+
+    model_config = {"from_attributes": True}
+
+
 # ─── Reports ──────────────────────────────────────────────────────────
 class ReportRequest(BaseModel):
     format: str = "json"  # json, html, pdf
