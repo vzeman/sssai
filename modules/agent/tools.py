@@ -38,6 +38,7 @@ TOOLS = [
             "  Auth: hydra\n"
             "  Cloud: prowler\n"
             "  Utility: curl, wget, jq, python3, node\n"
+            "  Browser: use browser_test and browser_crawl tools for Playwright-based client-side testing\n"
             "Save output files to /output/ for later reference."
         ),
         "input_schema": {
@@ -174,6 +175,76 @@ TOOLS = [
                 },
             },
             "required": ["current_file", "previous_file"],
+        },
+    },
+    {
+        "name": "browser_test",
+        "description": (
+            "Execute a Playwright Python script against a target URL for client-side security testing. "
+            "Use for: DOM XSS (URL fragments, postMessage, document.referrer), prototype pollution "
+            "(__proto__, constructor.prototype via URL params), client-side open redirects "
+            "(window.location manipulation), localStorage/sessionStorage data exposure, "
+            "and eval/innerHTML sink detection. "
+            "Returns: console log output, DOM snapshot, and screenshot path. "
+            "The script receives `page` (Playwright Page) and `url` (target URL) as variables. "
+            "Delegate script generation to the coder sub-agent for complex scenarios."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "script": {
+                    "type": "string",
+                    "description": (
+                        "Playwright Python script body. Variables available: `page` (async Playwright Page), "
+                        "`url` (target URL string). Use `await` for all async Playwright calls. "
+                        "Example: await page.goto(url); content = await page.content(); print(content[:500])"
+                    ),
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Target URL to navigate to",
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Script timeout in seconds (default 60)",
+                },
+                "screenshot_path": {
+                    "type": "string",
+                    "description": "Path to save screenshot (default /output/browser_test.png)",
+                },
+            },
+            "required": ["script", "url"],
+        },
+    },
+    {
+        "name": "browser_crawl",
+        "description": (
+            "JavaScript-aware SPA crawling using Playwright. Discovers routes and pages in "
+            "React, Vue, Angular, and other SPA frameworks that don't expose links to static crawlers. "
+            "Returns a list of discovered URLs with page titles, DOM snapshots, and JavaScript errors. "
+            "Use in Phase 0 when a SPA framework is detected to map the attack surface."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Starting URL to crawl",
+                },
+                "depth": {
+                    "type": "integer",
+                    "description": "Crawl depth (default 2, max 4)",
+                },
+                "max_pages": {
+                    "type": "integer",
+                    "description": "Maximum pages to visit (default 20)",
+                },
+                "output_path": {
+                    "type": "string",
+                    "description": "Path for crawl results JSON (default /output/browser_crawl.json)",
+                },
+            },
+            "required": ["url"],
         },
     },
     {
@@ -401,7 +472,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "browser_testing",
                     ],
                 },
             },

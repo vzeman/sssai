@@ -616,6 +616,26 @@ TOOL_REGISTRY = {
         "output_formats": ["json", "txt"],
     },
 
+    # ─── Browser-Based Client-Side Security Testing ───────────────────
+    "browser_test": {
+        "category": "browser",
+        "description": "Execute a Playwright script against a URL for DOM XSS, prototype pollution, open redirects, localStorage exposure, and eval/innerHTML sink detection. Returns console output + screenshots + DOM snapshots.",
+        "binary": "python3",
+        "examples": [
+            "browser_test(script='...playwright script...', url='https://example.com')",
+        ],
+        "output_formats": ["json", "png"],
+    },
+    "browser_crawl": {
+        "category": "browser",
+        "description": "JavaScript-aware SPA crawling using Playwright — discovers routes in React/Vue/Angular apps, returns page list with DOM content",
+        "binary": "python3",
+        "examples": [
+            "browser_crawl(url='https://example.com', depth=2)",
+        ],
+        "output_formats": ["json"],
+    },
+
     # ─── Visual Regression & Defacement Detection ─────────────────────
     "backstopjs": {
         "category": "visual",
@@ -719,6 +739,7 @@ CATEGORIES = {
     "dns": "DNS & Domain Analysis",
     "ct": "Certificate Transparency",
     "cms": "CMS-Specific Scanners",
+    "browser": "Browser-Based Client-Side Security Testing",
     "visual": "Visual Regression & Defacement",
     "auth": "Authentication & Rate Limit Testing",
     "cloud": "Cloud Security",
@@ -727,8 +748,8 @@ CATEGORIES = {
 
 # Scan type → which tool categories are relevant
 SCAN_TYPE_CATEGORIES = {
-    "security": ["network", "vulnerability", "ssl", "recon", "headers", "cors", "secrets", "takeover"],
-    "pentest": ["network", "vulnerability", "ssl", "recon", "cms", "auth", "cors", "takeover", "osint"],
+    "security": ["network", "vulnerability", "ssl", "recon", "headers", "cors", "secrets", "takeover", "browser"],
+    "pentest": ["network", "vulnerability", "ssl", "recon", "cms", "auth", "cors", "takeover", "osint", "browser"],
     "performance": ["performance", "seo", "protocol", "utility"],
     "seo": ["seo", "accessibility", "utility", "headers", "protocol", "visual"],
     "compliance": ["vulnerability", "ssl", "headers", "utility", "email", "iac", "container"],

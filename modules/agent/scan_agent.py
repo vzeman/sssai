@@ -218,6 +218,12 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
         except Exception as e:
             return f"ERROR: {e}"
 
+    elif name == "browser_test":
+        return _handle_browser_test(input)
+
+    elif name == "browser_crawl":
+        return _handle_browser_crawl(input)
+
     elif name == "screenshot":
         try:
             url = input["url"]
@@ -429,6 +435,14 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
                 suggestions.append("JWT DETECTED — load auth_testing knowledge, test algorithm confusion, weak secrets, token manipulation")
         if input.get("infrastructure", {}).get("waf"):
             suggestions.append(f"WAF DETECTED ({input['infrastructure']['waf']}) — adapt payloads to bypass WAF rules")
+        spa_frameworks = ["react", "vue", "angular", "svelte", "ember", "next", "nuxt"]
+        detected_techs = [t.lower() for t in input.get("technologies", [])]
+        if any(fw in t for fw in spa_frameworks for t in detected_techs):
+            suggestions.append(
+                "SPA FRAMEWORK DETECTED — load browser_testing knowledge, use browser_crawl to discover "
+                "SPA routes, then use browser_test to check DOM XSS sinks, prototype pollution, "
+                "client-side redirects, and localStorage/sessionStorage exposure"
+            )
 
         # Summary
         total_components = sum(
@@ -444,6 +458,258 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
 
     except Exception as e:
         return f"ERROR: update_attack_surface failed: {e}"
+
+
+# ── Browser-based client-side security testing ───────────────────────────
+
+_BROWSER_TEST_WRAPPER = '''
+import asyncio
+import json
+import sys
+import os
+
+async def run():
+    from playwright.async_api import async_playwright
+    console_messages = []
+    js_errors = []
+    results = {{}}
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+        )
+        context = await browser.new_context(
+            ignore_https_errors=True,
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        page = await context.new_page()
+
+        # Capture console output and JS errors
+        page.on("console", lambda msg: console_messages.append({{"type": msg.type, "text": msg.text}}))
+        page.on("pageerror", lambda err: js_errors.append(str(err)))
+
+        url = {url!r}
+        screenshot_path = {screenshot_path!r}
+
+        try:
+{script_indented}
+        except Exception as script_err:
+            results["script_error"] = str(script_err)
+
+        # Capture DOM snapshot and screenshot
+        try:
+            dom_snapshot = await page.content()
+            results["dom_length"] = len(dom_snapshot)
+            results["dom_snippet"] = dom_snapshot[:2000]
+        except Exception:
+            pass
+
+        try:
+            await page.screenshot(path=screenshot_path, full_page=True)
+            results["screenshot"] = screenshot_path
+        except Exception as e:
+            results["screenshot_error"] = str(e)
+
+        results["console"] = console_messages
+        results["js_errors"] = js_errors
+
+        await context.close()
+        await browser.close()
+
+    print(json.dumps(results, indent=2))
+
+asyncio.run(run())
+'''
+
+_BROWSER_CRAWL_SCRIPT = '''
+import asyncio
+import json
+import sys
+from urllib.parse import urljoin, urlparse
+
+async def crawl(start_url, depth=2, max_pages=20):
+    from playwright.async_api import async_playwright
+
+    visited = set()
+    to_visit = [(start_url, 0)]
+    results = []
+    base_origin = urlparse(start_url).netloc
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+        )
+        context = await browser.new_context(
+            ignore_https_errors=True,
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+
+        while to_visit and len(results) < max_pages:
+            url, current_depth = to_visit.pop(0)
+            if url in visited:
+                continue
+            visited.add(url)
+
+            try:
+                page = await context.new_page()
+                js_errors = []
+                console_msgs = []
+                page.on("pageerror", lambda e: js_errors.append(str(e)))
+                page.on("console", lambda m: console_msgs.append({"type": m.type, "text": m.text}))
+
+                await page.goto(url, wait_until="networkidle", timeout=30000)
+                title = await page.title()
+                content = await page.content()
+
+                # Discover links
+                links = await page.eval_on_selector_all(
+                    "a[href]",
+                    "els => els.map(e => e.href)"
+                )
+                new_links = [
+                    lnk for lnk in links
+                    if urlparse(lnk).netloc == base_origin and lnk not in visited
+                ]
+
+                page_result = {
+                    "url": url,
+                    "title": title,
+                    "depth": current_depth,
+                    "links_found": len(new_links),
+                    "js_errors": js_errors[:5],
+                    "console_warnings": [m for m in console_msgs if m["type"] in ("warning", "error")][:5],
+                    "dom_snippet": content[:1000],
+                    "has_forms": "<form" in content.lower(),
+                    "has_script_sinks": any(s in content for s in ["innerHTML", "document.write", "eval(", "setTimeout(", "location.href"]),
+                    "has_localstorage": "localStorage" in content or "sessionStorage" in content,
+                }
+                results.append(page_result)
+
+                if current_depth < depth:
+                    for lnk in new_links[:10]:
+                        if lnk not in visited:
+                            to_visit.append((lnk, current_depth + 1))
+
+                await page.close()
+            except Exception as e:
+                results.append({"url": url, "error": str(e), "depth": current_depth})
+
+        await context.close()
+        await browser.close()
+
+    return results
+
+results = asyncio.run(crawl(
+    start_url=sys.argv[1],
+    depth=int(sys.argv[2]),
+    max_pages=int(sys.argv[3]),
+))
+print(json.dumps(results, indent=2))
+'''
+
+
+def _handle_browser_test(input: dict) -> str:
+    """Execute a Playwright script for client-side security testing."""
+    import tempfile
+    try:
+        script_body = input["script"]
+        url = input["url"]
+        timeout = input.get("timeout", 60)
+        screenshot_path = input.get("screenshot_path", "/output/browser_test.png")
+
+        # Indent the user script so it fits inside the async try block
+        script_indented = "\n".join(
+            "            " + line for line in script_body.splitlines()
+        )
+
+        wrapper = _BROWSER_TEST_WRAPPER.format(
+            url=url,
+            screenshot_path=screenshot_path,
+            script_indented=script_indented,
+        )
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, prefix="/tmp/browser_test_"
+        ) as f:
+            f.write(wrapper)
+            tmp_path = f.name
+
+        try:
+            result = subprocess.run(
+                ["python3", tmp_path],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            output = result.stdout.strip()
+            if result.returncode != 0 and result.stderr:
+                output = f"STDERR:\n{result.stderr.strip()}\n\nSTDOUT:\n{output}"
+            if not output:
+                output = result.stderr.strip() or "(no output)"
+            if len(output) > MAX_OUTPUT_LEN:
+                output = output[:MAX_OUTPUT_LEN] + "\n... [truncated]"
+            return output
+        finally:
+            try:
+                Path(tmp_path).unlink()
+            except Exception:
+                pass
+    except subprocess.TimeoutExpired:
+        return "ERROR: browser_test timed out"
+    except Exception as e:
+        return f"ERROR: browser_test failed: {e}"
+
+
+def _handle_browser_crawl(input: dict) -> str:
+    """JS-aware SPA crawling using Playwright."""
+    import tempfile
+    try:
+        url = input["url"]
+        depth = min(input.get("depth", 2), 4)
+        max_pages = input.get("max_pages", 20)
+        output_path = input.get("output_path", "/output/browser_crawl.json")
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, prefix="/tmp/browser_crawl_"
+        ) as f:
+            f.write(_BROWSER_CRAWL_SCRIPT)
+            tmp_path = f.name
+
+        try:
+            result = subprocess.run(
+                ["python3", tmp_path, url, str(depth), str(max_pages)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            output = result.stdout.strip()
+            if result.returncode != 0 and result.stderr:
+                return f"ERROR: browser_crawl failed:\n{result.stderr.strip()}"
+            if not output:
+                return "(no output)"
+
+            # Save to output path
+            try:
+                p = Path(output_path)
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(output)
+            except Exception:
+                pass
+
+            if len(output) > MAX_OUTPUT_LEN:
+                output = output[:MAX_OUTPUT_LEN] + "\n... [truncated]"
+            return f"Crawl results saved to {output_path}:\n\n{output}"
+        finally:
+            try:
+                Path(tmp_path).unlink()
+            except Exception:
+                pass
+    except subprocess.TimeoutExpired:
+        return "ERROR: browser_crawl timed out"
+    except Exception as e:
+        return f"ERROR: browser_crawl failed: {e}"
 
 
 # ── Web search ───────────────────────────────────────────────────────────
