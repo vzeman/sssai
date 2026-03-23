@@ -159,6 +159,40 @@ class ReportRequest(BaseModel):
     format: str = "json"  # json, html, pdf
 
 
+# ─── Asset Inventory ──────────────────────────────────────────────────
+class AssetInventoryResponse(BaseModel):
+    id: str
+    scan_id: str | None = None
+    target: str
+    technology_name: str
+    technology_version: str | None = None
+    cpe_entries: list | None = None
+    first_seen: datetime
+    last_seen: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CveAlertResponse(BaseModel):
+    id: str
+    asset_id: str
+    cve_id: str
+    technology_name: str
+    technology_version: str | None = None
+    cvss_score: float | None = None
+    cvss_severity: str | None = None
+    description: str | None = None
+    exploit_available: bool = False
+    affected_endpoints: list | None = None
+    notification_sent: bool = False
+    auto_rescan_triggered: bool = False
+    rescan_id: str | None = None
+    published_date: datetime | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ─── Tools ────────────────────────────────────────────────────────────
 class ToolInfo(BaseModel):
     name: str

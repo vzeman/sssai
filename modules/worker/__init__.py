@@ -94,6 +94,26 @@ def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_cou
             conn.commit()
     except Exception as e:
         log.warning("Could not update scan status: %s", e)
+
+
+def _get_scan_user_id(scan_id: str) -> str | None:
+    """Look up the user_id for a completed scan."""
+    if not _DB_URL:
+        return None
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(_DB_URL)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT user_id FROM scans WHERE id = :scan_id"),
+                {"scan_id": scan_id},
+            ).fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        log.warning("Could not fetch user_id for scan %s: %s", scan_id, e)
+        return None
+
+
 running = True
 
 
@@ -184,6 +204,15 @@ def main():
                 log.info("Scan %s completed: %d findings, risk score %s", scan_id, findings, score)
                 _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings,
                                     token_usage=token_usage)
+
+                # Store detected technologies in asset inventory for CVE monitoring
+                try:
+                    user_id = _get_scan_user_id(scan_id)
+                    if user_id:
+                        from modules.cve_monitor.inventory import store_technologies_from_report
+                        store_technologies_from_report(scan_id, user_id, target, report, _DB_URL)
+                except Exception as inv_err:
+                    log.warning("Asset inventory update failed for scan %s: %s", scan_id, inv_err)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")

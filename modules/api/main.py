@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search
+from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, inventory
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -58,6 +58,52 @@ try:
 except Exception:
     pass
 
+# Add asset_inventory and cve_alerts tables if missing (migration)
+try:
+    from sqlalchemy import text as _text2
+    with engine.connect() as conn:
+        conn.execute(_text2("""
+            CREATE TABLE IF NOT EXISTS asset_inventory (
+                id VARCHAR PRIMARY KEY,
+                user_id VARCHAR NOT NULL REFERENCES users(id),
+                scan_id VARCHAR REFERENCES scans(id) ON DELETE SET NULL,
+                target VARCHAR NOT NULL,
+                technology_name VARCHAR NOT NULL,
+                technology_version VARCHAR,
+                cpe_entries JSON,
+                first_seen TIMESTAMP DEFAULT NOW(),
+                last_seen TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        conn.execute(_text2("CREATE INDEX IF NOT EXISTS ix_asset_inventory_user_id ON asset_inventory(user_id)"))
+        conn.execute(_text2("CREATE INDEX IF NOT EXISTS ix_asset_inventory_target ON asset_inventory(target)"))
+        conn.execute(_text2("CREATE INDEX IF NOT EXISTS ix_asset_inventory_technology_name ON asset_inventory(technology_name)"))
+        conn.execute(_text2("""
+            CREATE TABLE IF NOT EXISTS cve_alerts (
+                id VARCHAR PRIMARY KEY,
+                user_id VARCHAR NOT NULL REFERENCES users(id),
+                asset_id VARCHAR NOT NULL REFERENCES asset_inventory(id) ON DELETE CASCADE,
+                cve_id VARCHAR NOT NULL,
+                technology_name VARCHAR NOT NULL,
+                technology_version VARCHAR,
+                cvss_score REAL,
+                cvss_severity VARCHAR,
+                description TEXT,
+                exploit_available BOOLEAN DEFAULT FALSE,
+                affected_endpoints JSON,
+                notification_sent BOOLEAN DEFAULT FALSE,
+                auto_rescan_triggered BOOLEAN DEFAULT FALSE,
+                rescan_id VARCHAR,
+                published_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        conn.execute(_text2("CREATE INDEX IF NOT EXISTS ix_cve_alerts_user_id ON cve_alerts(user_id)"))
+        conn.execute(_text2("CREATE INDEX IF NOT EXISTS ix_cve_alerts_cve_id ON cve_alerts(cve_id)"))
+        conn.commit()
+except Exception:
+    pass
+
 # Set up Elasticsearch indices on startup
 try:
     from modules.infra import setup_es
@@ -92,6 +138,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 
 
 @app.get("/health")
