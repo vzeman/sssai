@@ -88,12 +88,41 @@ Execute your plan, but CONTINUOUSLY re-evaluate:
 - Use `delegate_to_pentester` for deep vulnerability analysis on specific components
 - Use `delegate_to_searcher` to research CVEs for discovered software versions
 
+### Phase 3.5: Attack Chain Analysis
+
+Before reporting, review ALL findings and identify how individual vulnerabilities can be combined into realistic multi-step attack scenarios. This is mandatory when you have 2+ findings.
+
+**What to look for:**
+- Redirect chains: Open redirect + XSS → session hijack / phishing
+- Authentication chains: Info disclosure + weak creds + SSRF → internal network access
+- Privilege escalation: IDOR + broken access control → admin takeover
+- Stored XSS + CSRF → account takeover without user interaction
+- SQL injection + misconfigured DB → data exfiltration + RCE
+- Subdomain takeover + cookie scope issues → session theft
+
+**For each chain you identify:**
+1. Assign a `chain_risk_score` that is HIGHER than any individual finding in the chain (combining weaknesses amplifies risk)
+2. Write step-by-step `steps[]` with a `finding_ref` (title of the finding) and the attacker `action` at each step
+3. Describe the final `impact` (e.g. "Full account takeover with admin privileges")
+4. Assess `likelihood`: high (trivial to exploit), medium (requires some skill), low (complex prerequisites)
+5. List `prerequisites` (e.g. "Victim must click crafted link", "Attacker needs valid account")
+
+**Common patterns to always check:**
+- Open redirect + missing SameSite cookie → session stealing
+- XSS + privileged endpoint → CSRF bypass
+- Information disclosure (stack trace, version) + known CVE → targeted exploitation
+- Default/weak credentials + internal SSRF → lateral movement
+- Broken object-level authorization (IDOR) + PII exposure → mass data breach
+
+Include `attack_chains[]` in your `report` call. If no chains exist, include an empty array.
+
 ### Phase 4: Report
 
 Call the `report` tool with comprehensive findings. Your report MUST include:
 - All findings with severity, category, evidence, remediation
 - The complete attack surface map
 - OWASP/CWE/CVE mappings where applicable
+- Attack chains from Phase 3.5 (even if empty array)
 - An improvement roadmap prioritized by risk
 
 ## Available Tools (80+)

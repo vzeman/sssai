@@ -1140,6 +1140,132 @@ def _run_reflector(client, text_output: str, system_prompt: str, tools: list,
         return None
 
 
+# ── Attack Chain Analysis ─────────────────────────────────────────────────
+
+_ATTACK_CHAIN_PATTERNS = [
+    ("open redirect", "xss"),
+    ("open redirect", "session"),
+    ("xss", "csrf"),
+    ("xss", "admin"),
+    ("information disclosure", "credentials"),
+    ("information disclosure", "ssrf"),
+    ("ssrf", "internal"),
+    ("idor", "authorization"),
+    ("idor", "pii"),
+    ("sql injection", "database"),
+    ("subdomain takeover", "cookie"),
+    ("default credentials", "ssrf"),
+    ("weak password", "admin"),
+    ("cors", "authentication"),
+    ("path traversal", "credentials"),
+]
+
+
+def _run_attack_chain_analysis(
+    client,
+    report: dict,
+    scan_context: dict | None = None,
+) -> list[dict]:
+    """Analyze findings and generate attack chains via a dedicated LLM call.
+
+    Called as a post-processing step when the agent did not produce attack_chains
+    itself (e.g. older prompt versions, fallback reports, or stopped scans).
+    Returns a list of attack chain dicts matching the report schema.
+    """
+    findings = report.get("findings", [])
+    if len(findings) < 2:
+        return []
+
+    # Build a compact findings summary for the LLM prompt
+    findings_lines = []
+    for i, f in enumerate(findings, 1):
+        title = f.get("title", "Unknown")
+        severity = f.get("severity", "info")
+        category = f.get("category", "")
+        desc = f.get("description", "")[:200]
+        findings_lines.append(f"F-{i:03d} [{severity}] {title} ({category}): {desc}")
+
+    findings_text = "\n".join(findings_lines)
+
+    # Quick heuristic: check if any known chain patterns exist before making LLM call
+    titles_lower = " ".join(f.get("title", "").lower() for f in findings)
+    desc_lower = " ".join(f.get("description", "").lower() for f in findings)
+    combined = titles_lower + " " + desc_lower
+    has_chainable = any(
+        a in combined and b in combined
+        for a, b in _ATTACK_CHAIN_PATTERNS
+    )
+
+    # Always try the LLM call if there are ≥3 findings, or if patterns match
+    if not has_chainable and len(findings) < 3:
+        return []
+
+    prompt = (
+        "You are a senior penetration tester reviewing scan findings. "
+        "Identify realistic attack chains where an attacker could combine multiple "
+        "findings into a more damaging attack scenario.\n\n"
+        f"Findings:\n{findings_text}\n\n"
+        "For each chain you identify, respond with a JSON array. Each element must have:\n"
+        '- "title": short descriptive name\n'
+        '- "chain_risk_score": number 0-100 (higher than individual findings in the chain)\n'
+        '- "steps": array of {"finding_ref": "<finding title>", "action": "<attacker action>"}\n'
+        '- "impact": string describing the end impact\n'
+        '- "likelihood": "low" | "medium" | "high"\n'
+        '- "prerequisites": string describing attacker prerequisites\n\n'
+        "Common patterns to check:\n"
+        "- Open redirect + XSS/missing SameSite → session theft\n"
+        "- Info disclosure + weak creds/SSRF → internal access\n"
+        "- IDOR + PII exposure → mass data breach\n"
+        "- XSS + CSRF + privileged endpoint → account takeover\n"
+        "- SQLi + misconfigured DB → data exfiltration or RCE\n\n"
+        "Return ONLY a valid JSON array (no markdown, no explanation). "
+        "If no realistic chains exist, return []."
+    )
+
+    try:
+        response = client.messages.create(
+            model=AI_MODEL_LIGHT,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        tracker = scan_context.get("_token_tracker") if scan_context else None
+        if tracker:
+            tracker.record(response, caller="attack_chain_analysis")
+
+        text = "".join(b.text for b in response.content if hasattr(b, "text")).strip()
+
+        # Strip markdown fences if present
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+
+        chains = json.loads(text)
+        if not isinstance(chains, list):
+            return []
+
+        # Validate and sanitise each chain
+        valid_chains = []
+        for chain in chains:
+            if not isinstance(chain, dict):
+                continue
+            if not chain.get("title") or "steps" not in chain:
+                continue
+            chain.setdefault("chain_risk_score", 75)
+            chain.setdefault("likelihood", "medium")
+            chain.setdefault("prerequisites", "")
+            chain.setdefault("impact", "")
+            valid_chains.append(chain)
+
+        return valid_chains
+
+    except Exception as e:
+        log.warning("Attack chain analysis failed: %s", e)
+        return []
+
+
 # ── Planning step ────────────────────────────────────────────────────────
 
 def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
@@ -1151,7 +1277,9 @@ def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
         "Phase 2 (Plan): Call adapt_plan to create a custom test plan based on discoveries. "
         "Load relevant knowledge modules.\n"
         "Phase 3 (Execute): Follow your plan. Adapt when you find new things.\n"
-        "Phase 4 (Report): Call report with all findings, attack surface, and plan evolution."
+        "Phase 3.5 (Attack Chain Analysis): Review all findings. Identify how multiple vulnerabilities "
+        "chain together into realistic attack scenarios with amplified risk scores.\n"
+        "Phase 4 (Report): Call report with all findings, attack chains, attack surface, and plan evolution."
     )
 
 
@@ -1657,6 +1785,37 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
     # ── Clean up checkpoint ──
     delete_checkpoint(scan_id)
+
+    # ── Phase 3.5: Attack Chain Analysis (post-processing fallback) ──
+    # If the agent didn't produce attack_chains itself, generate them now.
+    if not report.get("attack_chains"):
+        _log_activity(scan_id, {
+            "type": "phase",
+            "phase": "attack_chain_analysis",
+            "message": "Running attack chain analysis on findings...",
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+        chains = _run_attack_chain_analysis(client, report, scan_context)
+        if chains:
+            report["attack_chains"] = chains
+            _log_activity(scan_id, {
+                "type": "phase",
+                "phase": "attack_chain_analysis",
+                "message": f"Identified {len(chains)} attack chain(s).",
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            _post_agent_chat(
+                scan_id,
+                f"Attack chain analysis complete: {len(chains)} chain(s) identified.",
+                "status",
+            )
+        else:
+            report["attack_chains"] = []
+    else:
+        log.info(
+            "Scan %s: agent produced %d attack chain(s) directly.",
+            scan_id, len(report["attack_chains"]),
+        )
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)

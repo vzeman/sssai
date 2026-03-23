@@ -313,6 +313,58 @@ TOOLS = [
                         "entry_points": {"type": "array", "items": {"type": "string"}},
                     },
                 },
+                "attack_chains": {
+                    "type": "array",
+                    "description": (
+                        "Attack chains — sequences of vulnerabilities that combine into a higher-risk scenario. "
+                        "Identify chains where multiple low/medium findings can be chained into a critical attack path."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Short descriptive title, e.g. 'Account Takeover via Open Redirect + Session Fixation'",
+                            },
+                            "chain_risk_score": {
+                                "type": "number",
+                                "description": "Combined risk score 0-100 (typically higher than individual findings)",
+                            },
+                            "steps": {
+                                "type": "array",
+                                "description": "Ordered exploitation steps referencing individual findings",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "finding_ref": {
+                                            "type": "string",
+                                            "description": "Reference to a finding title or ID (e.g. 'Open Redirect on /oauth/callback')",
+                                        },
+                                        "action": {
+                                            "type": "string",
+                                            "description": "What the attacker does at this step",
+                                        },
+                                    },
+                                    "required": ["finding_ref", "action"],
+                                },
+                            },
+                            "impact": {
+                                "type": "string",
+                                "description": "End impact if the chain is successfully exploited",
+                            },
+                            "likelihood": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Likelihood of a real attacker exploiting this chain",
+                            },
+                            "prerequisites": {
+                                "type": "string",
+                                "description": "What the attacker needs to execute this chain (e.g. 'Victim clicks crafted link')",
+                            },
+                        },
+                        "required": ["title", "chain_risk_score", "steps", "impact", "likelihood"],
+                    },
+                },
                 "improvement_roadmap": {
                     "type": "array",
                     "description": "Prioritized list of improvements",
