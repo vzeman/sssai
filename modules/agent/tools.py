@@ -237,6 +237,14 @@ TOOLS = [
                             },
                             "description": {"type": "string"},
                             "evidence": {"type": "string"},
+                            "cvss_score": {
+                                "type": "number",
+                                "description": "CVSS base score (0.0–10.0). Will be auto-calculated if omitted.",
+                            },
+                            "cvss_vector": {
+                                "type": "string",
+                                "description": "CVSS vector string (e.g., 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'). Will be auto-calculated if omitted.",
+                            },
                             "cve_ids": {
                                 "type": "array",
                                 "items": {"type": "string"},
