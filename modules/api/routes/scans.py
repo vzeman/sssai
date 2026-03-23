@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
 from modules.api.models import Scan, User
-from modules.api.schemas import ScanCreate, ScanResponse
+from modules.api.schemas import ScanCreate, ScanResponse, VerificationCreate
 from modules.api.auth import get_current_user
 from modules.infra import get_queue, get_storage
+from modules.infra.checkpoint import load_checkpoint, build_resume_context, delete_checkpoint
 
 import redis as _redis
 
@@ -78,7 +79,6 @@ def force_retry_scan(scan_id: str, user: User = Depends(get_current_user), db: S
     if scan.status not in ("running", "failed"):
         raise HTTPException(status_code=400, detail="Scan must be running or failed to force-retry")
 
-    from modules.agent.checkpoint import load_checkpoint, build_resume_context
     checkpoint = load_checkpoint(scan_id)
     config = scan.config or {}
     if checkpoint:
@@ -116,7 +116,6 @@ def force_fail_scan(scan_id: str, user: User = Depends(get_current_user), db: Se
     r = _redis.from_url(_REDIS_URL)
     r.delete(f"scan:heartbeat:{scan_id}")
 
-    from modules.agent.checkpoint import delete_checkpoint
     delete_checkpoint(scan_id)
 
     return {"id": scan.id, "status": "failed"}
@@ -220,6 +219,90 @@ def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session
         "retry_of": scan_id,
         "status": "queued",
         "target": new_scan.target,
+    }
+
+
+@router.post("/{scan_id}/verify")
+def verify_scan(
+    scan_id: str,
+    body: VerificationCreate | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a targeted re-scan to verify whether original findings have been remediated.
+
+    The verification scan tests ONLY the specific findings from the original scan,
+    not a full re-scan. Each finding receives a status of verified_fixed,
+    still_vulnerable, partially_fixed, or new_regression.
+    """
+    original_scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not original_scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if original_scan.status != "completed":
+        raise HTTPException(status_code=400, detail="Original scan must be completed before verification")
+
+    storage = get_storage()
+    report = storage.get_json(f"scans/{scan_id}/report.json")
+    if not report:
+        raise HTTPException(status_code=404, detail="Original scan report not found")
+
+    findings = report.get("findings", [])
+
+    # Build compact finding summaries for the verification context
+    finding_summaries = []
+    for f in findings:
+        summary = {
+            "title": f.get("title", ""),
+            "severity": f.get("severity", "info"),
+            "description": f.get("description", "")[:500],
+            "evidence": f.get("evidence", "")[:300],
+            "affected_urls": f.get("affected_urls", []),
+            "category": f.get("category", ""),
+        }
+        finding_summaries.append(summary)
+
+    verification_context = {
+        "verification_of": scan_id,
+        "original_scan_created_at": original_scan.created_at.isoformat() if original_scan.created_at else None,
+        "original_risk_score": report.get("risk_score", 0),
+        "findings": finding_summaries,
+        "findings_count": len(finding_summaries),
+    }
+
+    extra_config = (body.config or {}) if body else {}
+    new_scan = Scan(
+        user_id=user.id,
+        target=original_scan.target,
+        scan_type="verification",
+        config={
+            **extra_config,
+            "verification_context": verification_context,
+        },
+    )
+    db.add(new_scan)
+    db.commit()
+    db.refresh(new_scan)
+
+    get_queue().send("scan-jobs", {
+        "scan_id": new_scan.id,
+        "target": new_scan.target,
+        "scan_type": new_scan.scan_type,
+        "config": new_scan.config or {},
+    })
+
+    return {
+        "id": new_scan.id,
+        "verification_of": scan_id,
+        "target": new_scan.target,
+        "scan_type": new_scan.scan_type,
+        "status": new_scan.status,
+        "findings_count": new_scan.findings_count,
+        "created_at": new_scan.created_at.isoformat() if new_scan.created_at else None,
+        "completed_at": None,
+        "risk_score": None,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "estimated_cost": 0.0,
     }
 
 

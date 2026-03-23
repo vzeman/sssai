@@ -162,6 +162,14 @@ INDICES = {
                 "tool": {"type": "keyword"},
                 "evidence": {"type": "text"},
                 "risk_score": {"type": "float"},
+                # Lifecycle / deduplication fields
+                "finding_status": {"type": "keyword"},      # new | existing | resolved | regressed
+                "dedup_key": {"type": "keyword"},           # sha1(title+category+url_domain)
+                "affected_url": {"type": "keyword"},        # primary affected URL
+                "first_seen_scan_id": {"type": "keyword"},
+                "first_seen_date": {"type": "date"},
+                "last_seen_scan_id": {"type": "keyword"},
+                "resolved_date": {"type": "date"},
             }
         },
     },
@@ -181,6 +189,45 @@ INDICES = {
                 "proof_of_concept": {"type": "text"},
                 "risk_rating": {"type": "keyword"},
                 "status": {"type": "keyword"},
+            }
+        },
+    },
+    "scanner-security-posture": {
+        "settings": INDEX_SETTINGS,
+        "mappings": {
+            "properties": {
+                "timestamp": {"type": "date"},
+                "scan_id": {"type": "keyword"},
+                "target": {"type": "keyword"},
+                "user_id": {"type": "keyword"},
+                "posture_score": {"type": "float"},
+                "trend": {"type": "keyword"},
+                "trend_delta": {"type": "float"},
+                "components": {
+                    "type": "object",
+                    "properties": {
+                        "base_penalty": {"type": "float"},
+                        "cvss_penalty": {"type": "float"},
+                        "age_penalty": {"type": "float"},
+                        "chain_penalty": {"type": "float"},
+                        "risk_penalty": {"type": "float"},
+                        "velocity_bonus": {"type": "float"},
+                    },
+                },
+                "finding_counts": {
+                    "type": "object",
+                    "properties": {
+                        "critical": {"type": "integer"},
+                        "high": {"type": "integer"},
+                        "medium": {"type": "integer"},
+                        "low": {"type": "integer"},
+                        "info": {"type": "integer"},
+                        "total": {"type": "integer"},
+                    },
+                },
+                "commentary": {"type": "text"},
+                "forecast": {"type": "text"},
+                "forecast_date": {"type": "date", "ignore_malformed": True},
             }
         },
     },

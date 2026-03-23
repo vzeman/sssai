@@ -37,6 +37,7 @@ TOOLS = [
             "  Visual: backstopjs\n"
             "  Auth: hydra\n"
             "  Cloud: prowler\n"
+            "  Breach Monitoring: holehe, breach-parse\n"
             "  Utility: curl, wget, jq, python3, node\n"
             "  Browser: use browser_test and browser_crawl tools for Playwright-based client-side testing\n"
             "Save output files to /output/ for later reference."
@@ -278,6 +279,59 @@ TOOLS = [
         },
     },
     {
+        "name": "report_assets",
+        "description": (
+            "Report discovered assets (subdomains, IPs, services, API endpoints, etc.) during Phase 0 Discovery. "
+            "Call this tool as soon as you discover new hosts, IPs, open ports, or services. "
+            "Assets are persisted to the inventory and diffed against previous scans automatically."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "assets": {
+                    "type": "array",
+                    "description": "List of discovered assets",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "asset_type": {
+                                "type": "string",
+                                "description": "Type of asset",
+                                "enum": ["domain", "subdomain", "ip", "api_endpoint", "service", "certificate", "dns_record"],
+                            },
+                            "hostname": {
+                                "type": "string",
+                                "description": "Hostname or domain name (e.g. api.example.com)",
+                            },
+                            "ip": {
+                                "type": "string",
+                                "description": "IP address if known",
+                            },
+                            "port": {
+                                "type": "integer",
+                                "description": "Port number if applicable",
+                            },
+                            "service": {
+                                "type": "string",
+                                "description": "Service name (e.g. nginx, apache, postgresql)",
+                            },
+                            "technology": {
+                                "type": "string",
+                                "description": "Technology or software version (e.g. WordPress 6.4)",
+                            },
+                            "extra": {
+                                "type": "object",
+                                "description": "Any additional metadata (e.g. certificate details, DNS record values)",
+                            },
+                        },
+                        "required": ["asset_type"],
+                    },
+                },
+            },
+            "required": ["assets"],
+        },
+    },
+    {
         "name": "report",
         "description": "Submit the final structured scan report with all findings, risk score, and recommendations.",
         "input_schema": {
@@ -308,6 +362,14 @@ TOOLS = [
                             },
                             "description": {"type": "string"},
                             "evidence": {"type": "string"},
+                            "cvss_score": {
+                                "type": "number",
+                                "description": "CVSS base score (0.0–10.0). Will be auto-calculated if omitted.",
+                            },
+                            "cvss_vector": {
+                                "type": "string",
+                                "description": "CVSS vector string (e.g., 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'). Will be auto-calculated if omitted.",
+                            },
                             "cve_ids": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -366,12 +428,52 @@ TOOLS = [
                 },
                 "compliance_summary": {
                     "type": "object",
-                    "description": "Compliance status per framework",
+                    "description": "High-level compliance status per framework",
                     "properties": {
                         "owasp_top10": {"type": "string", "enum": ["pass", "partial", "fail"]},
                         "pci_dss": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "gdpr": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "soc2": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "iso27001": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "hipaa": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "tls_best_practices": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                    },
+                },
+                "compliance_reports": {
+                    "type": "object",
+                    "description": (
+                        "Detailed per-requirement compliance reports for each framework. "
+                        "Include this when performing a compliance_audit scan or when findings "
+                        "map to specific compliance requirements. Each key is a framework ID "
+                        "(pci_dss_4, soc2, iso27001, hipaa, gdpr, owasp_top10)."
+                    ),
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "overall": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                            "framework_name": {"type": "string"},
+                            "requirements": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "string", "description": "Requirement ID, e.g. '6.2.4'"},
+                                        "title": {"type": "string"},
+                                        "status": {"type": "string", "enum": ["pass", "fail", "partial"]},
+                                        "findings": {
+                                            "type": "array",
+                                            "items": {"type": "string"},
+                                            "description": "Finding IDs (e.g. F-001) that caused this requirement to fail",
+                                        },
+                                        "evidence": {"type": "string", "description": "Evidence text for the failure"},
+                                        "remediation": {"type": "string"},
+                                    },
+                                    "required": ["id", "title", "status"],
+                                },
+                            },
+                            "pass_rate": {"type": "number", "description": "0.0–1.0 fraction of requirements passing"},
+                            "critical_gaps": {"type": "integer", "description": "Count of critical/high-weight failing requirements"},
+                        },
                     },
                 },
                 "attack_surface": {
@@ -382,6 +484,58 @@ TOOLS = [
                         "subdomains_found": {"type": "integer"},
                         "exposed_services": {"type": "array", "items": {"type": "string"}},
                         "entry_points": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+                "attack_chains": {
+                    "type": "array",
+                    "description": (
+                        "Attack chains — sequences of vulnerabilities that combine into a higher-risk scenario. "
+                        "Identify chains where multiple low/medium findings can be chained into a critical attack path."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Short descriptive title, e.g. 'Account Takeover via Open Redirect + Session Fixation'",
+                            },
+                            "chain_risk_score": {
+                                "type": "number",
+                                "description": "Combined risk score 0-100 (typically higher than individual findings)",
+                            },
+                            "steps": {
+                                "type": "array",
+                                "description": "Ordered exploitation steps referencing individual findings",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "finding_ref": {
+                                            "type": "string",
+                                            "description": "Reference to a finding title or ID (e.g. 'Open Redirect on /oauth/callback')",
+                                        },
+                                        "action": {
+                                            "type": "string",
+                                            "description": "What the attacker does at this step",
+                                        },
+                                    },
+                                    "required": ["finding_ref", "action"],
+                                },
+                            },
+                            "impact": {
+                                "type": "string",
+                                "description": "End impact if the chain is successfully exploited",
+                            },
+                            "likelihood": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Likelihood of a real attacker exploiting this chain",
+                            },
+                            "prerequisites": {
+                                "type": "string",
+                                "description": "What the attacker needs to execute this chain (e.g. 'Victim clicks crafted link')",
+                            },
+                        },
+                        "required": ["title", "chain_risk_score", "steps", "impact", "likelihood"],
                     },
                 },
                 "improvement_roadmap": {
@@ -398,6 +552,46 @@ TOOLS = [
                         },
                     },
                 },
+                "triage": {
+                    "type": "object",
+                    "description": (
+                        "Auto-triage buckets grouping findings by action urgency. "
+                        "Populated automatically after report submission — no need to include manually."
+                    ),
+                    "properties": {
+                        "immediate_action": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Critical findings requiring immediate remediation",
+                        },
+                        "this_sprint": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "High/medium findings to address in current sprint",
+                        },
+                        "backlog": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Low-priority findings for future backlog",
+                        },
+                    },
+                },
+                "recommended_scan_interval": {
+                    "type": "string",
+                    "description": (
+                        "AI-recommended interval for the next scan. "
+                        "One of: 'daily', 'weekly', 'biweekly', 'monthly'. "
+                        "Populated automatically after report submission."
+                    ),
+                    "enum": ["daily", "weekly", "biweekly", "monthly"],
+                },
+                "interval_reasoning": {
+                    "type": "string",
+                    "description": (
+                        "Human-readable explanation of why the scan interval was recommended. "
+                        "Populated automatically after report submission."
+                    ),
+                },
                 "scan_metadata": {
                     "type": "object",
                     "properties": {
@@ -411,6 +605,56 @@ TOOLS = [
                 },
             },
             "required": ["summary", "risk_score", "findings"],
+        },
+    },
+    # ── Breach & Dark Web Monitoring ─────────────────────────────────────────
+    {
+        "name": "breach_check",
+        "description": (
+            "Check if a domain has appeared in known data breaches using the Have I Been Pwned API "
+            "and other breach intelligence sources. Returns breach names, dates, data types exposed, "
+            "and affected account counts. Always run this during Phase 0 Discovery for security scans."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for breaches (e.g., 'example.com')",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/breach_check.json)",
+                },
+            },
+            "required": ["domain"],
+        },
+    },
+    {
+        "name": "credential_leak_check",
+        "description": (
+            "Search for exposed credentials and account registrations associated with a domain. "
+            "Uses holehe and related tools to identify which services domain emails are registered on, "
+            "indicating potential credential exposure surface. Run during Phase 0 Discovery."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for credential leaks (e.g., 'example.com')",
+                },
+                "emails": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific email addresses to check (if known). If not provided, uses common patterns like admin@domain, info@domain.",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/credential_leak.json)",
+                },
+            },
+            "required": ["domain"],
         },
     },
     # ── AI-first adaptive tools ──────────────────────────────────────────────
@@ -450,7 +694,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -472,11 +716,74 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing", "browser_testing",
+                        "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
                     ],
                 },
             },
             "required": ["module"],
+        },
+    },
+    {
+        "name": "get_session_headers",
+        "description": (
+            "Return the current authenticated session as curl flags and HTTP headers. "
+            "Use when you need to inject authentication into shell tool commands like curl, "
+            "nuclei, sqlmap, ffuf, etc. Returns empty strings if no session is active. "
+            "Example: pass the curl_flags into a curl command to test authenticated endpoints."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "test_auth_endpoint",
+        "description": (
+            "Test an endpoint both WITH and WITHOUT authentication and compare the responses. "
+            "Use this to discover authenticated-only content, identify access control boundaries, "
+            "detect IDOR vulnerabilities, and compare the authenticated vs unauthenticated "
+            "attack surface. Reports status codes, response sizes, and key differences."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to test",
+                },
+                "method": {
+                    "type": "string",
+                    "description": "HTTP method (default GET)",
+                    "enum": ["GET", "HEAD", "POST", "OPTIONS"],
+                },
+                "extra_headers": {
+                    "type": "object",
+                    "description": "Additional headers to include in both requests",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Request body for POST requests",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "check_session",
+        "description": (
+            "Check the status of the current authentication session. "
+            "Returns whether the session is active, which cookies/headers are set, "
+            "and whether re-authentication may be needed. "
+            "Use before running a long batch of authenticated tests."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reauthenticate": {
+                    "type": "boolean",
+                    "description": "If true, attempt to re-authenticate if session is invalid (default false)",
+                },
+            },
         },
     },
     {
@@ -555,6 +862,37 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Discovered subdomains",
+                },
+                "graphql_endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Full GraphQL endpoint URL"},
+                            "introspection_enabled": {"type": "boolean", "description": "Whether introspection query succeeded"},
+                            "engine": {"type": "string", "description": "GraphQL engine (Apollo, Hasura, Strawberry, etc.)"},
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected GraphQL endpoints with introspection status",
+                },
+                "grpc_services": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "description": "Host and port (e.g. target:50051)"},
+                            "reflection_enabled": {"type": "boolean", "description": "Whether server reflection is enabled"},
+                            "tls": {"type": "boolean", "description": "Whether TLS is in use"},
+                            "methods": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Discovered RPC method names",
+                            },
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected gRPC services with reflection and method info",
                 },
             },
         },

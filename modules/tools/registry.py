@@ -658,6 +658,26 @@ TOOL_REGISTRY = {
         "output_formats": ["txt", "json"],
     },
 
+    # ─── Breach & Dark Web Monitoring ─────────────────────────────────
+    "holehe": {
+        "category": "breach_monitoring",
+        "description": "Check if an email address is registered on 120+ websites — identify exposed accounts and credential leak surface",
+        "binary": "holehe",
+        "examples": [
+            "holehe user@{target} --only-used --output /output/holehe.txt",
+        ],
+        "output_formats": ["txt", "json"],
+    },
+    "breach-parse": {
+        "category": "breach_monitoring",
+        "description": "Parse and search breach dumps for domain emails — finds exposed credentials in public breach datasets",
+        "binary": "breach-parse",
+        "examples": [
+            "breach-parse @{target} /output/breach-parse.txt",
+        ],
+        "output_formats": ["txt"],
+    },
+
     # ─── Cloud Security ────────────────────────────────────────────────
     "prowler": {
         "category": "cloud",
@@ -743,6 +763,7 @@ CATEGORIES = {
     "visual": "Visual Regression & Defacement",
     "auth": "Authentication & Rate Limit Testing",
     "cloud": "Cloud Security",
+    "breach_monitoring": "Breach & Dark Web Monitoring",
     "utility": "Utilities",
 }
 
@@ -759,6 +780,7 @@ SCAN_TYPE_CATEGORIES = {
     "cloud": ["cloud", "container", "iac", "secrets", "supply_chain"],
     "recon": ["recon", "osint", "dns", "takeover", "ct", "email", "phishing"],
     "privacy": ["headers", "seo", "accessibility", "email"],
+    "breach_monitoring": ["breach_monitoring", "osint", "email"],
 }
 
 
