@@ -1,0 +1,167 @@
+## ISO 27001:2022 Control Catalog — External/Web Testing
+
+ISO/IEC 27001:2022 defines requirements for an Information Security Management System (ISMS).
+Annex A contains 93 controls across 4 themes. Below are externally testable controls.
+
+### Theme 5 — Organizational Controls (37 controls)
+- 5.1   Information security policies
+- 5.2   Information security roles and responsibilities
+- 5.7   Threat intelligence
+- 5.14  Information security in supplier relationships
+- 5.23  Information security for use of cloud services
+- 5.29  Information security during disruption
+- 5.30  ICT readiness for business continuity
+
+TEST (5.14): Check for third-party scripts without Subresource Integrity (SRI) attributes.
+TEST (5.7): Check for disclosed software versions that enable targeted attacks.
+
+### Theme 6 — People Controls (8 controls)
+- 6.8   Information security event reporting
+
+TEST: Check for security.txt disclosure mechanism for reporting.
+TOOLS: http_request url="{target}/.well-known/security.txt"
+
+### Theme 7 — Physical Controls (14 controls)
+- 7.9   Security of assets off-premises
+
+CONTEXT: Not testable via external web scanning.
+
+### Theme 8 — Technological Controls (34 controls) — PRIMARY FOCUS
+- 8.2   Privileged access rights
+          - Admin interfaces protected
+          - No unnecessary privileged accounts exposed
+- 8.3   Information access restriction
+          - Access control based on need-to-know
+          - Directory listing disabled
+- 8.4   Access to source code
+          - No .git, source code exposed
+- 8.5   Secure authentication
+          - Multi-factor authentication
+          - Strong password policies
+          - Account lockout mechanisms
+- 8.6   Capacity management
+- 8.7   Protection against malware
+          - No malicious scripts included
+- 8.8   Management of technical vulnerabilities
+          - Vulnerability scanning
+          - Patch management
+          - CVE remediation
+- 8.9   Configuration management
+          - Default configurations changed
+          - Security hardening applied
+          - No unnecessary services
+- 8.20  Network security
+          - Network segregation
+          - Firewall rules
+          - Minimal exposed ports
+- 8.21  Security of network services
+          - Network services secured and monitored
+          - SLAs with providers
+- 8.22  Segregation in networks
+- 8.23  Web filtering
+- 8.24  Use of cryptography
+          - TLS 1.2+ for all web traffic
+          - Strong cipher suites only
+          - Valid, trusted certificates
+          - Certificate expiry monitoring
+- 8.25  Secure development lifecycle
+          - Security integrated into SDLC
+          - Security requirements defined
+- 8.26  Application security requirements
+          - Security requirements for web applications
+          - OWASP Top 10 addressed
+- 8.27  Secure system architecture and engineering principles
+          - Defense in depth
+          - Least privilege
+          - Separation of duties
+- 8.28  Secure coding
+          - Code reviews
+          - Static analysis
+          - No hardcoded credentials
+          - Input validation and output encoding
+          - Injection prevention
+          - XSS prevention
+- 8.29  Security testing in development and acceptance
+          - Penetration testing
+          - DAST
+          - Code review
+- 8.30  Outsourced development
+- 8.31  Separation of development, test, and production environments
+- 8.32  Change management
+- 8.33  Test information
+- 8.34  Protection of information systems during audit testing
+
+### Key Test Commands
+
+**8.24 — Cryptography:**
+  testssl --json /output/testssl.json {target}
+  sslyze {target} --json_out /output/sslyze.json
+
+FAIL IF: TLS 1.0/1.1, SSL v3, weak ciphers (RC4, DES, EXPORT), expired/self-signed cert,
+         no certificate chain, HSTS missing, insecure cookies
+
+**8.8 — Vulnerability Management:**
+  nuclei -u {target} -t cves/ -json -o /output/nuclei_cves.json
+  nuclei -u {target} -t vulnerabilities/ -json -o /output/nuclei_vulns.json
+
+FAIL IF: Known CVEs with CVSS ≥ 4.0, outdated software components
+
+**8.28 — Secure Coding:**
+  sqlmap -u "{target}/?id=1" --batch (SQL injection)
+  wapiti -u {target} -f json -o /output/wapiti.json (XSS, injections)
+  nuclei -u {target} -t http/vulnerabilities/ -json -o /output/nuclei_webvulns.json
+
+FAIL IF: SQL injection, XSS, command injection, path traversal, SSRF, XXE
+
+**8.9 — Configuration Management:**
+  whatweb {target}
+  curl -sI {target} | grep -E "Server:|X-Powered-By:|X-AspNet"
+  gobuster dir -u {target} -w /wordlists/common.txt (discover misconfigurations)
+
+FAIL IF: Version disclosure in headers, directory listing enabled, .env/.git exposed,
+         debug mode enabled, unnecessary HTTP methods (TRACE, DEBUG)
+
+**8.20 — Network Security:**
+  nmap -sV -p- {target} (full port scan)
+
+FAIL IF: Unnecessary ports open, admin services exposed (SSH, RDP, FTP on default ports)
+
+**8.5 — Secure Authentication:**
+  Test login endpoint for rate limiting and account lockout.
+  Check for MFA indicators.
+
+FAIL IF: No account lockout, no MFA, weak password acceptance, default credentials
+
+**8.3 — Access Restriction:**
+  gobuster dir -u {target} -w /wordlists/common.txt
+  http_request url="{target}/.git/HEAD"
+  http_request url="{target}/.env"
+
+FAIL IF: Directory listing, .git exposed, .env exposed, backup files accessible
+
+### Category → ISO 27001 Control Mapping
+ssl_tls_weakness      → 8.24
+expired_certificate   → 8.24
+weak_cipher          → 8.24
+missing_hsts         → 8.24
+insecure_cookie      → 8.24
+sql_injection        → 8.28, 8.26
+xss                  → 8.28, 8.26
+csrf                 → 8.28
+command_injection    → 8.28
+path_traversal       → 8.28
+ssrf                 → 8.28
+known_cve            → 8.8
+outdated_component   → 8.8, 8.9
+missing_headers      → 8.26, 8.28
+no_account_lockout   → 8.5
+weak_authentication  → 8.5
+no_mfa               → 8.5
+information_disclosure → 8.9
+version_disclosure   → 8.9
+directory_listing    → 8.3
+exposed_source       → 8.4
+open_ports           → 8.20
+exposed_admin        → 8.2
+missing_sri          → 8.28
+no_security_txt      → 6.8

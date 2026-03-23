@@ -1,44 +1,120 @@
 ## Compliance Audit Methodology
 
-### OWASP Top 10 2021
-Test each A01-A10 category (load owasp_testing knowledge for full details).
-Map every finding to specific OWASP category.
+### Scope & Framework Selection
 
-### PCI DSS 4.0 (if payment processing detected)
-- Req 2: No default passwords/settings
-- Req 4: Encrypt transmission of cardholder data (TLS)
-- Req 6: Secure systems and software (patching, secure coding)
-- Req 7: Restrict access by business need-to-know
-- Req 8: Identify and authenticate access
-- Req 11: Test security of systems and networks regularly
+First, determine which frameworks apply to this target:
+- **PCI DSS 4.0**: Detected payment forms, checkout flows, card data handling → load `pci_dss_4`
+- **HIPAA**: Healthcare, medical records, patient data, PHI → load `hipaa`
+- **SOC 2**: SaaS/cloud service provider, B2B platform → load `soc2`
+- **ISO 27001**: Enterprise security baseline (always applicable) → load `iso27001`
+- **GDPR**: EU-facing site, personal data collection, cookie consent → always check
+- **OWASP Top 10**: Universal web security baseline → always check
 
-### GDPR Compliance Signals
-- Cookie consent banner presence and functionality
-- Privacy policy link and content
-- Data processing notices
-- Cookie classification (necessary vs analytics vs marketing)
-- Right to access/delete mechanisms
-- Data minimization in forms
+Load relevant framework knowledge modules via `load_knowledge` before testing.
 
-### CIS Controls v8
-- Basic security hygiene checks
-- Asset inventory, access control
-- Malware defenses, data recovery
+### Phase 1: Discovery (Run First)
+Detect technologies, payment processors, healthcare keywords, user data forms.
+Look for: Stripe/PayPal/Braintree (→ PCI DSS), patient/health/PHI keywords (→ HIPAA),
+cookie consent banners (→ GDPR), SaaS dashboard/API (→ SOC 2).
 
-### TLS/SSL Best Practices (Mozilla)
-- `testssl --json /output/testssl.json {target}`
-- `sslyze {target} --json_out /output/sslyze.json`
-- Protocol versions, cipher suites, certificate chain
+### Phase 2: TLS/Cryptography Testing (Critical for all frameworks)
+  testssl --json /output/testssl.json {target}
+  sslyze {target} --json_out /output/sslyze.json
+  openssl s_client -connect {target}:443 -tls1_1 2>&1 | grep "alert\|Cipher\|Protocol"
 
-### Accessibility (WCAG 2.1 AA)
-- `pa11y {target} --standard WCAG2AA --reporter json > /output/pa11y.json`
-- `axe {target} --tags wcag2a,wcag2aa --save /output/axe-results.json`
-- Color contrast, ARIA labels, keyboard navigation
+Maps to: PCI DSS 4.2.1, SOC2 CC6.7, ISO 27001 8.24, HIPAA 164.312(e)(2)(ii), GDPR Art.32
 
-### Security Headers
-- `drheader scan single {target} --json > /output/drheader.json`
-- CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy
+### Phase 3: Security Headers
+  drheader scan single {target} --json > /output/drheader.json
+  curl -sI {target} | grep -E "^(Strict-Transport|Content-Security|X-Frame|X-Content-Type|Permissions)"
 
-### Reporting
-Map EVERY finding to specific compliance control (e.g., "PCI DSS 6.2", "OWASP A05:2021").
-Include `compliance_summary` with owasp_top10, pci_dss, gdpr, tls_best_practices status.
+Check: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+Maps to: PCI DSS 6.2.4, SOC2 CC6.1, ISO 27001 8.26
+
+### Phase 4: Vulnerability Scanning
+  nuclei -u {target} -t cves/ -t vulnerabilities/ -json -o /output/nuclei_compliance.json
+  nikto -h {target} -Format json -o /output/nikto.json
+
+Maps to: PCI DSS 6.3.3, SOC2 CC7.1, ISO 27001 8.8, OWASP A06:2021
+
+### Phase 5: Web Application Security
+  wapiti -u {target} -f json -o /output/wapiti.json --flush-session
+  sqlmap -u "{target}/?q=1" --batch --level=2 --risk=1
+
+Maps to: PCI DSS 6.2.4, OWASP A03:2021, ISO 27001 8.28
+
+### Phase 6: Authentication Testing
+Test login form for: account lockout (>10 failed attempts), MFA presence, password policy,
+session timeout, cookie security flags (Secure, HttpOnly, SameSite).
+
+Maps to: PCI DSS 8.3.4/8.4.2, SOC2 CC6.6, ISO 27001 8.5, HIPAA 164.312(d), GDPR Art.25
+
+### Phase 7: Access Control
+  gobuster dir -u {target} -w /wordlists/common.txt -o /output/gobuster.txt
+  http_request url="{target}/.git/HEAD"
+  http_request url="{target}/.env"
+  http_request url="{target}/admin"
+  http_request url="{target}/phpinfo.php"
+
+Maps to: PCI DSS 7.2.1, SOC2 CC6.1, ISO 27001 8.3/8.4, OWASP A01:2021
+
+### Phase 8: GDPR/Privacy Signals
+Check: Cookie consent banner presence and correctness
+Check: Privacy policy link (accessible from homepage)
+Check: Cookie classification (necessary vs analytics vs marketing)
+http_request url="{target}/.well-known/security.txt"
+
+Maps to: GDPR Art.7/13/25, SOC2 P1.0/P2.0
+
+### Phase 9: Network / Port Exposure
+  nmap -sV --open -p 1-65535 {target} -oN /output/nmap_full.txt
+
+Maps to: PCI DSS 1.2.5, ISO 27001 8.20
+
+### Reporting Requirements
+
+**CRITICAL**: In your `report` tool call, you MUST:
+
+1. Set `compliance_frameworks` on EVERY finding with applicable framework names:
+   ["PCI-DSS", "OWASP", "GDPR", "SOC2", "ISO27001", "HIPAA"]
+
+2. Set `owasp_category` on relevant findings:
+   "A01:2021", "A02:2021", "A03:2021", etc.
+
+3. Set `compliance_summary` with overall per-framework status:
+   - owasp_top10: "pass" | "partial" | "fail"
+   - pci_dss: "pass" | "partial" | "fail" | "n/a"
+   - gdpr: "pass" | "partial" | "fail" | "n/a"
+   - soc2: "pass" | "partial" | "fail" | "n/a"
+   - iso27001: "pass" | "partial" | "fail" | "n/a"
+   - hipaa: "pass" | "partial" | "fail" | "n/a"
+   - tls_best_practices: "pass" | "partial" | "fail"
+
+4. Optionally set `compliance_reports` for detailed per-requirement breakdown.
+   The report generator will auto-generate this from findings if not provided.
+   If you provide it, use this structure per framework:
+   {
+     "pci_dss_4": {
+       "overall": "partial",
+       "framework_name": "PCI DSS 4.0",
+       "requirements": [
+         {
+           "id": "6.2.4",
+           "title": "Software engineering techniques prevent common vulnerabilities",
+           "status": "fail",
+           "findings": ["F-003", "F-007"],
+           "evidence": "SQL injection found in /api/search endpoint",
+           "remediation": "Implement parameterized queries"
+         }
+       ],
+       "pass_rate": 0.82,
+       "critical_gaps": 3
+     }
+   }
+
+### Evidence Requirements per Finding
+Each compliance-relevant finding must include:
+- `evidence`: Exact output snippet or proof (tool output, HTTP response, etc.)
+- `affected_urls`: Specific URLs where the issue was found
+- `remediation`: Actionable fix with specific guidance
+- `references`: CVE/OWASP/framework control reference URLs

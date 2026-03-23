@@ -54,6 +54,19 @@ class ReportGenerator:
             return "#17a2b8"
         return "#28a745"
 
+    def _build_compliance_reports(self, report: dict) -> dict:
+        """Generate compliance reports, using agent-provided data or auto-mapping from findings."""
+        # If agent already provided detailed compliance_reports, use them
+        if report.get("compliance_reports"):
+            return report["compliance_reports"]
+        # Auto-generate from findings using the compliance mapper
+        try:
+            from modules.reports.compliance_mapper import generate_compliance_reports
+            return generate_compliance_reports(report)
+        except Exception as e:
+            log.warning("compliance_mapper failed: %s", e)
+            return {}
+
     def generate_html(self, report: dict, scan_info: dict | None = None) -> str:
         """Generate an HTML report from scan data."""
         template = self.env.get_template("report.html")
@@ -65,6 +78,15 @@ class ReportGenerator:
             sev = f.get("severity", "info")
             by_severity[sev] = by_severity.get(sev, 0) + 1
 
+        # Build compliance reports for compliance scan types or when compliance data exists
+        scan_type = (scan_info or {}).get("scan_type", "")
+        has_compliance_data = bool(
+            report.get("compliance_summary") or
+            report.get("compliance_reports") or
+            scan_type in ("compliance", "compliance_audit", "full")
+        )
+        compliance_reports = self._build_compliance_reports(report) if has_compliance_data else {}
+
         context = {
             "report": report,
             "scan": scan_info or {},
@@ -72,6 +94,8 @@ class ReportGenerator:
             "findings_by_severity": by_severity,
             "severity_order": ["critical", "high", "medium", "low", "info"],
             "total_findings": len(findings),
+            "compliance_reports": compliance_reports,
+            "has_compliance": bool(compliance_reports),
         }
 
         return template.render(**context)

@@ -1,0 +1,146 @@
+## SOC 2 Trust Services Criteria — External/Web Testing
+
+SOC 2 is an auditing standard for service organizations covering Security, Availability,
+Processing Integrity, Confidentiality, and Privacy (Trust Services Categories).
+
+The Common Criteria (CC) are required for all SOC 2 reports.
+Additional categories (A, C, PI, P) are optional based on scope.
+
+### CC1 — Control Environment
+- CC1.1  Entity demonstrates commitment to integrity and ethical values
+- CC1.2  Board of directors exercises oversight
+- CC1.3  Management establishes organizational structure and reporting lines
+- CC1.4  Entity demonstrates commitment to competence
+- CC1.5  Entity holds individuals accountable
+
+CONTEXT: Not directly testable via external scan; document-level controls.
+
+### CC2 — Communication and Information
+- CC2.1  Entity obtains/generates/uses relevant, quality information
+- CC2.2  Entity communicates information internally to support functioning of internal control
+- CC2.3  Entity communicates with external parties about matters affecting internal control
+
+TEST: Check for security.txt at /.well-known/security.txt and /security.txt
+      Check for privacy policy and terms of service pages
+TOOLS: http_request url="{target}/.well-known/security.txt"
+
+### CC3 — Risk Assessment
+- CC3.1  Entity specifies objectives with sufficient clarity
+- CC3.2  Entity identifies and analyzes risks
+- CC3.3  Entity considers potential for fraud
+- CC3.4  Entity identifies and assesses changes that could impact internal control
+
+CONTEXT: Not directly testable; requires documentation review.
+
+### CC6 — Logical and Physical Access Controls (Most Testable)
+- CC6.1  Logical access security software, infrastructure, architectures address risk
+          - Authentication mechanisms in place
+          - Access controls restrict unauthorized access
+- CC6.2  Prior to issuing credentials, entity registers and authorizes new users
+- CC6.3  Entity authorizes, modifies, removes access when changes in roles occur
+- CC6.6  Entity implements logical access security measures to protect against threats
+          - Malicious software protection
+          - Detection of unauthorized access attempts
+- CC6.7  Entity restricts transmission/movement of information to authorized parties
+          - TLS for data in transit
+          - Encrypted communication channels
+- CC6.8  Entity implements controls to prevent/detect/act against malware
+
+TEST COMMANDS:
+  testssl --json /output/testssl.json {target}          # CC6.7 - encryption in transit
+  drheader scan single {target} --json > /output/drheader.json  # CC6.1 - security headers
+  nuclei -u {target} -t http/misconfiguration/ -json -o /output/nuclei_misconfig.json
+  gobuster dir -u {target} -w /wordlists/common.txt -o /output/gobuster.txt
+
+FAIL IF (CC6.7): TLS 1.0/1.1 accepted, no HSTS, insecure cookies without Secure flag
+FAIL IF (CC6.1): No authentication on sensitive endpoints, missing authorization checks
+FAIL IF (CC6.6): No account lockout, weak authentication mechanisms
+
+### CC7 — System Operations
+- CC7.1  Entity detects and monitors for vulnerabilities and threats
+          - Vulnerability management program
+          - Continuous monitoring
+- CC7.2  Entity monitors system components for anomalous behavior
+- CC7.3  Entity evaluates security events to determine if they are security incidents
+- CC7.4  Entity responds to identified security incidents
+- CC7.5  Entity recovers from identified security incidents
+
+TEST COMMANDS:
+  nuclei -u {target} -t cves/ -t vulnerabilities/ -json -o /output/nuclei_cves.json
+  nikto -h {target} -Format json -o /output/nikto.json
+
+FAIL IF (CC7.1): Known CVEs present, unpatched vulnerabilities found
+
+### CC8 — Change Management
+- CC8.1  Entity authorizes, designs, develops, acquires, implements, configures, tests,
+         and deploys infrastructure/software to meet objectives
+         - Secure development lifecycle
+         - Security testing before deployment
+
+TEST: Check for version disclosure in headers, outdated software components.
+TOOLS: whatweb {target}; check response headers for Server, X-Powered-By versions
+FAIL IF: Outdated software versions with known vulnerabilities
+
+### CC9 — Risk Mitigation
+- CC9.1  Entity identifies, selects, and develops risk mitigation activities
+- CC9.2  Entity assesses and manages risks associated with vendors/business partners
+
+CONTEXT: Partially testable; check third-party script inclusion security.
+TEST: Inspect page source for third-party scripts loaded without integrity checks (SRI)
+
+### A1 — Availability
+- A1.1  Entity maintains performance objectives and availability commitments
+- A1.2  Environmental protections, software, data backup processes meet objectives
+- A1.3  Recovery plan procedures tested and updated
+
+TEST: Basic availability check; check for rate limiting (protection against DoS)
+TOOLS: http_request to check response times; check for rate limiting headers
+
+### C1 — Confidentiality
+- C1.1  Entity identifies and maintains confidential information
+- C1.2  Entity disposes of confidential information to meet objectives
+
+TEST: Check for information disclosure in error messages, headers, responses.
+FAIL IF: Stack traces in errors, sensitive data in responses, internal IPs disclosed
+
+### PI1 — Processing Integrity
+- PI1.1  Entity obtains/generates/uses relevant, quality information to support processing
+- PI1.2  System inputs are complete, accurate, and valid
+- PI1.3  System outputs are complete, accurate, and distributed according to specifications
+- PI1.4  System processes inputs completely, accurately, timely
+- PI1.5  System stores/maintains information to meet objectives
+
+TEST: Test input validation on forms; check for injection vulnerabilities.
+FAIL IF: SQL injection, XSS, improper input handling
+
+### P1-P8 — Privacy (if personal data processed)
+- P1.0  Privacy notice/policy provided to data subjects
+- P2.0  Choice and consent mechanisms provided
+- P3.0  Collection of personal information limited to stated purposes
+- P4.0  Use, retention, disposal of personal information as stated
+- P5.0  Access to personal information provided to data subjects
+- P6.0  Disclosure to third parties as stated
+- P7.0  Quality and accuracy of personal information maintained
+- P8.0  Monitoring and enforcement of privacy practices
+
+TEST: Check for cookie consent, privacy policy, data subject rights mechanisms.
+TOOLS: Check for cookie consent banner; verify privacy policy link; check cookies set
+
+### Category → SOC2 Criteria Mapping
+ssl_tls_weakness      → CC6.7
+expired_certificate   → CC6.7
+missing_hsts         → CC6.7
+insecure_cookie      → CC6.7
+missing_headers      → CC6.1
+no_account_lockout   → CC6.6
+weak_authentication  → CC6.6
+sql_injection        → PI1.2, CC6.1
+xss                  → PI1.2, CC6.1
+known_cve            → CC7.1
+outdated_component   → CC7.1, CC8.1
+information_disclosure → C1.1
+directory_listing    → CC6.1
+exposed_admin        → CC6.1
+no_privacy_policy    → P1.0
+no_cookie_consent    → P2.0
+missing_sri          → CC9.2
