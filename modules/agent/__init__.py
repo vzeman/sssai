@@ -3,8 +3,8 @@ from pathlib import Path
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 SCAN_TYPES = [
-    "security", "pentest", "performance", "seo", "uptime", "compliance", "full",
-    "api_security", "cloud", "recon", "privacy",
+    "security", "pentest", "performance", "seo", "uptime", "compliance", "compliance_audit",
+    "full", "api_security", "cloud", "recon", "privacy",
 ]
 
 
