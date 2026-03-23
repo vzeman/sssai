@@ -27,13 +27,29 @@ Look for chatbot/AI widgets by analyzing the HTML source of the homepage:
 - Look for API documentation links in HTML
 - `ffuf -u {target}/FUZZ -w /usr/share/wordlists/dirb/common.txt -o /output/ffuf.json -of json`
 
-#### 4. Form Enumeration
+#### 4. GraphQL Detection (CRITICAL — check all targets)
+- Probe common GraphQL endpoints: `/graphql`, `/api/graphql`, `/graphql/v1`, `/query`, `/gql`
+- Send introspection query to each: `POST` with `{{"query":"{{__schema{{queryType{{name}}}}}}"}}`
+- Check response for `data.__schema` — confirms GraphQL
+- `graphw00f -t {target}` to fingerprint GraphQL engine if found
+- If GraphQL detected: record endpoint, whether introspection is enabled, and engine type
+- **If GraphQL found → load `graphql_testing` knowledge and perform deep testing**
+
+#### 5. gRPC Detection (CRITICAL — check all targets)
+- Check HTTP/2 support: `curl -I --http2 {target}` — look for `h2` protocol upgrade
+- Check response headers for `content-type: application/grpc`
+- Probe common gRPC ports: 50051, 9090, 8080, 443
+- `nmap -sV -p 50051,9090,8080 {target} -oN /output/nmap-grpc.txt`
+- Attempt service reflection: `grpcurl -plaintext {target}:50051 list` (try TLS variant without `-plaintext` too)
+- **If gRPC found → load `grpc_testing` knowledge and perform deep testing**
+
+#### 6. Form Enumeration
 - Parse all `<form>` elements from the HTML
 - Identify form types: login, registration, search, contact, file upload, payment
 - Note form fields, methods, actions, and any CSRF tokens
 - Check for hidden forms and JavaScript-rendered forms
 
-#### 5. Authentication Detection
+#### 7. Authentication Detection
 - Check response headers for `Set-Cookie` (session cookies, JWT in cookies)
 - Look for `Authorization: Bearer` patterns in JavaScript
 - Check for OAuth redirect URLs, SSO endpoints
@@ -71,6 +87,8 @@ Call `adapt_plan` to generate your custom test plan. The plan should:
 Then use `load_knowledge` to load the specialized testing methodology you need. Only load what is relevant — common combinations:
 - Found chatbot → `chatbot_testing`
 - Found APIs → `api_testing`
+- Found GraphQL endpoint → `graphql_testing`
+- Found gRPC service → `grpc_testing`
 - Found login form → `auth_testing`
 - Found forms → `form_testing`
 - Security scan → `owasp_testing` + `ssl_tls`

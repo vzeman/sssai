@@ -439,7 +439,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -461,7 +461,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
                     ],
                 },
             },
@@ -544,6 +544,37 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Discovered subdomains",
+                },
+                "graphql_endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Full GraphQL endpoint URL"},
+                            "introspection_enabled": {"type": "boolean", "description": "Whether introspection query succeeded"},
+                            "engine": {"type": "string", "description": "GraphQL engine (Apollo, Hasura, Strawberry, etc.)"},
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected GraphQL endpoints with introspection status",
+                },
+                "grpc_services": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "description": "Host and port (e.g. target:50051)"},
+                            "reflection_enabled": {"type": "boolean", "description": "Whether server reflection is enabled"},
+                            "tls": {"type": "boolean", "description": "Whether TLS is in use"},
+                            "methods": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Discovered RPC method names",
+                            },
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected gRPC services with reflection and method info",
                 },
             },
         },

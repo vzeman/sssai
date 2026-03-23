@@ -402,6 +402,8 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
                 "chatbots_found": len(input.get("chatbots", [])),
                 "apis_found": len(input.get("api_endpoints", [])),
                 "forms_found": len(input.get("forms", [])),
+                "graphql_found": len(input.get("graphql_endpoints", [])),
+                "grpc_found": len(input.get("grpc_services", [])),
                 "timestamp": time.strftime("%H:%M:%S"),
             })
 
@@ -429,6 +431,26 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
             mechs = input["auth_mechanisms"]
             if any("jwt" in m.lower() for m in mechs):
                 suggestions.append("JWT DETECTED — load auth_testing knowledge, test algorithm confusion, weak secrets, token manipulation")
+        if input.get("graphql_endpoints"):
+            for ep in input["graphql_endpoints"]:
+                introspection = ep.get("introspection_enabled", False)
+                engine = ep.get("engine", "unknown")
+                url = ep.get("url", "?")
+                suggestions.append(
+                    f"GRAPHQL DETECTED ({engine}) at {url} "
+                    f"[introspection={'ON' if introspection else 'OFF'}] "
+                    f"— load graphql_testing knowledge and test depth limits, batching, IDOR, injection"
+                )
+        if input.get("grpc_services"):
+            for svc in input["grpc_services"]:
+                host = svc.get("host", "?")
+                reflection = svc.get("reflection_enabled", False)
+                methods = len(svc.get("methods", []))
+                suggestions.append(
+                    f"GRPC SERVICE DETECTED at {host} "
+                    f"[reflection={'ON' if reflection else 'OFF'}, {methods} methods] "
+                    f"— load grpc_testing knowledge and test auth bypass, message fuzzing, metadata injection"
+                )
         if input.get("infrastructure", {}).get("waf"):
             suggestions.append(f"WAF DETECTED ({input['infrastructure']['waf']}) — adapt payloads to bypass WAF rules")
 
