@@ -25,6 +25,7 @@ import httpx
 from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
 from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
+from modules.agent.session_manager import SessionManager
 from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
 
@@ -139,8 +140,21 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             headers = input.get("headers", {})
             follow = input.get("follow_redirects", True)
 
+            # Inject authenticated session if available
+            session_mgr: SessionManager | None = (
+                scan_context.get("_session_manager") if scan_context else None
+            )
+            session_cookies: dict = {}
+            if session_mgr and session_mgr.is_session_valid():
+                merged_headers = {**session_mgr.get_headers(), **headers}
+                session_cookies = session_mgr.get_cookies()
+            else:
+                merged_headers = headers
+
             with httpx.Client(follow_redirects=follow, timeout=30) as client:
-                resp = client.request(method, url, headers=headers)
+                resp = client.request(
+                    method, url, headers=merged_headers, cookies=session_cookies
+                )
 
             output_parts = [
                 f"HTTP/{resp.http_version} {resp.status_code} {resp.reason_phrase}",
@@ -278,6 +292,15 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
 
     elif name == "update_attack_surface":
         return _handle_update_attack_surface(input, scan_context)
+
+    elif name == "get_session_headers":
+        return _handle_get_session_headers(scan_context)
+
+    elif name == "test_auth_endpoint":
+        return _handle_test_auth_endpoint(input, scan_context)
+
+    elif name == "check_session":
+        return _handle_check_session(input, scan_context)
 
     elif name == "report":
         return "__REPORT__"
@@ -468,6 +491,185 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
 
     except Exception as e:
         return f"ERROR: update_attack_surface failed: {e}"
+
+
+# ── Authenticated session tool handlers ──────────────────────────────────
+
+def _handle_get_session_headers(scan_context: dict | None) -> str:
+    """Return session credentials formatted for CLI tool injection."""
+    session_mgr: SessionManager | None = (
+        scan_context.get("_session_manager") if scan_context else None
+    )
+    if not session_mgr:
+        return (
+            "No authentication session configured for this scan. "
+            "To perform authenticated scanning, include an 'auth' key in the scan config."
+        )
+    if not session_mgr.is_authenticated:
+        return "Authentication has not been performed yet or failed during scan initialization."
+    if not session_mgr.is_session_valid():
+        return "Session has expired. Use check_session with reauthenticate=true to refresh."
+
+    info = session_mgr.get_session_info()
+    curl_flags = session_mgr.get_curl_flags()
+    cookie_header = session_mgr.get_cookie_header()
+    headers = session_mgr.get_headers()
+
+    lines = [
+        f"Authentication session active (type: {info['auth_type']})",
+        "",
+        "## curl flags (paste into run_command):",
+        f"  {curl_flags}" if curl_flags else "  (no flags — check query_param auth)",
+        "",
+    ]
+    if cookie_header:
+        lines += ["## Cookie header value:", f"  {cookie_header}", ""]
+    if headers:
+        lines += ["## HTTP headers:"]
+        for k, v in headers.items():
+            # Mask token values to avoid leaking into logs
+            masked = v[:8] + "..." if len(v) > 16 else v
+            lines.append(f"  {k}: {masked}")
+        lines.append("")
+    lines += [
+        "## Example usages:",
+        f"  curl {curl_flags} https://target.com/api/profile",
+        f"  nuclei -u https://target.com -H 'Cookie: {cookie_header}' -t /path/to/templates",
+    ]
+    return "\n".join(lines)
+
+
+def _handle_test_auth_endpoint(input: dict, scan_context: dict | None) -> str:
+    """Test an endpoint with and without authentication, compare results."""
+    try:
+        url = input["url"]
+        method = input.get("method", "GET")
+        extra_headers = input.get("extra_headers", {})
+        body = input.get("body")
+
+        session_mgr: SessionManager | None = (
+            scan_context.get("_session_manager") if scan_context else None
+        )
+
+        results = {}
+        for label, use_auth in [("unauthenticated", False), ("authenticated", True)]:
+            headers = dict(extra_headers)
+            cookies: dict = {}
+
+            if use_auth and session_mgr and session_mgr.is_session_valid():
+                headers = {**session_mgr.get_headers(), **headers}
+                cookies = session_mgr.get_cookies()
+            elif use_auth and not session_mgr:
+                results[label] = {"skipped": "No session configured"}
+                continue
+
+            try:
+                with httpx.Client(follow_redirects=True, timeout=20) as client:
+                    req_kwargs: dict = {
+                        "headers": headers,
+                        "cookies": cookies,
+                    }
+                    if body and method == "POST":
+                        req_kwargs["content"] = body.encode()
+                    resp = client.request(method, url, **req_kwargs)
+
+                results[label] = {
+                    "status_code": resp.status_code,
+                    "content_length": len(resp.content),
+                    "final_url": str(resp.url),
+                    "content_type": resp.headers.get("content-type", ""),
+                    "body_preview": resp.text[:500],
+                }
+            except Exception as exc:
+                results[label] = {"error": str(exc)}
+
+        # Build comparison summary
+        lines = [f"## Auth vs Unauth comparison for {url}", ""]
+        for label in ("unauthenticated", "authenticated"):
+            r = results.get(label, {})
+            if "skipped" in r:
+                lines.append(f"### {label.capitalize()}: SKIPPED — {r['skipped']}")
+            elif "error" in r:
+                lines.append(f"### {label.capitalize()}: ERROR — {r['error']}")
+            else:
+                lines += [
+                    f"### {label.capitalize()}:",
+                    f"  Status: {r.get('status_code')}",
+                    f"  Content-Length: {r.get('content_length')} bytes",
+                    f"  Final URL: {r.get('final_url')}",
+                    f"  Content-Type: {r.get('content_type')}",
+                    f"  Body preview: {r.get('body_preview', '')[:200]}",
+                    "",
+                ]
+
+        unauth = results.get("unauthenticated", {})
+        auth = results.get("authenticated", {})
+        if (
+            unauth.get("status_code") and auth.get("status_code")
+            and not unauth.get("error") and not auth.get("error")
+        ):
+            lines.append("## Analysis:")
+            if unauth["status_code"] in (401, 403) and auth["status_code"] == 200:
+                lines.append("  ACCESS CONTROL WORKING — endpoint requires auth (401/403 unauth, 200 auth)")
+            elif unauth["status_code"] == 200 and auth["status_code"] == 200:
+                size_diff = abs(auth["content_length"] - unauth["content_length"])
+                if size_diff > 100:
+                    lines.append(
+                        f"  DIFFERENT CONTENT — both return 200 but size differs by {size_diff} bytes "
+                        f"(authenticated gets more/different data — check for hidden fields/endpoints)"
+                    )
+                else:
+                    lines.append("  SAME RESPONSE — endpoint does not appear to be auth-gated")
+            elif unauth["status_code"] == 200 and auth["status_code"] != 200:
+                lines.append(
+                    f"  UNEXPECTED — unauth returns 200, auth returns {auth['status_code']} "
+                    f"(possible session issue or CSRF protection)"
+                )
+            if unauth.get("final_url") != auth.get("final_url"):
+                lines.append(
+                    f"  REDIRECT DIFFERENCE — unauth redirects to {unauth.get('final_url')}, "
+                    f"auth stays at {auth.get('final_url')}"
+                )
+
+        return "\n".join(lines)
+
+    except Exception as exc:
+        return f"ERROR: test_auth_endpoint failed: {exc}"
+
+
+def _handle_check_session(input: dict, scan_context: dict | None) -> str:
+    """Check session validity and optionally re-authenticate."""
+    session_mgr: SessionManager | None = (
+        scan_context.get("_session_manager") if scan_context else None
+    )
+    if not session_mgr:
+        return "No authentication session configured for this scan."
+
+    info = session_mgr.get_session_info()
+    lines = [
+        f"Auth type: {info['auth_type']}",
+        f"Authenticated: {info['authenticated']}",
+        f"Session valid: {info['session_valid']}",
+        f"Cookie names: {info['cookie_names']}",
+        f"Auth header names: {info['auth_header_names']}",
+    ]
+    if info.get("token_expiry"):
+        remaining = info["token_expiry"] - time.time()
+        lines.append(f"Token expires in: {int(remaining)}s")
+
+    reauthenticate = input.get("reauthenticate", False)
+    if reauthenticate and not info["session_valid"]:
+        lines.append("")
+        lines.append("Session invalid — attempting re-authentication...")
+        result = session_mgr.authenticate()
+        if result.get("success"):
+            lines.append(f"Re-authentication succeeded: {result}")
+        else:
+            lines.append(f"Re-authentication failed: {result.get('error', 'unknown error')}")
+    elif reauthenticate and info["session_valid"]:
+        lines.append("Session is still valid — no re-authentication needed.")
+
+    return "\n".join(lines)
 
 
 # ── Web search ───────────────────────────────────────────────────────────
@@ -1482,7 +1684,7 @@ def _save_scan_checkpoint(scan_id, target, scan_type, config, iteration,
         "scan_id": scan_id,
         "target": target,
         "scan_type": scan_type,
-        "config": {k: v for k, v in (config or {}).items() if k != "resume_context"},
+        "config": {k: v for k, v in (config or {}).items() if k not in ("resume_context", "auth")},
         "iteration": iteration,
         "commands_executed": commands_executed,
         "start_time": start_time,
@@ -1561,6 +1763,42 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "_token_tracker": token_tracker,
     }
 
+    # ── Authenticated session setup ──
+    auth_config = config.get("auth")
+    auth_status_msg: str | None = None
+    if auth_config:
+        try:
+            session_mgr = SessionManager(auth_config)
+            auth_result = session_mgr.authenticate()
+            scan_context["_session_manager"] = session_mgr
+            if auth_result.get("success"):
+                auth_summary = (
+                    f"type={auth_result.get('auth_type', auth_config.get('type'))}, "
+                    f"cookies={auth_result.get('cookies_obtained', auth_result.get('cookies_set', []))}"
+                )
+                auth_status_msg = f"Authenticated session established ({auth_summary})"
+                log.info("Scan %s: auth session established (%s)", scan_id, auth_config.get("type"))
+                _log_activity(scan_id, {
+                    "type": "auth",
+                    "message": auth_status_msg,
+                    "timestamp": time.strftime("%H:%M:%S"),
+                })
+            else:
+                auth_status_msg = (
+                    f"Authentication failed ({auth_config.get('type')}): "
+                    f"{auth_result.get('error', 'unknown error')}. "
+                    "Proceeding with unauthenticated scan."
+                )
+                log.warning("Scan %s: auth failed: %s", scan_id, auth_result.get("error"))
+                _log_activity(scan_id, {
+                    "type": "auth",
+                    "message": auth_status_msg,
+                    "timestamp": time.strftime("%H:%M:%S"),
+                })
+        except Exception as exc:
+            auth_status_msg = f"Auth session setup error: {exc}. Proceeding unauthenticated."
+            log.error("Scan %s: auth setup exception: %s", scan_id, exc)
+
     # ── Planning step ──
     _log_activity(scan_id, {
         "type": "phase",
@@ -1588,6 +1826,40 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "to save context space. Trust the summary — do NOT re-run tools already mentioned in it. "
         "Continue from where the summary leaves off."
     )
+
+    # Add authenticated session awareness
+    if auth_config:
+        auth_type = auth_config.get("type", "unknown")
+        if auth_status_msg and "established" in auth_status_msg:
+            session_mgr = scan_context.get("_session_manager")
+            session_info = session_mgr.get_session_info() if session_mgr else {}
+            system_prompt += (
+                f"\n\n## Authenticated Scanning Mode\n"
+                f"An authenticated session has been established ({auth_type}). "
+                f"Session cookies: {session_info.get('cookie_names', [])}. "
+                f"Auth headers: {session_info.get('auth_header_names', [])}.\n\n"
+                "**IMPORTANT — How authenticated scanning works:**\n"
+                "- All `http_request` tool calls automatically include the session cookies/headers\n"
+                "- For CLI tools (curl, nuclei, sqlmap, ffuf, etc.) use `get_session_headers` to get\n"
+                "  the curl flags and inject them into your commands\n"
+                "- Use `test_auth_endpoint` to compare authenticated vs unauthenticated responses\n"
+                "- Use `check_session` to verify the session is still valid\n\n"
+                "**Authenticated attack surface to test:**\n"
+                "1. Discover authenticated-only endpoints (profile, settings, admin, API)\n"
+                "2. Map the authenticated attack surface with `update_attack_surface`\n"
+                "3. Test for privilege escalation (access admin endpoints as regular user)\n"
+                "4. Test for IDOR (Insecure Direct Object References) — try other users' IDs\n"
+                "5. Test horizontal access control (access other users' resources)\n"
+                "6. Compare authenticated vs unauthenticated responses on all endpoints\n"
+                "7. Test session management: timeout, fixation, concurrent sessions, logout\n"
+                "8. Load `auth_testing` knowledge for detailed methodology\n"
+            )
+        else:
+            system_prompt += (
+                f"\n\n## Authenticated Scanning (Session Setup Failed)\n"
+                f"Auth type '{auth_type}' was configured but setup failed: {auth_status_msg}\n"
+                "Proceeding with unauthenticated scan. Consider investigating the auth mechanism manually.\n"
+            )
 
     # Add chat/human interaction awareness
     system_prompt += (

@@ -1,41 +1,146 @@
 ## Authentication & Session Security Testing
 
-### Login Form Testing
-- Test password policy (weak password acceptance)
-- Brute force protection: `hydra -l admin -P /usr/share/wordlists/rockyou.txt {target} http-form-post`
-- Account lockout mechanism (does it exist? How many attempts?)
-- Error message enumeration (different messages for valid/invalid users?)
-- Credential stuffing protection
+### Using Authenticated Sessions
+If the scan has an authenticated session configured, `http_request` automatically injects
+session cookies and headers. For CLI tools, call `get_session_headers` first to obtain
+the curl flags, then embed them in your commands:
 
-### Session Management
-- Cookie flags: Secure, HttpOnly, SameSite attributes
-- Session fixation: Can you set session before auth and reuse after?
-- Session timeout: How long until session expires?
-- Concurrent session handling
-- Session invalidation on logout
+```
+# Get session flags
+get_session_headers → returns: -H 'Authorization: Bearer ...' -b 'session=abc; csrf=xyz'
+
+# Use in curl
+curl <session_flags> https://target.com/api/profile -v
+
+# Use in nuclei
+nuclei -u https://target.com -H 'Cookie: session=abc' -t /nuclei-templates/
+
+# Use in sqlmap
+sqlmap -u "https://target.com/api/user?id=1" --cookie="session=abc" --level=3
+
+# Use in ffuf (discover authenticated endpoints)
+ffuf -u https://target.com/FUZZ -w /wordlists/api.txt -H 'Cookie: session=abc'
+```
+
+Always use `test_auth_endpoint` to compare authenticated vs unauthenticated responses
+before declaring whether an endpoint requires auth.
+
+### Authenticated Attack Surface Discovery
+1. Crawl authenticated pages for new links, forms, API calls not visible unauthenticated
+2. Check common authenticated paths: /profile, /settings, /dashboard, /admin, /account,
+   /api/me, /api/user, /api/users, /api/admin, /manage, /console
+3. Compare JS bundles: authenticated vs unauthenticated (different routes loaded?)
+4. Check for admin/privileged routes referenced in JS: /admin, /superuser, /internal
+5. Map all API endpoints with `ffuf` using session cookies
+
+### Privilege Escalation Testing
+- Access admin endpoints as regular user: /admin, /admin/users, /admin/settings
+- Try IDOR on admin actions: PUT /api/users/1/role with {"role":"admin"}
+- Test parameter tampering: change `user_id`, `account_id`, `org_id` params
+- Check JWT claims: decode token, try modifying `role`, `admin`, `is_superuser` fields
+- Test vertical escalation: perform admin-only actions (delete users, change settings)
+
+```
+# Try accessing admin endpoints
+curl <session_flags> https://target.com/api/admin/users
+curl <session_flags> https://target.com/api/admin/settings
+curl <session_flags> -X POST https://target.com/api/users/1/promote
+```
+
+### IDOR (Insecure Direct Object Reference) Testing
+- Find endpoints with numeric IDs: /api/invoices/123, /api/orders/456
+- Try sequential IDs to access other users' resources: /api/orders/122, /api/orders/124
+- Try UUIDs of other resources if you can enumerate them
+- Test both GET (read IDOR) and POST/PUT/DELETE (write/delete IDOR)
+- Check image/file endpoints: /uploads/user_123/avatar.jpg → change to /uploads/user_124/
+
+```
+# IDOR test — enumerate IDs around your own
+for i in $(seq 1 20); do
+  curl -s <session_flags> https://target.com/api/invoices/$i -o /output/idor_$i.json
+done
+# Then compare: which ones returned data vs 403?
+```
+
+### Horizontal Access Control Testing
+- Two-account testing: create two accounts, test if account A can access account B's data
+- Substitute your user ID with another user ID in all requests
+- Test tenant isolation in multi-tenant apps: change org_id/tenant_id in requests
+- Test shared resource access: documents, files, projects
+
+```
+# Common access control test patterns
+curl <session_flags> https://target.com/api/messages?user_id=OTHER_USER_ID
+curl <session_flags> https://target.com/api/documents/OTHER_USER_DOC_ID
+curl <session_flags> -X PUT https://target.com/api/users/OTHER_USER_ID/email \
+  -H 'Content-Type: application/json' -d '{"email":"attacker@evil.com"}'
+```
+
+### Session Management Testing
+- **Timeout**: Note session start time, wait for timeout (check app docs), verify session dies
+- **Fixation**: Set session cookie before auth → does it change after login?
+  ```
+  curl -c /tmp/cookies.txt https://target.com/login  # get pre-auth session
+  # Log in with pre-auth session
+  curl -b /tmp/cookies.txt -c /tmp/cookies.txt -d 'user=...&pass=...' https://target.com/login
+  # Does the session ID change? It should!
+  ```
+- **Logout**: After logout, reuse old session token → does it work?
+  ```
+  # Save token, logout, then try to use saved token
+  OLD_TOKEN="<saved_session_cookie>"
+  # logout first, then:
+  curl -b "session=$OLD_TOKEN" https://target.com/api/profile  # should 401
+  ```
+- **Concurrent**: Log in from two places simultaneously — does first session get invalidated?
+- **Cookie flags**: Check Secure, HttpOnly, SameSite attributes via http_request response headers
+
+### Login Form Testing
+- Brute force protection: `hydra -l admin -P /usr/share/wordlists/rockyou.txt {target} http-form-post`
+- Account lockout mechanism (does it exist? How many attempts before lockout?)
+- Error message enumeration: different messages for valid vs invalid usernames?
+- Credential stuffing protection: rate limiting, CAPTCHA, device fingerprinting
+- Username enumeration via timing differences in responses
 
 ### JWT Testing
-- Algorithm confusion (RS256 → HS256, none algorithm)
-- Weak signing secrets (brute force with jwt-cracker)
-- Token expiry validation
-- Token refresh mechanism
-- Token revocation/blacklist
-- Claims manipulation (modify sub, role, admin claims)
+- Algorithm confusion (RS256 → HS256, none algorithm):
+  ```
+  python3 -c "
+  import base64, json
+  # Decode and inspect JWT claims
+  token = 'YOUR_JWT_TOKEN'
+  parts = token.split('.')
+  header = json.loads(base64.b64decode(parts[0] + '=='))
+  payload = json.loads(base64.b64decode(parts[1] + '=='))
+  print('Header:', header)
+  print('Payload:', payload)
+  "
+  ```
+- Weak signing secrets: `hashcat -a 0 -m 16500 <jwt> /usr/share/wordlists/rockyou.txt`
+- Token expiry validation: use an expired token
+- Claims manipulation: modify sub, role, admin claims (requires weak secret)
+- Token revocation/blacklist testing
 
 ### OAuth/SSO Testing
 - Open redirect in OAuth callback URLs
-- CSRF in OAuth flow (state parameter)
+- CSRF in OAuth flow (state parameter missing or not validated)
 - Token leakage via referrer headers
-- Scope escalation
+- Scope escalation (request more scopes than allowed)
 
 ### Multi-Factor Authentication
-- 2FA bypass techniques
-- Backup code handling
-- Rate limiting on 2FA verification
-- Session management after 2FA
+- 2FA bypass techniques (check if authenticated endpoints accessible before 2FA completes)
+- Backup code handling (predictable? Single-use?)
+- Rate limiting on 2FA verification code submissions
+- Session management after 2FA: does session upgrade after MFA completion?
 
 ### Password Reset
-- Token predictability
-- Token expiry
-- Account enumeration via reset
-- Email header injection
+- Token predictability (sequential, time-based)
+- Token expiry enforcement
+- Account enumeration via reset (different response for valid vs invalid email)
+- Email header injection in forgot-password form
+
+### API Authentication Testing
+- Try accessing API endpoints without auth token
+- Test token scope: use limited-scope token on privileged endpoints
+- Test API key rotation: old keys still work after rotation?
+- Test service-to-service auth: internal endpoints accessible from outside?
