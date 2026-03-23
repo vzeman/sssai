@@ -1,0 +1,170 @@
+# Breach & Dark Web Monitoring — Testing Methodology
+
+## Overview
+
+Breach monitoring determines whether the target domain, its employees, or associated credentials
+have appeared in publicly known data breaches or dark web dumps. This intelligence informs the
+broader security posture assessment and prioritises defensive actions.
+
+---
+
+## Phase 0 Integration (Always Run for Security/Pentest Scans)
+
+Run these tools at the START of every security scan before active testing:
+
+### 1. Domain Breach Check (HIBP API)
+
+```
+breach_check(domain="example.com")
+```
+
+Returns: breach names, dates, data types, affected account counts.
+
+### 2. Credential Leak Discovery
+
+```
+credential_leak_check(domain="example.com")
+```
+
+Checks common email patterns (admin@, info@, security@, contact@) against holehe and related tools
+to identify services where domain emails are registered — indicating credential exposure surface.
+
+### 3. Supplementary Shell Tools
+
+```bash
+# Check breach-parse datasets (if local breach data is available)
+breach-parse @example.com /output/breach-parse.txt
+
+# holehe — check if email is registered on 120+ services
+holehe admin@example.com --only-used --output /output/holehe.txt
+
+# theHarvester — gather emails from public sources for deeper checking
+theHarvester -d example.com -b all -f /output/harvester.json
+```
+
+---
+
+## Breach Findings — Severity Mapping
+
+| Condition | Severity | Rationale |
+|-----------|----------|-----------|
+| Active credentials exposed (password + email combo) | Critical | Immediate account takeover risk |
+| Plaintext or weakly-hashed passwords in breach | Critical | Direct credential risk |
+| Recent breach (< 1 year) with passwords | High | Passwords likely still valid |
+| Old breach (> 2 years) with passwords | Medium | Passwords may be rotated |
+| Breach with PII only (names, addresses, phones) | Medium | Phishing/social engineering risk |
+| Breach with email addresses only | Low | Spam/phishing surface |
+| Breach with non-sensitive metadata | Info | Low direct risk |
+
+---
+
+## Report — Breach Exposure Summary Section
+
+When breaches are found, populate the `breach_exposure` field in the report tool:
+
+```json
+{
+  "breach_exposure": {
+    "breaches_found": [
+      {
+        "breach_name": "ExampleBreach2023",
+        "breach_date": "2023-06-15",
+        "data_types": ["Email addresses", "Passwords", "Phone numbers"],
+        "affected_accounts": 125000,
+        "source": "HIBP"
+      }
+    ],
+    "credential_leaks": [
+      {
+        "email": "admin@example.com",
+        "services_exposed": ["GitHub", "LinkedIn", "Dropbox"],
+        "risk_level": "high"
+      }
+    ],
+    "total_breaches": 2,
+    "total_affected_accounts": 150000,
+    "new_since_last_scan": ["ExampleBreach2023"],
+    "summary": "Domain example.com appears in 2 known data breaches affecting 150,000 accounts. Most recent breach (June 2023) included password hashes."
+  }
+}
+```
+
+Also create a standard finding entry for each significant breach:
+
+```json
+{
+  "title": "Domain Found in Data Breach: ExampleBreach2023",
+  "severity": "high",
+  "category": "breach_exposure",
+  "description": "The domain example.com appears in the ExampleBreach2023 data breach (2023-06-15). 125,000 accounts were compromised with email addresses and password hashes exposed.",
+  "evidence": "HIBP API confirmed domain presence. Data types: Email addresses, Passwords. Affected: 125,000 accounts.",
+  "compliance_frameworks": ["GDPR", "PCI-DSS"],
+  "remediation": "Force password resets for all domain email accounts. Implement MFA across all services. Review and rotate API keys. Notify affected users per GDPR Article 33 if data processor.",
+  "remediation_priority": "immediate"
+}
+```
+
+---
+
+## Scheduled Daily Monitoring
+
+For clients with scheduled scanning enabled, breach monitoring should run daily:
+
+1. Use the `breach_check` tool with the domain
+2. Compare results against previous scan using `compare_results`
+3. If `new_since_last_scan` is non-empty — trigger a notification immediately
+4. Notification severity: `critical` if passwords exposed, `warning` if PII only
+
+### Notification Trigger Logic
+
+```python
+# After breach_check completes:
+if new_breaches:
+    severity = "critical" if any password-related data_types else "warning"
+    # The notification dispatcher will send Slack/Discord/email alerts
+    # based on configured channels with min_severity threshold
+```
+
+---
+
+## Key Data Sources
+
+| Source | Access | Coverage |
+|--------|--------|----------|
+| Have I Been Pwned (HIBP) | API key (HIBP_API_KEY env var) | 12B+ accounts, 700+ breaches |
+| DeHashed | API key (DEHASHED_API_KEY env var) | Credential search |
+| holehe | CLI, no key needed | 120+ service email checks |
+| breach-parse | CLI, local dataset | Local breach data |
+| theHarvester | CLI, no key needed | Email enumeration from public sources |
+
+---
+
+## Remediation Guidance Template
+
+For any breach findings, include these remediations:
+
+**Immediate (if passwords exposed):**
+- Force password resets for all accounts with @domain email addresses
+- Revoke all active sessions / API tokens
+- Enable MFA on all services
+- Alert IT/security team for incident response
+
+**Short-term:**
+- Implement credential stuffing protection (rate limiting, CAPTCHA on login)
+- Set up ongoing breach monitoring (daily scheduled scan)
+- Review third-party service accounts registered with domain emails
+
+**Long-term:**
+- Adopt password manager policy for all staff
+- Implement SSO to reduce credential sprawl
+- Subscribe to HIBP Enterprise notifications for real-time alerts
+- GDPR: Assess notification obligations (72-hour rule for processors)
+
+---
+
+## Compliance Implications
+
+- **GDPR Article 33**: Data processors must notify supervisory authority within 72 hours of becoming aware of a breach
+- **PCI-DSS Requirement 12.10**: Maintain an incident response plan; breaches may trigger PCI audit
+- **HIPAA**: If PHI was exposed, breach notification rules apply
+- **SOC 2**: Breach exposure affects availability and confidentiality trust service criteria

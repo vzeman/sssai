@@ -1,0 +1,147 @@
+## PCI DSS 4.0 Control Catalog — External/Web Testing
+
+PCI DSS 4.0 applies to any entity that stores, processes, or transmits cardholder data.
+Use this module when payment forms, card data endpoints, or e-commerce flows are detected.
+
+### Requirement 1: Install and Maintain Network Security Controls
+- 1.2.1  Configuration standards for all network security controls
+- 1.2.5  All services, protocols, and ports allowed are identified and approved
+- 1.3.2  Inbound traffic to the CDE restricted to what is necessary
+- 1.3.3  Outbound traffic from the CDE restricted to what is necessary
+
+TEST: Scan for open ports beyond 80/443. Check for exposed admin panels, databases.
+TOOLS: nmap -sV {target}; check for unexpected exposed services
+
+### Requirement 2: Apply Secure Configurations
+- 2.2.1  System components use vendor-supported software
+- 2.2.5  All unnecessary functionality removed
+- 2.2.7  All non-console administrative access encrypted (no telnet/FTP/HTTP admin)
+- 2.3.1  Wireless environments: change default settings, strong encryption (WPA3 or WPA2)
+
+TEST: Check server headers for version disclosure. Look for admin interfaces on HTTP.
+TOOLS: whatweb {target}; curl -I {target}; check for /admin, /phpmyadmin etc on HTTP
+
+### Requirement 3: Protect Stored Account Data
+- 3.3.1  SAD (Sensitive Authentication Data) not retained after authorization
+- 3.4.1  PAN rendered unreadable in storage (encryption, masking, hashing)
+- 3.5.1  Primary Account Number (PAN) secured with strong cryptography
+
+TEST: Check if card numbers appear in responses/error messages/logs.
+INSPECT: Form submission responses, error messages for PAN data leakage.
+
+### Requirement 4: Protect Cardholder Data with Strong Cryptography
+- 4.2.1  Strong cryptography for all open, public networks transmitting CHD
+          - TLS 1.2+ required; TLS 1.3 preferred
+          - No SSL, TLS 1.0, TLS 1.1
+          - No weak ciphers (RC4, DES, 3DES, EXPORT ciphers)
+- 4.2.1.1 Certificate inventory maintained
+- 4.2.2  PANs sent via messaging technologies protected
+
+TEST COMMANDS:
+  testssl --json /output/testssl.json {target}
+  sslyze {target} --json_out /output/sslyze.json
+  openssl s_client -connect {target}:443 -tls1_1 (should reject)
+  openssl s_client -connect {target}:443 -tls1 (should reject)
+
+FAIL IF: TLS 1.0 or 1.1 accepted, SSL accepted, weak ciphers available, self-signed cert,
+         expired certificate, HSTS missing, mixed content (HTTP resources on HTTPS page)
+
+### Requirement 5: Protect All Systems and Networks from Malicious Software
+- 5.2.2  Anti-malware solutions detect known malware
+- 5.3.3  Anti-malware mechanisms and processes updated
+
+TEST: Check for malware indicators in JS includes, iframes, unexpected redirects.
+INSPECT: View source for suspicious external scripts, obfuscated code.
+
+### Requirement 6: Develop and Maintain Secure Systems and Software
+- 6.2.4  Software engineering techniques address common vulnerabilities:
+          - Injection flaws (SQLi, command injection, LDAP injection, XPath injection)
+          - XSS (reflected, stored, DOM-based)
+          - Improper access control
+          - Security misconfigurations
+          - Cryptographic failures
+          - Insecure deserialization
+          - Broken authentication
+          - SSRF
+- 6.3.3  All software components protected from known vulnerabilities
+          - CVE patching; components up to date
+- 6.4.1  Public-facing web applications protected against attacks
+          - WAF in place OR DAST performed
+- 6.4.3  All payment page scripts managed and authorized
+- 6.5.6  Bespoke and custom software security addressed
+
+TEST COMMANDS:
+  sqlmap -u "{target}/search?q=1" --batch --level=3 (check for SQLi)
+  nuclei -u {target} -t vulnerabilities/ -t cves/ -json -o /output/nuclei_vulns.json
+  nuclei -u {target} -t http/technologies/ -json -o /output/nuclei_tech.json
+  wapiti -u {target} -f json -o /output/wapiti.json --flush-session
+  nikto -h {target} -Format json -o /output/nikto.json
+
+FAIL IF: SQLi found, XSS found, command injection found, known CVEs present, outdated components
+
+### Requirement 7: Restrict Access to System Components and Cardholder Data
+- 7.2.1  All access to system components and data access is restricted
+- 7.2.2  Access assigned based on job classification and function (least privilege)
+- 7.2.3  Required privileges are approved by authorized personnel
+- 7.3.1  Access control system(s) in place to restrict access
+
+TEST: Check for directory listing, unauthorized access to admin paths, unauthenticated API endpoints.
+TOOLS: gobuster dir -u {target} -w /wordlists/common.txt; check for exposed .git, .env, backup files
+
+### Requirement 8: Identify Users and Authenticate Access
+- 8.2.1  All user IDs and authentication credentials managed properly
+- 8.3.4  Invalid authentication attempts (account lockout after ≤10 attempts)
+- 8.3.6  Passwords meet minimum complexity:
+          - Minimum 12 characters (or 8 if TOTP/MFA also required)
+          - Uppercase, lowercase, numbers, special characters
+- 8.3.9  Passwords changed at least every 90 days (if not MFA)
+- 8.4.2  MFA implemented for all access into the CDE
+- 8.6.1  System/application accounts managed to prevent misuse
+
+TEST: Attempt login with weak/default credentials. Test account lockout behavior.
+TOOLS: Check login response for lockout messages after repeated failures.
+       hydra -l admin -P /wordlists/top100.txt {target} http-post-form "/login:user=^USER^&pass=^PASS^:Invalid"
+
+FAIL IF: No account lockout, weak password policy, default credentials work, no MFA on admin
+
+### Requirement 10: Log and Monitor All Access
+- 10.2.1  Audit logs capture all individual user access to cardholder data
+- 10.3.3  Audit log files protected (not tamperable by users)
+- 10.7.1  Failures of critical security controls detected and reported
+
+TEST: Check if error pages expose stack traces, SQL errors, debug information.
+INSPECT: Response headers for debug info; verbose error messages.
+
+### Requirement 11: Test Security of Systems and Networks Regularly
+- 11.3.1  Internal vulnerability scans performed quarterly
+- 11.3.2  External vulnerability scans performed by ASV quarterly
+- 11.4.1  Penetration testing methodology exists and is implemented
+- 11.4.2  Internal penetration testing performed annually
+- 11.4.3  External penetration testing performed annually
+- 11.5.1  Intrusion-detection/prevention techniques detect and alert on covert malware
+
+TEST: Run comprehensive vulnerability scan.
+TOOLS: nuclei -u {target} -t cves/ -t vulnerabilities/ -json -o /output/nuclei_full.json
+
+### Category → Requirement Mapping (for finding classification)
+ssl_tls_weakness      → 4.2.1
+expired_certificate   → 4.2.1
+weak_cipher          → 4.2.1
+missing_hsts         → 4.2.1
+sql_injection        → 6.2.4
+xss                  → 6.2.4
+csrf                 → 6.2.4
+ssrf                 → 6.2.4
+command_injection    → 6.2.4
+known_cve            → 6.3.3
+outdated_component   → 6.3.3
+directory_listing    → 7.2.1
+exposed_admin        → 7.2.1
+no_account_lockout   → 8.3.4
+weak_password_policy → 8.3.6
+default_credentials  → 8.2.1
+no_mfa               → 8.4.2
+information_disclosure → 3.4.1
+open_ports           → 1.2.5
+missing_headers      → 6.2.4
+insecure_cookie      → 6.2.4

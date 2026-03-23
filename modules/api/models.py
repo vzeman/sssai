@@ -26,6 +26,25 @@ class User(Base):
     monitors: Mapped[list["Monitor"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     scheduled_scans: Mapped[list["ScheduledScan"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notification_channels: Mapped[list["NotificationChannel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String, default="")
+    scan_type: Mapped[str] = mapped_column(String, default="security")
+    status: Mapped[str] = mapped_column(String, default="running")  # running, completed, failed
+    targets: Mapped[list] = mapped_column(JSON, default=list)
+    config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    aggregate_risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="campaigns")
+    scans: Mapped[list["Scan"]] = relationship(back_populates="campaign")
 
 
 class Scan(Base):
@@ -42,11 +61,13 @@ class Scan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     schedule_id: Mapped[str | None] = mapped_column(ForeignKey("scheduled_scans.id"), nullable=True)
+    campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
     total_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     total_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
 
     user: Mapped["User"] = relationship(back_populates="scans")
+    campaign: Mapped["Campaign | None"] = relationship(back_populates="scans")
 
 
 class Monitor(Base):
@@ -102,6 +123,27 @@ class ScheduledScan(Base):
     user: Mapped["User"] = relationship(back_populates="scheduled_scans")
 
 
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    target: Mapped[str] = mapped_column(String, index=True)  # parent scan target (e.g. example.com)
+    asset_type: Mapped[str] = mapped_column(String)  # domain, subdomain, ip, api_endpoint, service, certificate, dns_record
+    hostname: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    service: Mapped[str | None] = mapped_column(String, nullable=True)
+    technology: Mapped[str | None] = mapped_column(String, nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # additional metadata
+    first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    scan_id: Mapped[str | None] = mapped_column(String, nullable=True)  # last scan that discovered/updated this
+
+    user: Mapped["User"] = relationship(back_populates="assets")
+
+
 class NotificationChannel(Base):
     __tablename__ = "notification_channels"
 
@@ -115,3 +157,20 @@ class NotificationChannel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="notification_channels")
+
+
+class WebhookConfig(Base):
+    __tablename__ = "webhook_configs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String)
+    key_prefix: Mapped[str] = mapped_column(String, index=True)  # first 8 chars for lookup
+    key_hash: Mapped[str] = mapped_column(String)  # bcrypt hash for verification
+    gates: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # default quality gates
+    scan_type: Mapped[str] = mapped_column(String, default="security")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="webhook_configs")
