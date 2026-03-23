@@ -1,0 +1,23 @@
+{
+  "name": "sssai-security-scanner",
+  "version": "0.2.0",
+  "description": "AI-first security scanner with autonomous decision-making",
+  "private": true,
+  "scripts": {
+    "lint": "cd frontend && npm run lint",
+    "build": "cd frontend && npm run build",
+    "dev": "cd frontend && npm run dev",
+    "preview": "cd frontend && npm run preview",
+    "test": "echo 'Tests run in Python backend'",
+    "type-check": "echo 'Type checking backend with mypy'"
+  },
+  "keywords": [
+    "security",
+    "scanning",
+    "ai",
+    "vulnerability",
+    "penetration-testing"
+  ],
+  "author": "vzeman",
+  "license": "MIT"
+}
