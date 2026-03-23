@@ -210,3 +210,7 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     
     user: Mapped["User"] = relationship(back_populates="audit_logs")
+
+
+# Alias for backward compatibility
+AssetInventory = Asset
