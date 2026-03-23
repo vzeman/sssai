@@ -237,6 +237,14 @@ TOOLS = [
                             },
                             "description": {"type": "string"},
                             "evidence": {"type": "string"},
+                            "cvss_score": {
+                                "type": "number",
+                                "description": "CVSS base score (0.0–10.0). Will be auto-calculated if omitted.",
+                            },
+                            "cvss_vector": {
+                                "type": "string",
+                                "description": "CVSS vector string (e.g., 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'). Will be auto-calculated if omitted.",
+                            },
                             "cve_ids": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -295,12 +303,52 @@ TOOLS = [
                 },
                 "compliance_summary": {
                     "type": "object",
-                    "description": "Compliance status per framework",
+                    "description": "High-level compliance status per framework",
                     "properties": {
                         "owasp_top10": {"type": "string", "enum": ["pass", "partial", "fail"]},
                         "pci_dss": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "gdpr": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "soc2": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "iso27001": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
+                        "hipaa": {"type": "string", "enum": ["pass", "partial", "fail", "n/a"]},
                         "tls_best_practices": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                    },
+                },
+                "compliance_reports": {
+                    "type": "object",
+                    "description": (
+                        "Detailed per-requirement compliance reports for each framework. "
+                        "Include this when performing a compliance_audit scan or when findings "
+                        "map to specific compliance requirements. Each key is a framework ID "
+                        "(pci_dss_4, soc2, iso27001, hipaa, gdpr, owasp_top10)."
+                    ),
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "overall": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                            "framework_name": {"type": "string"},
+                            "requirements": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "string", "description": "Requirement ID, e.g. '6.2.4'"},
+                                        "title": {"type": "string"},
+                                        "status": {"type": "string", "enum": ["pass", "fail", "partial"]},
+                                        "findings": {
+                                            "type": "array",
+                                            "items": {"type": "string"},
+                                            "description": "Finding IDs (e.g. F-001) that caused this requirement to fail",
+                                        },
+                                        "evidence": {"type": "string", "description": "Evidence text for the failure"},
+                                        "remediation": {"type": "string"},
+                                    },
+                                    "required": ["id", "title", "status"],
+                                },
+                            },
+                            "pass_rate": {"type": "number", "description": "0.0–1.0 fraction of requirements passing"},
+                            "critical_gaps": {"type": "integer", "description": "Count of critical/high-weight failing requirements"},
+                        },
                     },
                 },
                 "attack_surface": {
@@ -311,6 +359,58 @@ TOOLS = [
                         "subdomains_found": {"type": "integer"},
                         "exposed_services": {"type": "array", "items": {"type": "string"}},
                         "entry_points": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+                "attack_chains": {
+                    "type": "array",
+                    "description": (
+                        "Attack chains — sequences of vulnerabilities that combine into a higher-risk scenario. "
+                        "Identify chains where multiple low/medium findings can be chained into a critical attack path."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Short descriptive title, e.g. 'Account Takeover via Open Redirect + Session Fixation'",
+                            },
+                            "chain_risk_score": {
+                                "type": "number",
+                                "description": "Combined risk score 0-100 (typically higher than individual findings)",
+                            },
+                            "steps": {
+                                "type": "array",
+                                "description": "Ordered exploitation steps referencing individual findings",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "finding_ref": {
+                                            "type": "string",
+                                            "description": "Reference to a finding title or ID (e.g. 'Open Redirect on /oauth/callback')",
+                                        },
+                                        "action": {
+                                            "type": "string",
+                                            "description": "What the attacker does at this step",
+                                        },
+                                    },
+                                    "required": ["finding_ref", "action"],
+                                },
+                            },
+                            "impact": {
+                                "type": "string",
+                                "description": "End impact if the chain is successfully exploited",
+                            },
+                            "likelihood": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Likelihood of a real attacker exploiting this chain",
+                            },
+                            "prerequisites": {
+                                "type": "string",
+                                "description": "What the attacker needs to execute this chain (e.g. 'Victim clicks crafted link')",
+                            },
+                        },
+                        "required": ["title", "chain_risk_score", "steps", "impact", "likelihood"],
                     },
                 },
                 "improvement_roadmap": {
@@ -379,7 +479,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -401,7 +501,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
                     ],
                 },
             },
@@ -547,6 +647,37 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Discovered subdomains",
+                },
+                "graphql_endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Full GraphQL endpoint URL"},
+                            "introspection_enabled": {"type": "boolean", "description": "Whether introspection query succeeded"},
+                            "engine": {"type": "string", "description": "GraphQL engine (Apollo, Hasura, Strawberry, etc.)"},
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected GraphQL endpoints with introspection status",
+                },
+                "grpc_services": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "description": "Host and port (e.g. target:50051)"},
+                            "reflection_enabled": {"type": "boolean", "description": "Whether server reflection is enabled"},
+                            "tls": {"type": "boolean", "description": "Whether TLS is in use"},
+                            "methods": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Discovered RPC method names",
+                            },
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected gRPC services with reflection and method info",
                 },
             },
         },

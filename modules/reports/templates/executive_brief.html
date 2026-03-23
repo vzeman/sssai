@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Security Brief — {{ scan_info.get('target', 'Security Assessment') }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            line-height: 1.7;
+            color: #1a1a1a;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 24px;
+            background: #f4f4f0;
+        }
+        .cover {
+            background: linear-gradient(135deg, #0a2342 0%, #1a3a5c 60%, #0d5986 100%);
+            color: white;
+            padding: 48px 40px 40px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .cover::after {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 220px; height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+        }
+        .cover-label {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0.7;
+            margin-bottom: 12px;
+        }
+        .cover h1 {
+            font-size: 32px;
+            font-weight: 400;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+        .cover .target {
+            font-size: 18px;
+            opacity: 0.85;
+            margin-bottom: 24px;
+        }
+        .cover-meta {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+            opacity: 0.7;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .risk-score-circle {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            flex-shrink: 0;
+        }
+        .risk-badge-text { font-size: 20px; font-weight: 600; }
+        .risk-badge-sub { font-size: 13px; opacity: 0.8; }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 28px 32px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .section-label {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #0a2342;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .section h2 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: #0a2342;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .section p {
+            font-size: 15px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            border-top: 3px solid #0a2342;
+        }
+        .metric-card .label {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 6px;
+        }
+        .metric-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0a2342;
+            line-height: 1.1;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .metric-card .sub {
+            font-size: 13px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .severity-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .sev-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .sev-critical { background: #fde8e9; color: #b71c1c; }
+        .sev-high     { background: #fef3e2; color: #e65100; }
+        .sev-medium   { background: #fffde7; color: #827717; }
+        .sev-low      { background: #e3f4f8; color: #006064; }
+        .sev-info     { background: #f1f1f1; color: #555; }
+        .risk-item {
+            border-left: 4px solid #ddd;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border-radius: 0 6px 6px 0;
+            background: #fafafa;
+        }
+        .risk-item.critical { border-left-color: #dc3545; }
+        .risk-item.high     { border-left-color: #fd7e14; }
+        .risk-item.medium   { border-left-color: #e6b800; }
+        .risk-item.low      { border-left-color: #17a2b8; }
+        .risk-item-title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #1a1a1a;
+        }
+        .risk-item-desc {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .risk-item-cost {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: #b71c1c;
+        }
+        .timeline-row {
+            display: flex;
+            gap: 0;
+            margin-top: 8px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .timeline-phase {
+            flex: 1;
+            padding: 14px 16px;
+            background: #f0f4f8;
+            border-right: 2px solid white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .timeline-phase:last-child { border-right: none; }
+        .timeline-phase .phase-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #0a2342;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .timeline-phase .phase-text {
+            font-size: 13px;
+            color: #444;
+        }
+        .comparison-box {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: #f0f7ff;
+            border: 1px solid #c0d8f0;
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .comparison-arrow {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .improved { color: #155724; }
+        .worsened { color: #721c24; }
+        .unchanged { color: #666; }
+        .benchmark-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 12px;
+            margin: 8px 0;
+            position: relative;
+            overflow: visible;
+        }
+        .benchmark-fill {
+            height: 100%;
+            border-radius: 4px;
+            position: absolute;
+            top: 0; left: 0;
+        }
+        .benchmark-marker {
+            position: absolute;
+            top: -4px;
+            width: 3px;
+            height: 20px;
+            border-radius: 2px;
+        }
+        .budget-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+        .budget-table th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f0f4f8;
+            color: #0a2342;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .budget-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .budget-table tr:last-child td { border-bottom: none; }
+        .budget-total {
+            font-weight: 700;
+            font-size: 15px;
+            color: #0a2342;
+        }
+        .risk-matrix-wrap {
+            display: flex;
+            justify-content: center;
+            padding: 8px 0;
+        }
+        .disclaimer {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            color: #888;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 14px;
+            margin-top: 14px;
+        }
+        .footer {
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 12px;
+            color: #999;
+            margin-top: 24px;
+            padding: 16px;
+        }
+        @media print {
+            body { background: white; max-width: 100%; padding: 0; }
+            .two-col { page-break-inside: avoid; }
+            .section { page-break-inside: avoid; box-shadow: none; border: 1px solid #e0e0e0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Cover Header -->
+<div class="cover">
+    <div class="cover-label">Confidential · Executive Security Brief</div>
+    <h1>Security Posture Assessment</h1>
+    <div class="target">{{ scan_info.get('target', 'Unknown Target') }}</div>
+
+    <div class="risk-badge">
+        <div class="risk-score-circle" style="background: {{ risk_color }}">
+            {{ risk_score | int }}
+        </div>
+        <div>
+            <div class="risk-badge-text">{{ risk_level }} Risk</div>
+            <div class="risk-badge-sub">Score: {{ risk_score | int }}/100 &nbsp;·&nbsp; {{ total_findings }} findings identified</div>
+        </div>
+    </div>
+
+    <div class="cover-meta">
+        <span>Prepared: {{ generated_at[:10] }}</span>
+        <span>Scan Type: {{ scan_info.get('scan_type', 'Security Assessment') | upper }}</span>
+        {% if scan_info.get('scan_id') %}
+        <span>Ref: {{ scan_info.scan_id[:8] }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Risk Summary -->
+<div class="section">
+    <div class="section-label">Executive Summary</div>
+    <p>{{ risk_summary }}</p>
+
+    <div class="severity-row">
+        {% if severity_counts.get('critical', 0) > 0 %}
+        <span class="sev-pill sev-critical">● {{ severity_counts.critical }} Critical</span>
+        {% endif %}
+        {% if severity_counts.get('high', 0) > 0 %}
+        <span class="sev-pill sev-high">● {{ severity_counts.high }} High</span>
+        {% endif %}
+        {% if severity_counts.get('medium', 0) > 0 %}
+        <span class="sev-pill sev-medium">● {{ severity_counts.medium }} Medium</span>
+        {% endif %}
+        {% if severity_counts.get('low', 0) > 0 %}
+        <span class="sev-pill sev-low">● {{ severity_counts.low }} Low</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Business Impact + Financial Exposure -->
+<div class="two-col">
+    <div class="metric-card">
+        <div class="label">Financial Exposure</div>
+        <div class="value">${{ "{:,.0f}".format(financial_exposure.low_estimate) }}–${{ "{:,.0f}".format(financial_exposure.high_estimate) }}</div>
+        <div class="sub">{{ financial_exposure.breach_probability_pct }}% breach probability · {{ financial_exposure.source }}</div>
+    </div>
+    <div class="metric-card">
+        <div class="label">Estimated Remediation Cost</div>
+        <div class="value">${{ "{:,.0f}".format(remediation_budget.estimated_total) }}</div>
+        <div class="sub">vs. ${{ "{:,.0f}".format(financial_exposure.low_estimate) }}+ breach cost</div>
+    </div>
+</div>
+
+<!-- Business Impact Narrative -->
+<div class="section">
+    <div class="section-label">Business Impact</div>
+    <p>{{ business_impact }}</p>
+    <p>{{ benchmark_comparison }}</p>
+</div>
+
+<!-- Industry Benchmark -->
+<div class="section">
+    <div class="section-label">Industry Benchmark Comparison</div>
+    <h2>How You Compare</h2>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #666; margin-bottom: 6px;">
+        Industry average risk score: <strong>{{ industry_benchmark.avg }}</strong> &nbsp;·&nbsp;
+        Top quartile: <strong>{{ industry_benchmark.top_quartile }}</strong>
+    </div>
+    <div class="benchmark-bar">
+        <div class="benchmark-fill" style="width: {{ [risk_score, 100] | min }}%; background: {{ risk_color }};"></div>
+        <!-- Industry average marker -->
+        <div class="benchmark-marker" style="left: {{ industry_benchmark.avg }}%; background: #aaa; top: -4px;"></div>
+        <!-- Top quartile marker -->
+        <div class="benchmark-marker" style="left: {{ industry_benchmark.top_quartile }}%; background: #28a745; top: -4px;"></div>
+    </div>
+    <div style="display:flex; gap: 20px; font-family: -apple-system, sans-serif; font-size: 12px; color: #777; margin-top: 6px;">
+        <span>▌ Industry Avg ({{ industry_benchmark.avg }})</span>
+        <span style="color:#28a745">▌ Top Quartile ({{ industry_benchmark.top_quartile }})</span>
+        <span style="color:{{ risk_color }}">■ Your Score ({{ risk_score | int }})</span>
+    </div>
+</div>
+
+<!-- Top 3 Risks -->
+<div class="section">
+    <div class="section-label">Priority Risks</div>
+    <h2>Top {{ top_risks | length }} Issues Requiring Attention</h2>
+    {% for risk in top_risks %}
+    <div class="risk-item {{ risk.get('severity', 'info') }}">
+        <div class="risk-item-title">{{ loop.index }}. {{ risk.title }}</div>
+        {% if risk.get('description') %}
+        <div class="risk-item-desc">{{ risk.description[:300] }}{% if risk.description | length > 300 %}…{% endif %}</div>
+        {% endif %}
+        <div class="risk-item-cost">
+            Estimated remediation: ${{ "{:,.0f}".format(
+                {'critical': 15000, 'high': 8000, 'medium': 3000, 'low': 500}.get(risk.get('severity', 'info'), 0)
+            ) }}
+            &nbsp;·&nbsp; Severity: {{ risk.get('severity', 'info') | upper }}
+        </div>
+    </div>
+    {% endfor %}
+    {% if not top_risks %}
+    <p style="color: #28a745; font-style: italic;">No significant findings identified.</p>
+    {% endif %}
+</div>
+
+<!-- Risk Matrix -->
+<div class="section">
+    <div class="section-label">Visual Risk Assessment</div>
+    <h2>Risk Matrix</h2>
+    <div class="risk-matrix-wrap">
+        {{ risk_matrix_svg | safe }}
+    </div>
+</div>
+
+<!-- Remediation Budget -->
+{% if remediation_budget.breakdown %}
+<div class="section">
+    <div class="section-label">Remediation Investment</div>
+    <h2>Recommended Budget Allocation</h2>
+    <p>{{ budget_recommendation }}</p>
+    <table class="budget-table">
+        <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Count</th>
+                <th>Est. Cost per Item</th>
+                <th>Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sev, subtotal in remediation_budget.breakdown.items() %}
+            {% set count = severity_counts.get(sev, 0) %}
+            {% set unit_cost = {'critical': 15000, 'high': 8000, 'medium': 3000, 'low': 500}.get(sev, 0) %}
+            <tr>
+                <td>{{ sev | capitalize }}</td>
+                <td>{{ count }}</td>
+                <td>${{ "{:,.0f}".format(unit_cost) }}</td>
+                <td>${{ "{:,.0f}".format(subtotal) }}</td>
+            </tr>
+            {% endfor %}
+            <tr>
+                <td colspan="3" class="budget-total">Total Estimated Remediation</td>
+                <td class="budget-total">${{ "{:,.0f}".format(remediation_budget.estimated_total) }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Timeline -->
+<div class="section">
+    <div class="section-label">Remediation Roadmap</div>
+    <h2>Path to Target Security Posture</h2>
+    <div style="background:#e8f5e9; border-left: 4px solid #28a745; padding: 10px 14px; border-radius: 0 6px 6px 0; margin-bottom: 16px; font-family: -apple-system, sans-serif; font-size: 14px; color: #155724;">
+        <strong>Goal:</strong> {{ timeline.target_posture }}
+    </div>
+    <div class="timeline-row">
+        <div class="timeline-phase">
+            <div class="phase-label">Immediate</div>
+            <div class="phase-text">{{ timeline.immediate }}</div>
+        </div>
+        <div class="timeline-phase">
+            <div class="phase-label">Short-Term</div>
+            <div class="phase-text">{{ timeline.short_term }}</div>
+        </div>
+        <div class="timeline-phase">
+            <div class="phase-label">Long-Term</div>
+            <div class="phase-text">{{ timeline.long_term }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison with Previous Scans -->
+{% if comparison %}
+<div class="section">
+    <div class="section-label">Trend Analysis</div>
+    <h2>Comparison with Previous Assessment</h2>
+    <div class="comparison-box">
+        <div>
+            <div style="font-size:12px; color:#888;">Previous Score</div>
+            <div style="font-size:28px; font-weight:700; color:#555;">{{ comparison.previous_score | int }}</div>
+        </div>
+        <div class="comparison-arrow {{ comparison.direction }}">
+            {% if comparison.direction == 'improved' %}↓ {{ comparison.delta | abs | int }}{% elif comparison.direction == 'worsened' %}↑ {{ comparison.delta | int }}{% else %}→{% endif %}
+        </div>
+        <div>
+            <div style="font-size:12px; color:#888;">Current Score</div>
+            <div style="font-size:28px; font-weight:700; color:#0a2342;">{{ comparison.current_score | int }}</div>
+        </div>
+        <div style="flex:1; padding-left: 20px; font-size:14px; color:#555;">
+            {% if comparison.direction == 'improved' %}
+            Security posture has <strong style="color:#155724">improved</strong> since the last assessment.
+            {% elif comparison.direction == 'worsened' %}
+            Security posture has <strong style="color:#721c24">worsened</strong> since the last assessment. Immediate action recommended.
+            {% else %}
+            Security posture is <strong>unchanged</strong> since the last assessment.
+            {% endif %}
+            {% if comparison.previous_date %}
+            <br><span style="font-size:12px; color:#999;">Previous assessment: {{ comparison.previous_date[:10] }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="footer">
+    <div class="disclaimer">
+        This report is intended for executive and board-level audiences. Financial exposure estimates are based on
+        IBM Cost of a Data Breach Report 2025 industry averages and do not constitute actuarial projections.
+        Remediation costs are indicative estimates. Consult your security team for detailed technical findings.
+    </div>
+    <div style="margin-top: 10px;">
+        Generated {{ generated_at[:19].replace('T', ' ') }} UTC &nbsp;·&nbsp; Confidential — Do Not Distribute
+    </div>
+</div>
+
+</body>
+</html>
