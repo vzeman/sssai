@@ -157,6 +157,7 @@ class NotificationDispatcher:
 
     async def _send_email(self, config: dict, notification: Notification):
         """Send email notification via SMTP."""
+        import html
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
@@ -176,15 +177,20 @@ class NotificationDispatcher:
         if notification.report_url:
             text_body += f"\n\nView Report: {notification.report_url}"
 
+        _title = html.escape(notification.title)
+        _message = html.escape(notification.message)
+        _target = html.escape(notification.target) if notification.target else None
+        _report_url = html.escape(notification.report_url) if notification.report_url else None
+
         html_body = f"""
-        <h2>{notification.title}</h2>
-        <p>{notification.message}</p>
+        <h2>{_title}</h2>
+        <p>{_message}</p>
         <table>
-            {"<tr><td><b>Target:</b></td><td>" + notification.target + "</td></tr>" if notification.target else ""}
+            {"<tr><td><b>Target:</b></td><td>" + _target + "</td></tr>" if _target else ""}
             {"<tr><td><b>Risk Score:</b></td><td>" + str(notification.risk_score) + "/100</td></tr>" if notification.risk_score is not None else ""}
             {"<tr><td><b>Findings:</b></td><td>" + str(notification.findings_count) + "</td></tr>" if notification.findings_count is not None else ""}
         </table>
-        {"<p><a href='" + notification.report_url + "'>View Full Report</a></p>" if notification.report_url else ""}
+        {"<p><a href='" + _report_url + "'>View Full Report</a></p>" if _report_url else ""}
         """
 
         msg.attach(MIMEText(text_body, "plain"))

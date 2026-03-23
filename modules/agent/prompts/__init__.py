@@ -41,7 +41,7 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     Uses the master prompt (AI-first adaptive) with a focus hint from scan_type.
     Falls back to legacy {scan_type}.txt if master.txt doesn't exist.
     """
-    config = config or {}
+    config = dict(config) if config else {}
 
     # Extract special contexts before passing to template format (they have curly braces)
     retry_context = config.pop("retry_context", None)

@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
 from modules.api.models import Scan, User
-from modules.api.schemas import ScanCreate, ScanResponse, VerificationCreate, VerificationScanResponse
+from modules.api.schemas import ScanCreate, ScanResponse, VerificationCreate
 from modules.api.auth import get_current_user
 from modules.infra import get_queue, get_storage
+from modules.infra.checkpoint import load_checkpoint, build_resume_context, delete_checkpoint
 
 import redis as _redis
 
@@ -78,7 +79,6 @@ def force_retry_scan(scan_id: str, user: User = Depends(get_current_user), db: S
     if scan.status not in ("running", "failed"):
         raise HTTPException(status_code=400, detail="Scan must be running or failed to force-retry")
 
-    from modules.agent.checkpoint import load_checkpoint, build_resume_context
     checkpoint = load_checkpoint(scan_id)
     config = scan.config or {}
     if checkpoint:
@@ -116,7 +116,6 @@ def force_fail_scan(scan_id: str, user: User = Depends(get_current_user), db: Se
     r = _redis.from_url(_REDIS_URL)
     r.delete(f"scan:heartbeat:{scan_id}")
 
-    from modules.agent.checkpoint import delete_checkpoint
     delete_checkpoint(scan_id)
 
     return {"id": scan.id, "status": "failed"}
