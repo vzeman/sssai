@@ -2551,6 +2551,29 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     except Exception:
         pass
 
+    # Dispatch findings to issue trackers (Jira, Linear, GitHub Issues)
+    try:
+        from modules.notifications.issue_tracker import dispatch_issue_trackers
+        import asyncio
+
+        notification_channels = json.loads(os.getenv("NOTIFICATION_CHANNELS", "[]"))
+        issue_tracker_types = {"jira", "linear", "github_issues"}
+        tracker_channels = [c for c in notification_channels if c.get("type") in issue_tracker_types]
+        if tracker_channels:
+            findings = report.get("findings", [])
+            report_url = os.getenv("REPORT_BASE_URL", "").rstrip("/")
+            report_url = f"{report_url}/scans/{scan_id}/report" if report_url else None
+            asyncio.run(dispatch_issue_trackers(
+                channels=tracker_channels,
+                findings=findings,
+                target=target,
+                scan_id=scan_id,
+                report_url=report_url,
+                storage=storage,
+            ))
+    except Exception:
+        pass
+
     # Notify completion
     queue.publish(f"scan-progress:{scan_id}", {
         "scan_id": scan_id,

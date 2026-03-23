@@ -13,9 +13,9 @@ router = APIRouter()
 
 @router.post("/", response_model=NotificationChannelResponse)
 def create_channel(body: NotificationChannelCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    valid_types = {"email", "slack", "discord", "webhook", "openclaw"}
+    valid_types = {"email", "slack", "discord", "webhook", "openclaw", "jira", "linear", "github_issues"}
     if body.channel_type not in valid_types:
-        raise HTTPException(status_code=400, detail=f"Invalid channel type. Must be one of: {', '.join(valid_types)}")
+        raise HTTPException(status_code=400, detail=f"Invalid channel type. Must be one of: {', '.join(sorted(valid_types))}")
 
     channel = NotificationChannel(
         user_id=user.id,
