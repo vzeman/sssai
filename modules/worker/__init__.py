@@ -94,6 +94,25 @@ def _update_scan_status(scan_id: str, status: str, risk_score=None, findings_cou
             conn.commit()
     except Exception as e:
         log.warning("Could not update scan status: %s", e)
+
+
+def _get_scan_user_id(scan_id: str) -> str:
+    """Look up user_id for a scan from the database."""
+    if not _DB_URL:
+        return ""
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(_DB_URL)
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT user_id FROM scans WHERE id = :scan_id"),
+                {"scan_id": scan_id},
+            ).fetchone()
+            return row[0] if row else ""
+    except Exception:
+        return ""
+
+
 running = True
 
 
@@ -174,7 +193,8 @@ def main():
 
             try:
                 report = run_scan(scan_id, target, scan_type, config)
-                findings = len(report.get("findings", []))
+                raw_findings = report.get("findings", [])
+                findings = len(raw_findings)
                 score = report.get("risk_score", 0)
                 # Extract token usage from report metadata
                 token_usage = None
@@ -184,6 +204,14 @@ def main():
                 log.info("Scan %s completed: %d findings, risk score %s", scan_id, findings, score)
                 _update_scan_status(scan_id, "completed", risk_score=score, findings_count=findings,
                                     token_usage=token_usage)
+
+                # Calculate and persist continuous security posture score
+                try:
+                    user_id = _get_scan_user_id(scan_id)
+                    from modules.agent.posture_score import run_posture_update
+                    run_posture_update(scan_id, target, user_id, raw_findings, score)
+                except Exception as posture_err:
+                    log.warning("Posture score update failed for scan %s: %s", scan_id, posture_err)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")

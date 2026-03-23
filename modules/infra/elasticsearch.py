@@ -184,6 +184,45 @@ INDICES = {
             }
         },
     },
+    "scanner-security-posture": {
+        "settings": INDEX_SETTINGS,
+        "mappings": {
+            "properties": {
+                "timestamp": {"type": "date"},
+                "scan_id": {"type": "keyword"},
+                "target": {"type": "keyword"},
+                "user_id": {"type": "keyword"},
+                "posture_score": {"type": "float"},
+                "trend": {"type": "keyword"},
+                "trend_delta": {"type": "float"},
+                "components": {
+                    "type": "object",
+                    "properties": {
+                        "base_penalty": {"type": "float"},
+                        "cvss_penalty": {"type": "float"},
+                        "age_penalty": {"type": "float"},
+                        "chain_penalty": {"type": "float"},
+                        "risk_penalty": {"type": "float"},
+                        "velocity_bonus": {"type": "float"},
+                    },
+                },
+                "finding_counts": {
+                    "type": "object",
+                    "properties": {
+                        "critical": {"type": "integer"},
+                        "high": {"type": "integer"},
+                        "medium": {"type": "integer"},
+                        "low": {"type": "integer"},
+                        "info": {"type": "integer"},
+                        "total": {"type": "integer"},
+                    },
+                },
+                "commentary": {"type": "text"},
+                "forecast": {"type": "text"},
+                "forecast_date": {"type": "date", "ignore_malformed": True},
+            }
+        },
+    },
 }
 
 
