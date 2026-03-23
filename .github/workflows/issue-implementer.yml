@@ -424,7 +424,17 @@ jobs:
           echo "build=true" >> "$GITHUB_OUTPUT"
 
       # ================================================================
-      # Step 15: Create PR
+      # Step 15: Re-authenticate git (claude-code-action clears credentials)
+      # ================================================================
+      - name: Re-authenticate git
+        if: steps.changes.outputs.has-changes == 'true'
+        run: |
+          git config --local --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+          git config --local http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(echo -n 'x-access-token:${{ secrets.GITHUB_TOKEN }}' | base64)"
+
+      # ================================================================
+      # Step 16: Create PR
       # ================================================================
       - name: Create PR
         if: steps.changes.outputs.has-changes == 'true' && steps.mode.outputs.mode == 'issue'
