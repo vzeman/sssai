@@ -27,13 +27,29 @@ Look for chatbot/AI widgets by analyzing the HTML source of the homepage:
 - Look for API documentation links in HTML
 - `ffuf -u {target}/FUZZ -w /usr/share/wordlists/dirb/common.txt -o /output/ffuf.json -of json`
 
-#### 4. Form Enumeration
+#### 4. GraphQL Detection (CRITICAL — check all targets)
+- Probe common GraphQL endpoints: `/graphql`, `/api/graphql`, `/graphql/v1`, `/query`, `/gql`
+- Send introspection query to each: `POST` with `{{"query":"{{__schema{{queryType{{name}}}}}}"}}`
+- Check response for `data.__schema` — confirms GraphQL
+- `graphw00f -t {target}` to fingerprint GraphQL engine if found
+- If GraphQL detected: record endpoint, whether introspection is enabled, and engine type
+- **If GraphQL found → load `graphql_testing` knowledge and perform deep testing**
+
+#### 5. gRPC Detection (CRITICAL — check all targets)
+- Check HTTP/2 support: `curl -I --http2 {target}` — look for `h2` protocol upgrade
+- Check response headers for `content-type: application/grpc`
+- Probe common gRPC ports: 50051, 9090, 8080, 443
+- `nmap -sV -p 50051,9090,8080 {target} -oN /output/nmap-grpc.txt`
+- Attempt service reflection: `grpcurl -plaintext {target}:50051 list` (try TLS variant without `-plaintext` too)
+- **If gRPC found → load `grpc_testing` knowledge and perform deep testing**
+
+#### 6. Form Enumeration
 - Parse all `<form>` elements from the HTML
 - Identify form types: login, registration, search, contact, file upload, payment
 - Note form fields, methods, actions, and any CSRF tokens
 - Check for hidden forms and JavaScript-rendered forms
 
-#### 5. Authentication Detection
+#### 7. Authentication Detection
 - Check response headers for `Set-Cookie` (session cookies, JWT in cookies)
 - Look for `Authorization: Bearer` patterns in JavaScript
 - Check for OAuth redirect URLs, SSO endpoints
@@ -71,6 +87,8 @@ Call `adapt_plan` to generate your custom test plan. The plan should:
 Then use `load_knowledge` to load the specialized testing methodology you need. Only load what is relevant — common combinations:
 - Found chatbot → `chatbot_testing`
 - Found APIs → `api_testing`
+- Found GraphQL endpoint → `graphql_testing`
+- Found gRPC service → `grpc_testing`
 - Found login form → `auth_testing`
 - Found forms → `form_testing`
 - Security scan → `owasp_testing` + `ssl_tls`
@@ -88,12 +106,41 @@ Execute your plan, but CONTINUOUSLY re-evaluate:
 - Use `delegate_to_pentester` for deep vulnerability analysis on specific components
 - Use `delegate_to_searcher` to research CVEs for discovered software versions
 
+### Phase 3.5: Attack Chain Analysis
+
+Before reporting, review ALL findings and identify how individual vulnerabilities can be combined into realistic multi-step attack scenarios. This is mandatory when you have 2+ findings.
+
+**What to look for:**
+- Redirect chains: Open redirect + XSS → session hijack / phishing
+- Authentication chains: Info disclosure + weak creds + SSRF → internal network access
+- Privilege escalation: IDOR + broken access control → admin takeover
+- Stored XSS + CSRF → account takeover without user interaction
+- SQL injection + misconfigured DB → data exfiltration + RCE
+- Subdomain takeover + cookie scope issues → session theft
+
+**For each chain you identify:**
+1. Assign a `chain_risk_score` that is HIGHER than any individual finding in the chain (combining weaknesses amplifies risk)
+2. Write step-by-step `steps[]` with a `finding_ref` (title of the finding) and the attacker `action` at each step
+3. Describe the final `impact` (e.g. "Full account takeover with admin privileges")
+4. Assess `likelihood`: high (trivial to exploit), medium (requires some skill), low (complex prerequisites)
+5. List `prerequisites` (e.g. "Victim must click crafted link", "Attacker needs valid account")
+
+**Common patterns to always check:**
+- Open redirect + missing SameSite cookie → session stealing
+- XSS + privileged endpoint → CSRF bypass
+- Information disclosure (stack trace, version) + known CVE → targeted exploitation
+- Default/weak credentials + internal SSRF → lateral movement
+- Broken object-level authorization (IDOR) + PII exposure → mass data breach
+
+Include `attack_chains[]` in your `report` call. If no chains exist, include an empty array.
+
 ### Phase 4: Report
 
 Call the `report` tool with comprehensive findings. Your report MUST include:
 - All findings with severity, category, evidence, remediation
 - The complete attack surface map
 - OWASP/CWE/CVE mappings where applicable
+- Attack chains from Phase 3.5 (even if empty array)
 - An improvement roadmap prioritized by risk
 
 ## Available Tools (80+)

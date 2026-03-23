@@ -237,6 +237,14 @@ TOOLS = [
                             },
                             "description": {"type": "string"},
                             "evidence": {"type": "string"},
+                            "cvss_score": {
+                                "type": "number",
+                                "description": "CVSS base score (0.0–10.0). Will be auto-calculated if omitted.",
+                            },
+                            "cvss_vector": {
+                                "type": "string",
+                                "description": "CVSS vector string (e.g., 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'). Will be auto-calculated if omitted.",
+                            },
                             "cve_ids": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -313,6 +321,58 @@ TOOLS = [
                         "entry_points": {"type": "array", "items": {"type": "string"}},
                     },
                 },
+                "attack_chains": {
+                    "type": "array",
+                    "description": (
+                        "Attack chains — sequences of vulnerabilities that combine into a higher-risk scenario. "
+                        "Identify chains where multiple low/medium findings can be chained into a critical attack path."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Short descriptive title, e.g. 'Account Takeover via Open Redirect + Session Fixation'",
+                            },
+                            "chain_risk_score": {
+                                "type": "number",
+                                "description": "Combined risk score 0-100 (typically higher than individual findings)",
+                            },
+                            "steps": {
+                                "type": "array",
+                                "description": "Ordered exploitation steps referencing individual findings",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "finding_ref": {
+                                            "type": "string",
+                                            "description": "Reference to a finding title or ID (e.g. 'Open Redirect on /oauth/callback')",
+                                        },
+                                        "action": {
+                                            "type": "string",
+                                            "description": "What the attacker does at this step",
+                                        },
+                                    },
+                                    "required": ["finding_ref", "action"],
+                                },
+                            },
+                            "impact": {
+                                "type": "string",
+                                "description": "End impact if the chain is successfully exploited",
+                            },
+                            "likelihood": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Likelihood of a real attacker exploiting this chain",
+                            },
+                            "prerequisites": {
+                                "type": "string",
+                                "description": "What the attacker needs to execute this chain (e.g. 'Victim clicks crafted link')",
+                            },
+                        },
+                        "required": ["title", "chain_risk_score", "steps", "impact", "likelihood"],
+                    },
+                },
                 "improvement_roadmap": {
                     "type": "array",
                     "description": "Prioritized list of improvements",
@@ -379,7 +439,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -401,7 +461,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
                     ],
                 },
             },
@@ -484,6 +544,37 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Discovered subdomains",
+                },
+                "graphql_endpoints": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "description": "Full GraphQL endpoint URL"},
+                            "introspection_enabled": {"type": "boolean", "description": "Whether introspection query succeeded"},
+                            "engine": {"type": "string", "description": "GraphQL engine (Apollo, Hasura, Strawberry, etc.)"},
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected GraphQL endpoints with introspection status",
+                },
+                "grpc_services": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "host": {"type": "string", "description": "Host and port (e.g. target:50051)"},
+                            "reflection_enabled": {"type": "boolean", "description": "Whether server reflection is enabled"},
+                            "tls": {"type": "boolean", "description": "Whether TLS is in use"},
+                            "methods": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Discovered RPC method names",
+                            },
+                            "details": {"type": "string", "description": "Additional notes"},
+                        },
+                    },
+                    "description": "Detected gRPC services with reflection and method info",
                 },
             },
         },

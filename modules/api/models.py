@@ -26,7 +26,25 @@ class User(Base):
     monitors: Mapped[list["Monitor"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     scheduled_scans: Mapped[list["ScheduledScan"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notification_channels: Mapped[list["NotificationChannel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    webhook_configs: Mapped[list["WebhookConfig"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String, default="")
+    scan_type: Mapped[str] = mapped_column(String, default="security")
+    status: Mapped[str] = mapped_column(String, default="running")  # running, completed, failed
+    targets: Mapped[list] = mapped_column(JSON, default=list)
+    config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    aggregate_risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="campaigns")
+    scans: Mapped[list["Scan"]] = relationship(back_populates="campaign")
 
 
 class Scan(Base):
@@ -43,11 +61,13 @@ class Scan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     schedule_id: Mapped[str | None] = mapped_column(ForeignKey("scheduled_scans.id"), nullable=True)
+    campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id"), nullable=True, index=True)
     total_input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     total_output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
 
     user: Mapped["User"] = relationship(back_populates="scans")
+    campaign: Mapped["Campaign | None"] = relationship(back_populates="scans")
 
 
 class Monitor(Base):
