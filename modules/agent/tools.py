@@ -897,6 +897,211 @@ TOOLS = [
             },
         },
     },
+    # ── Scan Control Tools (for brain/chat agent) ────────────────────────────────
+    {
+        "name": "list_user_scans",
+        "description": (
+            "List all scans for the current user, with optional filtering by status. "
+            "Shows scan ID, target, type, status, creation date, and risk score. "
+            "Use to answer 'what scans do I have?' or 'what's running?' questions."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status: queued, running, completed, failed (optional)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results to return (default 20)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_scan_status",
+        "description": (
+            "Get detailed status of a specific scan including current progress, "
+            "findings count, tokens used, and any errors. Returns status, findings, "
+            "risk score, timestamps, and token usage."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the scan to check",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "start_scan",
+        "description": (
+            "Start a new security scan on a target. Queues the scan for execution. "
+            "Returns the new scan ID. Supported types: full, security, pentest, seo, "
+            "performance, compliance, api_security, cloud, recon, privacy, uptime, owasp, chatbot."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Target URL or domain (e.g., https://example.com)",
+                },
+                "scan_type": {
+                    "type": "string",
+                    "description": "Type of scan: full, security, pentest, seo, performance, compliance, api_security, cloud, recon, privacy, uptime, owasp, chatbot (default: security)",
+                },
+                "config": {
+                    "type": "object",
+                    "description": "Optional scan configuration (custom parameters)",
+                },
+            },
+            "required": ["target"],
+        },
+    },
+    {
+        "name": "stop_scan",
+        "description": (
+            "Stop a running or queued scan. The scan will be gracefully stopped, "
+            "allowing any in-progress work to complete before stopping. "
+            "Returns confirmation of stop request."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the scan to stop",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "cancel_scan",
+        "description": (
+            "Cancel a queued scan (before it starts). Only works on queued scans. "
+            "Returns error if scan is already running."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the scan to cancel",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "retry_scan",
+        "description": (
+            "Retry a failed or completed scan. Creates a new scan that focuses on "
+            "failed steps, with previous report as context. Returns new scan ID."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the scan to retry",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "get_scan_report",
+        "description": (
+            "Fetch the full report from a completed scan, including all findings, "
+            "risk scores, remediation recommendations, and summary."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the scan",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "get_stuck_scans",
+        "description": (
+            "Identify scans that appear stuck (running but no heartbeat). "
+            "Shows scan ID, how long silent, and checkpoint status. "
+            "Can force-retry or force-fail stuck scans."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "force_retry_stuck_scan",
+        "description": (
+            "Force-retry a stuck scan, resuming from checkpoint if available. "
+            "Use when a scan is hung and needs to be restarted."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the stuck scan",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "force_fail_scan",
+        "description": (
+            "Force-fail a stuck running scan immediately. "
+            "Use only when a scan is completely hung and won't recover."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the stuck scan to fail",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
+    {
+        "name": "verify_scan",
+        "description": (
+            "Create a verification scan to test if findings from a previous scan "
+            "have been remediated. The verification scan focuses only on the "
+            "original findings, not a full re-scan."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {
+                    "type": "string",
+                    "description": "ID of the completed scan to verify",
+                },
+                "config": {
+                    "type": "object",
+                    "description": "Optional configuration for verification scan",
+                },
+            },
+            "required": ["scan_id"],
+        },
+    },
 ]
 
 

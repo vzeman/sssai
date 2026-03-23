@@ -320,6 +320,40 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "check_session":
         return _handle_check_session(input, scan_context)
 
+    # Scan control tools (brain/chat agent)
+    elif name == "list_user_scans":
+        return _handle_list_user_scans(input, scan_context)
+
+    elif name == "get_scan_status":
+        return _handle_get_scan_status(input, scan_context)
+
+    elif name == "start_scan":
+        return _handle_start_scan(input, scan_context)
+
+    elif name == "stop_scan":
+        return _handle_stop_scan(input, scan_context)
+
+    elif name == "cancel_scan":
+        return _handle_cancel_scan(input, scan_context)
+
+    elif name == "retry_scan":
+        return _handle_retry_scan(input, scan_context)
+
+    elif name == "get_scan_report":
+        return _handle_get_scan_report(input, scan_context)
+
+    elif name == "get_stuck_scans":
+        return _handle_get_stuck_scans(input, scan_context)
+
+    elif name == "force_retry_stuck_scan":
+        return _handle_force_retry_stuck_scan(input, scan_context)
+
+    elif name == "force_fail_scan":
+        return _handle_force_fail_scan(input, scan_context)
+
+    elif name == "verify_scan":
+        return _handle_verify_scan(input, scan_context)
+
     elif name == "report":
         return "__REPORT__"
 
@@ -1423,6 +1457,546 @@ def _handle_ask_human(input: dict, scan_context: dict | None) -> str:
 
     except Exception as e:
         return f"ERROR: ask_human failed: {e}"
+
+
+# ── Scan Control Tools (Brain/Chat Agent) ──────────────────────────────
+
+def _handle_list_user_scans(input: dict, scan_context: dict | None) -> str:
+    """List all scans for the current user."""
+    try:
+        from modules.api.database import engine, Scan
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy import desc
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        # Get user_id from scan_context if available, otherwise generic fetch
+        status_filter = input.get("status", "")
+        limit = input.get("limit", 20)
+
+        query = db.query(Scan).order_by(desc(Scan.created_at))
+        if status_filter and status_filter in ("queued", "running", "completed", "failed"):
+            query = query.filter(Scan.status == status_filter)
+
+        scans = query.limit(limit).all()
+
+        result = []
+        for scan in scans:
+            result.append({
+                "id": scan.id[:8],  # Short ID
+                "target": scan.target,
+                "scan_type": scan.scan_type,
+                "status": scan.status,
+                "risk_score": scan.risk_score,
+                "findings_count": scan.findings_count,
+                "created_at": str(scan.created_at),
+                "completed_at": str(scan.completed_at) if scan.completed_at else None,
+            })
+
+        db.close()
+        return json.dumps({
+            "total": len(result),
+            "scans": result,
+            "filtered_by": status_filter or "all",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to list scans: {e}"
+
+
+def _handle_get_scan_status(input: dict, scan_context: dict | None) -> str:
+    """Get detailed status of a specific scan."""
+    try:
+        from modules.api.database import engine, Scan
+        from sqlalchemy.orm import sessionmaker
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        db.close()
+
+        if not scan:
+            return f"ERROR: Scan {scan_id} not found"
+
+        result = {
+            "id": scan.id,
+            "target": scan.target,
+            "scan_type": scan.scan_type,
+            "status": scan.status,
+            "risk_score": scan.risk_score,
+            "findings_count": scan.findings_count,
+            "created_at": str(scan.created_at),
+            "completed_at": str(scan.completed_at) if scan.completed_at else None,
+            "total_input_tokens": scan.total_input_tokens,
+            "total_output_tokens": scan.total_output_tokens,
+            "estimated_cost": scan.estimated_cost,
+        }
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to get scan status: {e}"
+
+
+def _handle_start_scan(input: dict, scan_context: dict | None) -> str:
+    """Start a new security scan."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_queue
+        from sqlalchemy.orm import sessionmaker
+
+        target = input.get("target", "").strip()
+        if not target:
+            return "ERROR: target is required"
+
+        scan_type = input.get("scan_type", "security")
+        config = input.get("config", {})
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+
+        new_scan = Scan(
+            user_id="brain",  # Brain agent scans
+            target=target,
+            scan_type=scan_type,
+            config=config or None,
+        )
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+        scan_id = new_scan.id
+
+        db.close()
+
+        # Queue the scan
+        get_queue().send("scan-jobs", {
+            "scan_id": scan_id,
+            "target": target,
+            "scan_type": scan_type,
+            "config": config or {},
+        })
+
+        return json.dumps({
+            "status": "queued",
+            "scan_id": scan_id,
+            "target": target,
+            "scan_type": scan_type,
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to start scan: {e}"
+
+
+def _handle_stop_scan(input: dict, scan_context: dict | None) -> str:
+    """Stop a running or queued scan."""
+    try:
+        import redis
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        r = redis.from_url(_REDIS_URL)
+        r.set(f"scan:stop:{scan_id}", "1", ex=3600)
+
+        return json.dumps({
+            "status": "stopping",
+            "scan_id": scan_id,
+            "message": f"Scan {scan_id} has been signaled to stop.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to stop scan: {e}"
+
+
+def _handle_cancel_scan(input: dict, scan_context: dict | None) -> str:
+    """Cancel a queued scan (before it starts)."""
+    try:
+        from modules.api.database import engine, Scan
+        from sqlalchemy.orm import sessionmaker
+        import redis
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+
+        if not scan:
+            db.close()
+            return f"ERROR: Scan {scan_id} not found"
+
+        if scan.status != "queued":
+            db.close()
+            return f"ERROR: Scan must be queued to cancel. Current status: {scan.status}"
+
+        scan.status = "cancelled"
+        db.commit()
+        db.close()
+
+        # Also signal stop in Redis
+        r = redis.from_url(_REDIS_URL)
+        r.set(f"scan:cancel:{scan_id}", "1", ex=3600)
+
+        return json.dumps({
+            "status": "cancelled",
+            "scan_id": scan_id,
+            "message": f"Scan {scan_id} has been cancelled.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to cancel scan: {e}"
+
+
+def _handle_retry_scan(input: dict, scan_context: dict | None) -> str:
+    """Retry a failed or completed scan."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_queue, get_storage
+        from sqlalchemy.orm import sessionmaker
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        original_scan = db.query(Scan).filter(Scan.id == scan_id).first()
+
+        if not original_scan:
+            db.close()
+            return f"ERROR: Scan {scan_id} not found"
+
+        if original_scan.status not in ("failed", "completed"):
+            db.close()
+            return f"ERROR: Scan must be failed or completed to retry. Status: {original_scan.status}"
+
+        storage = get_storage()
+        report = storage.get_json(f"scans/{scan_id}/report.json") if original_scan.status == "completed" else None
+
+        retry_context = {
+            "retry_of": scan_id,
+            "original_status": original_scan.status,
+        }
+
+        if report:
+            retry_context["previous_findings_count"] = len(report.get("findings", []))
+            retry_context["previous_risk_score"] = report.get("risk_score", 0)
+
+        new_scan = Scan(
+            user_id=original_scan.user_id,
+            target=original_scan.target,
+            scan_type=original_scan.scan_type,
+            config={
+                **(original_scan.config or {}),
+                "retry_context": retry_context,
+            },
+        )
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+        new_scan_id = new_scan.id
+
+        db.close()
+
+        get_queue().send("scan-jobs", {
+            "scan_id": new_scan_id,
+            "target": new_scan.target,
+            "scan_type": new_scan.scan_type,
+            "config": new_scan.config or {},
+        })
+
+        return json.dumps({
+            "status": "queued",
+            "new_scan_id": new_scan_id,
+            "retry_of": scan_id,
+            "message": f"New scan {new_scan_id} created as retry of {scan_id}.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to retry scan: {e}"
+
+
+def _handle_get_scan_report(input: dict, scan_context: dict | None) -> str:
+    """Get the full report from a completed scan."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_storage
+        from sqlalchemy.orm import sessionmaker
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        db.close()
+
+        if not scan:
+            return f"ERROR: Scan {scan_id} not found"
+
+        storage = get_storage()
+        report = storage.get_json(f"scans/{scan_id}/report.json")
+
+        if not report:
+            return f"ERROR: No report available for scan {scan_id}"
+
+        # Truncate if very large
+        report_json = json.dumps(report, indent=2)
+        if len(report_json) > 100000:
+            # Keep summary, top findings, and remove detailed tool output
+            truncated = {
+                "summary": report.get("summary"),
+                "risk_score": report.get("risk_score"),
+                "findings_count": len(report.get("findings", [])),
+                "findings": report.get("findings", [])[:20],  # Top 20 findings
+                "remediation_recommendations": report.get("remediation_recommendations", [])[:10],
+                "note": "[Full report truncated for display]",
+            }
+            return json.dumps(truncated, indent=2)
+
+        return report_json
+
+    except Exception as e:
+        return f"ERROR: Failed to get scan report: {e}"
+
+
+def _handle_get_stuck_scans(input: dict, scan_context: dict | None) -> str:
+    """Identify scans that appear stuck (running but no heartbeat)."""
+    try:
+        from modules.api.database import engine, Scan
+        from sqlalchemy.orm import sessionmaker
+        import redis
+        from datetime import datetime, timezone
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        running_scans = db.query(Scan).filter(Scan.status == "running").all()
+
+        r = redis.from_url(_REDIS_URL)
+        stuck_scans = []
+        stuck_timeout = int(os.environ.get("STUCK_SCAN_TIMEOUT_SECONDS", "600"))
+
+        for scan in running_scans:
+            last_beat = r.get(f"scan:heartbeat:{scan.id}")
+            if last_beat:
+                silent_seconds = int(time.time() - float(last_beat))
+            else:
+                silent_seconds = int((datetime.now(timezone.utc) - scan.created_at).total_seconds()) if scan.created_at else 0
+
+            if silent_seconds > stuck_timeout:
+                has_checkpoint = r.exists(f"scan:checkpoint:{scan.id}") > 0
+                stuck_scans.append({
+                    "id": scan.id[:8],
+                    "target": scan.target,
+                    "scan_type": scan.scan_type,
+                    "silent_seconds": silent_seconds,
+                    "has_checkpoint": has_checkpoint,
+                    "created_at": str(scan.created_at),
+                })
+
+        db.close()
+
+        return json.dumps({
+            "stuck_count": len(stuck_scans),
+            "stuck_scans": stuck_scans,
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to get stuck scans: {e}"
+
+
+def _handle_force_retry_stuck_scan(input: dict, scan_context: dict | None) -> str:
+    """Force-retry a stuck scan, resuming from checkpoint if available."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_queue
+        from modules.agent.checkpoint import load_checkpoint, build_resume_context
+        from sqlalchemy.orm import sessionmaker
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+
+        if not scan:
+            db.close()
+            return f"ERROR: Scan {scan_id} not found"
+
+        if scan.status != "running":
+            db.close()
+            return f"ERROR: Scan must be running to force-retry. Status: {scan.status}"
+
+        checkpoint = load_checkpoint(scan_id)
+        config = scan.config or {}
+        if checkpoint:
+            config = {**config, "resume_context": build_resume_context(checkpoint)}
+
+        scan.status = "queued"
+        db.commit()
+        db.close()
+
+        get_queue().send("scan-jobs", {
+            "scan_id": scan.id,
+            "target": scan.target,
+            "scan_type": scan.scan_type,
+            "config": config,
+        })
+
+        return json.dumps({
+            "status": "queued",
+            "scan_id": scan_id,
+            "had_checkpoint": checkpoint is not None,
+            "message": f"Scan {scan_id} force-retried with checkpoint resume.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to force-retry scan: {e}"
+
+
+def _handle_force_fail_scan(input: dict, scan_context: dict | None) -> str:
+    """Force-fail a stuck running scan immediately."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_storage
+        from modules.agent.checkpoint import delete_checkpoint
+        from sqlalchemy.orm import sessionmaker
+        import redis
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+
+        if not scan:
+            db.close()
+            return f"ERROR: Scan {scan_id} not found"
+
+        if scan.status != "running":
+            db.close()
+            return f"ERROR: Scan must be running to force-fail. Status: {scan.status}"
+
+        scan.status = "failed"
+        db.commit()
+        db.close()
+
+        get_storage().put_json(f"scans/{scan_id}/error.json", {
+            "error": "Scan force-failed by brain agent.",
+            "scan_id": scan_id,
+        })
+
+        r = redis.from_url(_REDIS_URL)
+        r.delete(f"scan:heartbeat:{scan_id}")
+        delete_checkpoint(scan_id)
+
+        return json.dumps({
+            "status": "failed",
+            "scan_id": scan_id,
+            "message": f"Scan {scan_id} has been force-failed.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to force-fail scan: {e}"
+
+
+def _handle_verify_scan(input: dict, scan_context: dict | None) -> str:
+    """Create a verification scan to test if findings have been remediated."""
+    try:
+        from modules.api.database import engine, Scan
+        from modules.infra import get_queue, get_storage
+        from sqlalchemy.orm import sessionmaker
+
+        scan_id = input.get("scan_id", "")
+        if not scan_id:
+            return "ERROR: scan_id is required"
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        original_scan = db.query(Scan).filter(Scan.id == scan_id).first()
+
+        if not original_scan:
+            db.close()
+            return f"ERROR: Scan {scan_id} not found"
+
+        if original_scan.status != "completed":
+            db.close()
+            return f"ERROR: Original scan must be completed. Status: {original_scan.status}"
+
+        storage = get_storage()
+        report = storage.get_json(f"scans/{scan_id}/report.json")
+
+        if not report:
+            db.close()
+            return f"ERROR: No report found for scan {scan_id}"
+
+        findings = report.get("findings", [])
+        finding_summaries = []
+        for f in findings:
+            summary = {
+                "title": f.get("title", ""),
+                "severity": f.get("severity", "info"),
+                "description": f.get("description", "")[:500],
+                "evidence": f.get("evidence", "")[:300],
+                "affected_urls": f.get("affected_urls", []),
+                "category": f.get("category", ""),
+            }
+            finding_summaries.append(summary)
+
+        verification_context = {
+            "verification_of": scan_id,
+            "original_scan_created_at": str(original_scan.created_at),
+            "original_risk_score": report.get("risk_score", 0),
+            "findings": finding_summaries,
+            "findings_count": len(finding_summaries),
+        }
+
+        extra_config = input.get("config", {})
+        new_scan = Scan(
+            user_id=original_scan.user_id,
+            target=original_scan.target,
+            scan_type="verification",
+            config={
+                **extra_config,
+                "verification_context": verification_context,
+            },
+        )
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+        new_scan_id = new_scan.id
+
+        db.close()
+
+        get_queue().send("scan-jobs", {
+            "scan_id": new_scan_id,
+            "target": new_scan.target,
+            "scan_type": "verification",
+            "config": new_scan.config or {},
+        })
+
+        return json.dumps({
+            "status": "queued",
+            "new_scan_id": new_scan_id,
+            "verification_of": scan_id,
+            "findings_count": len(finding_summaries),
+            "message": f"Verification scan {new_scan_id} created to verify {len(finding_summaries)} findings.",
+        }, indent=2)
+
+    except Exception as e:
+        return f"ERROR: Failed to create verification scan: {e}"
 
 
 def _check_human_messages(scan_id: str) -> str | None:
