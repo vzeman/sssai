@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from collections import Counter
 from pathlib import Path
@@ -612,12 +613,19 @@ print(json.dumps(results, indent=2))
 
 def _handle_browser_test(input: dict) -> str:
     """Execute a Playwright script for client-side security testing."""
-    import tempfile
     try:
         script_body = input["script"]
         url = input["url"]
         timeout = input.get("timeout", 60)
         screenshot_path = input.get("screenshot_path", "/output/browser_test.png")
+
+        # Validate screenshot_path stays within /output/ to prevent path traversal
+        try:
+            resolved = Path(screenshot_path).resolve()
+            if not str(resolved).startswith("/output/"):
+                return "ERROR: screenshot_path must be within /output/"
+        except Exception:
+            return "ERROR: invalid screenshot_path"
 
         # Indent the user script so it fits inside the async try block
         script_indented = "\n".join(
@@ -664,12 +672,19 @@ def _handle_browser_test(input: dict) -> str:
 
 def _handle_browser_crawl(input: dict) -> str:
     """JS-aware SPA crawling using Playwright."""
-    import tempfile
     try:
         url = input["url"]
         depth = min(input.get("depth", 2), 4)
         max_pages = input.get("max_pages", 20)
         output_path = input.get("output_path", "/output/browser_crawl.json")
+
+        # Validate output_path stays within /output/ to prevent path traversal
+        try:
+            resolved = Path(output_path).resolve()
+            if not str(resolved).startswith("/output/"):
+                return "ERROR: output_path must be within /output/"
+        except Exception:
+            return "ERROR: invalid output_path"
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".py", delete=False, prefix="/tmp/browser_crawl_"
