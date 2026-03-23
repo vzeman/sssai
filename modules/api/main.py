@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search
+from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, campaigns
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -41,6 +41,18 @@ try:
 except Exception:
     pass
 
+# Add campaign_id column to scans table if missing (migration)
+try:
+    from sqlalchemy import text as _text2
+    with engine.connect() as conn:
+        try:
+            conn.execute(_text2("ALTER TABLE scans ADD COLUMN IF NOT EXISTS campaign_id VARCHAR REFERENCES campaigns(id)"))
+        except Exception:
+            pass
+        conn.commit()
+except Exception:
+    pass
+
 # Add token tracking columns to scans table if missing (migration)
 try:
     from sqlalchemy import text as _text
@@ -52,6 +64,23 @@ try:
         ]:
             try:
                 conn.execute(_text(f"ALTER TABLE scans ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+            except Exception:
+                pass
+        conn.commit()
+except Exception:
+    pass
+
+# Add webhook_configs columns if missing (migration)
+try:
+    from sqlalchemy import text as _wh_text
+    with engine.connect() as conn:
+        # Create webhook_configs table if it doesn't exist via Base.metadata, but also
+        # ensure any new columns are added to existing tables gracefully.
+        for col, col_type in [
+            ("last_used_at", "TIMESTAMP NULL"),
+        ]:
+            try:
+                conn.execute(_wh_text(f"ALTER TABLE webhook_configs ADD COLUMN IF NOT EXISTS {col} {col_type}"))
             except Exception:
                 pass
         conn.commit()
@@ -92,6 +121,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(campaigns.router, prefix="/api/campaigns", tags=["campaigns"])
 
 
 @app.get("/health")
@@ -432,10 +462,10 @@ def clear_global_chat(
 
 
 def _answer_global_chat(user, question: str, r, db):
-    """Global AI assistant with access to all user scans and reports."""
+    """Global AI Security Advisor with full access to scan history, findings, memory, and analytics."""
     import threading
 
-    # Snapshot data we need before thread starts (db session is thread-local)
+    # Snapshot data before thread starts (db session is thread-local)
     user_id = user.id
     all_scans = db.query(Scan).filter(Scan.user_id == user_id).order_by(Scan.created_at.desc()).all()
     scans_summary = []
@@ -450,12 +480,33 @@ def _answer_global_chat(user, question: str, r, db):
             "created_at": str(s.created_at),
         })
 
+    # Fetch scan_memory entries (cross-scan knowledge base)
+    memory_entries = []
+    try:
+        from sqlalchemy import text as _sqltext
+        from modules.api.database import engine as _db_engine
+        with _db_engine.connect() as conn:
+            rows = conn.execute(_sqltext(
+                "SELECT content, memory_type, tags, target, created_at "
+                "FROM scan_memory ORDER BY created_at DESC LIMIT 20"
+            )).fetchall()
+            for row in rows:
+                memory_entries.append({
+                    "content": row[0],
+                    "type": row[1],
+                    "tags": row[2] or [],
+                    "target": row[3],
+                })
+    except Exception:
+        pass
+
     def _do_reply():
         try:
             import anthropic
             from modules.infra import get_storage
+            from modules.infra.elasticsearch import search as _es_search
 
-            # Load reports for completed scans (summaries only to save tokens)
+            # Load report summaries for completed scans
             reports_context = ""
             for scan_info in scans_summary[:5]:
                 if scan_info["status"] == "completed":
@@ -465,12 +516,17 @@ def _answer_global_chat(user, question: str, r, db):
                             brief = {
                                 "scan_id": scan_info["id"][:8],
                                 "target": scan_info["target"],
+                                "scan_type": scan_info["scan_type"],
                                 "risk_score": report.get("risk_score"),
-                                "summary": (report.get("summary") or "")[:500],
+                                "summary": (report.get("summary") or "")[:600],
                                 "findings_count": len(report.get("findings") or []),
                                 "top_findings": [
-                                    {"severity": f.get("severity"), "title": f.get("title")}
-                                    for f in (report.get("findings") or [])[:10]
+                                    {
+                                        "severity": f.get("severity"),
+                                        "title": f.get("title"),
+                                        "category": f.get("category"),
+                                    }
+                                    for f in (report.get("findings") or [])[:15]
                                 ],
                             }
                             reports_context += _json.dumps(brief, indent=1) + "\n\n"
@@ -479,7 +535,79 @@ def _answer_global_chat(user, question: str, r, db):
             if len(reports_context) > 30000:
                 reports_context = reports_context[:30000] + "\n... [truncated]"
 
-            # Load chat history
+            # ES analytics: top critical/high findings across all scans
+            critical_findings_context = ""
+            try:
+                findings_result = _es_search(
+                    "scanner-scan-findings",
+                    {"bool": {"filter": [{"terms": {"severity": ["critical", "high"]}}]}},
+                    size=20,
+                    sort=[{"timestamp": "desc"}],
+                )
+                findings_hits = findings_result.get("hits", {}).get("hits", [])
+                if findings_hits:
+                    critical_findings_context = _json.dumps([
+                        {
+                            "severity": h["_source"].get("severity"),
+                            "title": h["_source"].get("title"),
+                            "target": h["_source"].get("target"),
+                            "category": h["_source"].get("category"),
+                            "description": (h["_source"].get("description") or "")[:200],
+                            "remediation": (h["_source"].get("remediation") or "")[:150],
+                        }
+                        for h in findings_hits
+                    ], indent=1)
+            except Exception:
+                pass
+
+            # ES analytics: severity distribution, top categories, findings by target
+            analytics_context = ""
+            try:
+                agg_result = _es_search(
+                    "scanner-scan-findings",
+                    {"match_all": {}},
+                    size=0,
+                    aggs={
+                        "severity_dist": {"terms": {"field": "severity"}},
+                        "by_target": {"terms": {"field": "target", "size": 10}},
+                        "top_categories": {"terms": {"field": "category", "size": 10}},
+                        "last_30d": {
+                            "filter": {"range": {"timestamp": {"gte": "now-30d"}}},
+                            "aggs": {"severity_dist": {"terms": {"field": "severity"}}},
+                        },
+                        "last_7d": {
+                            "filter": {"range": {"timestamp": {"gte": "now-7d"}}},
+                            "aggs": {"severity_dist": {"terms": {"field": "severity"}}},
+                        },
+                    },
+                )
+                aggs = agg_result.get("aggregations", {})
+                analytics_context = _json.dumps({
+                    "overall_severity_distribution": {
+                        b["key"]: b["doc_count"]
+                        for b in aggs.get("severity_dist", {}).get("buckets", [])
+                    },
+                    "findings_by_target": {
+                        b["key"]: b["doc_count"]
+                        for b in aggs.get("by_target", {}).get("buckets", [])
+                    },
+                    "top_vulnerability_categories": {
+                        b["key"]: b["doc_count"]
+                        for b in aggs.get("top_categories", {}).get("buckets", [])
+                    },
+                    "last_30d_by_severity": {
+                        b["key"]: b["doc_count"]
+                        for b in aggs.get("last_30d", {}).get("severity_dist", {}).get("buckets", [])
+                    },
+                    "last_7d_by_severity": {
+                        b["key"]: b["doc_count"]
+                        for b in aggs.get("last_7d", {}).get("severity_dist", {}).get("buckets", [])
+                    },
+                }, indent=1)
+            except Exception:
+                pass
+
+            # Load chat history for conversation continuity
             raw = r.lrange(f"global:chat:{user_id}", 0, -1)
             chat_history = []
             for item in raw:
@@ -488,13 +616,12 @@ def _answer_global_chat(user, question: str, r, db):
                 except Exception:
                     pass
 
-            # Build messages
+            # Build messages with proper role alternation
             messages = []
             for m in chat_history[-30:]:
                 role = "user" if m.get("role") == "human" else "assistant"
                 messages.append({"role": role, "content": m.get("message", "")})
 
-            # Ensure proper alternation
             merged = []
             for m in messages:
                 if merged and merged[-1]["role"] == m["role"]:
@@ -511,69 +638,89 @@ def _answer_global_chat(user, question: str, r, db):
             scan_types = "full, security, pentest, seo, performance, compliance, api_security, cloud, recon, privacy, uptime, owasp, chatbot"
 
             system = (
-                "You are the central AI brain of a security scanning platform. "
-                "You help users plan, run, and analyze security scans.\n\n"
+                "You are the AI Security Advisor — the central intelligence of a security scanning platform. "
+                "You have full access to the user's complete scan history, findings database, "
+                "security knowledge base, and real-time analytics.\n\n"
                 "## Your Capabilities\n"
-                "- Discuss security risks, vulnerabilities, and remediation strategies\n"
-                "- Advise on which scan type to use for specific targets/goals\n"
-                "- Analyze and explain findings from completed scans\n"
-                "- Suggest scan configurations and improvements for specific environments\n"
-                "- Compare results across multiple scans\n"
-                "- Create new scans when the user asks\n"
-                "- **Validate findings**: Launch exploit PoC tasks to prove vulnerabilities are real\n"
-                "- Run OWASP Top 10 comprehensive testing\n"
-                "- Test AI chatbots for prompt injection, data leakage, and abuse\n\n"
+                "- **Risk Assessment**: Answer 'What's our biggest security risk right now?' with data-backed analysis\n"
+                "- **Trend Analysis**: Compare security posture across time periods — 'Compare this month to last month'\n"
+                "- **Remediation Plans**: Generate prioritized remediation plans for all critical/high findings\n"
+                "- **Ad-hoc Reports**: Generate filtered reports — 'Show me all SQL injection findings'\n"
+                "- **Scan Triggering**: Start scans — 'Scan example.com with focus on API security'\n"
+                "- **Cross-scan Analysis**: Identify patterns across multiple targets and scan types\n"
+                "- **CVE Alerts**: Flag new CVEs affecting detected technology stacks\n"
+                "- **Finding Validation**: Launch exploit PoC tasks to prove vulnerabilities are real\n\n"
                 "## Actions\n"
-                "You can trigger actions by including JSON blocks in your response:\n\n"
+                "Trigger platform actions by including JSON blocks in your response:\n\n"
                 "### Create a scan\n"
                 "```action\n"
                 '{\"action\": \"create_scan\", \"target\": \"https://example.com\", \"scan_type\": \"full\"}\n'
                 "```\n"
                 f"Available scan types: {scan_types}\n\n"
+                "### Generate an ad-hoc report\n"
+                "When the user asks for a filtered findings report:\n"
+                "```action\n"
+                '{\"action\": \"generate_report\", \"title\": \"Critical SQL Injection Findings\", '
+                '\"severity\": \"critical,high\", \"category\": \"injection\", \"target\": \"\"}\n'
+                "```\n\n"
                 "### Validate a finding (exploit PoC)\n"
-                "When the user asks to validate, prove, or test a specific vulnerability:\n"
                 "```action\n"
                 '{\"action\": \"validate_finding\", \"target\": \"https://example.com\", '
-                '\"finding\": \"XSS in search parameter\", \"scan_id\": \"abc123\", '
-                '\"goal\": \"Prove XSS is exploitable with a working payload\"}\n'
-                "```\n"
-                "This launches a sandboxed agent that writes exploit code, runs it, and "
-                "documents a step-by-step proof of concept.\n\n"
+                '\"finding\": \"SQL injection in login form\", \"scan_id\": \"abc123\", '
+                '\"goal\": \"Prove SQLi with working payload and extract sample data\"}\n'
+                "```\n\n"
+                "### Trigger CVE check\n"
+                "When you detect known technologies, proactively check for CVEs:\n"
+                "```action\n"
+                '{\"action\": \"cve_check\", \"technologies\": [\"WordPress 6.0\", \"Apache 2.4.51\", \"OpenSSL 1.1.1\"]}\n'
+                "```\n\n"
+                "## Risk Assessment Guidelines\n"
+                "When assessing risk, consider:\n"
+                "- Critical findings always take top priority\n"
+                "- Authentication/authorization flaws carry highest business risk\n"
+                "- Injection vulnerabilities (SQLi, XSS, SSRF, RCE) are critical by default\n"
+                "- Unpatched CVEs in detected tech stack compound risk significantly\n"
+                "- Trends matter: increasing critical count signals deteriorating posture\n\n"
+                "## Remediation Plan Format\n"
+                "When generating remediation plans, structure them as:\n"
+                "1. **Immediate (24-48h)**: Critical severity — patch/mitigate now\n"
+                "2. **Short-term (1-2 weeks)**: High severity — schedule fixes\n"
+                "3. **Medium-term (1 month)**: Medium severity — plan improvements\n"
+                "4. **Long-term**: Process/tooling improvements to prevent recurrence\n\n"
                 "## Scan Types\n"
                 "- **full**: Comprehensive audit — security, performance, SEO, compliance\n"
                 "- **security**: Vulnerability assessment — nuclei, nikto, headers, SSL\n"
                 "- **pentest**: Aggressive pentesting — port scan, directory brute-force, SQLi, fuzzing\n"
-                "- **owasp**: OWASP Top 10 focused testing — injection, broken auth, XSS, CSRF, "
-                "SSRF, security misconfiguration, vulnerable components, broken access control, "
-                "cryptographic failures, logging/monitoring gaps. Systematic coverage of all categories.\n"
-                "- **chatbot**: AI/Chatbot security testing — prompt injection (direct & indirect), "
-                "jailbreak attempts, data exfiltration via conversation, PII leakage, system prompt "
-                "extraction, tool abuse, conversation history manipulation, training data extraction, "
-                "denial of service via complex prompts, unauthorized action execution\n"
-                "- **seo**: SEO and performance — Lighthouse, accessibility, broken links\n"
+                "- **owasp**: OWASP Top 10 systematic coverage\n"
+                "- **chatbot**: AI/Chatbot security — prompt injection, jailbreaks, data leakage\n"
                 "- **api_security**: API endpoint discovery, auth testing, rate limiting\n"
-                "- **recon**: Passive reconnaissance — subdomains, DNS, WHOIS, tech detection\n"
-                "- **compliance**: OWASP, GDPR, PCI-DSS, HIPAA standards checking\n"
-                "- **privacy**: Cookie consent, tracking, data exposure checks\n"
-                "- **cloud**: Cloud infrastructure security assessment\n"
-                "- **performance**: Load testing, response time, bottleneck detection\n"
-                "- **uptime**: Availability monitoring and alerting\n\n"
-                "## Advice Approach\n"
-                "Before starting a scan, discuss with the user:\n"
-                "- What type of application is the target? (SaaS, e-commerce, API, WordPress, chatbot, etc.)\n"
-                "- What are their security concerns? (compliance, pentesting, specific vulnerability classes)\n"
-                "- Suggest the optimal scan type and configuration\n"
-                "- If they have existing scan results, recommend follow-up actions\n"
-                "- For chatbot targets, ask about the chatbot platform and what tools/actions it has access to\n\n"
+                "- **recon**: Passive recon — subdomains, DNS, WHOIS, tech detection\n"
+                "- **compliance**: OWASP, GDPR, PCI-DSS, HIPAA standards\n"
+                "- **cloud**: Cloud infrastructure security assessment\n\n"
                 f"## User's Scans ({len(scans_summary)} total)\n"
                 f"{_json.dumps(scans_summary, indent=1)}\n\n"
             )
+
             if reports_context:
                 system += f"## Recent Scan Reports (summaries)\n{reports_context}\n\n"
 
+            if critical_findings_context:
+                system += f"## Active Critical & High Findings\n{critical_findings_context}\n\n"
+
+            if analytics_context:
+                system += f"## Security Analytics\n{analytics_context}\n\n"
+
+            if memory_entries:
+                system += (
+                    f"## Security Knowledge Base (from past scans)\n"
+                    f"{_json.dumps(memory_entries[:15], indent=1)}\n\n"
+                )
+
             system += (
-                "Be concise but thorough. Reference specific scan data when relevant. "
-                "If the user asks about something not covered by existing scans, suggest running one. "
+                "Be concise but thorough. Reference specific scan data, findings, and analytics when relevant. "
+                "When the user asks about risk, use the analytics data to give specific numbers. "
+                "When generating remediation plans, reference actual findings with their severity and target. "
+                "If the user mentions technologies, proactively suggest a cve_check action. "
                 "When the user asks to validate or prove a finding, use the validate_finding action."
             )
 
@@ -600,7 +747,6 @@ def _answer_global_chat(user, question: str, r, db):
                 })
                 r.rpush(f"global:chat:{user_id}", agent_msg)
                 r.expire(f"global:chat:{user_id}", 86400 * 7)
-                # ES dual-write
                 try:
                     from modules.infra.elasticsearch import index_doc
                     index_doc("scanner-chat-messages", {
@@ -629,6 +775,227 @@ def _answer_global_chat(user, question: str, r, db):
                 pass
 
     threading.Thread(target=_do_reply, daemon=True).start()
+
+
+def _execute_chat_actions(reply_text: str, user_id: str, db):
+    """Parse and execute action blocks embedded in AI response text."""
+    import re
+
+    action_pattern = re.compile(r"```action\s*([\s\S]*?)```", re.MULTILINE)
+    matches = action_pattern.findall(reply_text)
+    if not matches:
+        return
+
+    for match in matches:
+        try:
+            action = _json.loads(match.strip())
+            action_type = action.get("action")
+
+            if action_type == "create_scan":
+                target = action.get("target", "").strip()
+                scan_type = action.get("scan_type", "security")
+                config = action.get("config", {})
+                if target and target != "https://example.com":
+                    new_scan = Scan(
+                        user_id=user_id,
+                        target=target,
+                        scan_type=scan_type,
+                        config=config or None,
+                    )
+                    db.add(new_scan)
+                    db.commit()
+                    db.refresh(new_scan)
+                    get_queue().send("scan-jobs", {
+                        "scan_id": new_scan.id,
+                        "target": new_scan.target,
+                        "scan_type": new_scan.scan_type,
+                        "config": new_scan.config or {},
+                    })
+        except Exception:
+            pass
+
+
+# ─── Chat: actions, ad-hoc reports, and proactive alerts ──────────────
+
+class ChatActionRequest(BaseModel):
+    action: str
+    target: str = ""
+    scan_type: str = "security"
+    config: dict | None = None
+    # generate_report params
+    title: str = ""
+    severity: str = ""
+    category: str = ""
+    # validate_finding params
+    finding: str = ""
+    scan_id: str = ""
+    goal: str = ""
+    # cve_check params
+    technologies: list[str] = []
+
+
+@app.post("/api/chat/actions")
+def execute_chat_action(
+    body: ChatActionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Execute a structured action triggered from the AI chat (create scan, generate report, CVE check)."""
+    if body.action == "create_scan":
+        target = body.target.strip()
+        if not target:
+            raise HTTPException(status_code=400, detail="target is required for create_scan")
+        new_scan = Scan(
+            user_id=user.id,
+            target=target,
+            scan_type=body.scan_type or "security",
+            config=body.config or None,
+        )
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+        get_queue().send("scan-jobs", {
+            "scan_id": new_scan.id,
+            "target": new_scan.target,
+            "scan_type": new_scan.scan_type,
+            "config": new_scan.config or {},
+        })
+        return {"action": "create_scan", "scan_id": new_scan.id, "status": "queued", "target": target}
+
+    elif body.action == "generate_report":
+        from modules.infra.elasticsearch import search as _es_search
+        filters: list[dict] = []
+        if body.severity:
+            filters.append({"terms": {"severity": body.severity.split(",")}})
+        if body.category:
+            filters.append({"match": {"category": body.category}})
+        if body.target:
+            filters.append({"wildcard": {"target": f"*{body.target}*"}})
+        query = {"bool": {"filter": filters}} if filters else {"match_all": {}}
+        result = _es_search("scanner-scan-findings", query, size=200, sort=[{"timestamp": "desc"}])
+        hits = result.get("hits", {})
+        findings = [h["_source"] for h in hits.get("hits", [])]
+        return {
+            "action": "generate_report",
+            "title": body.title or "Ad-hoc Security Report",
+            "total": hits.get("total", {}).get("value", 0),
+            "findings": findings,
+        }
+
+    elif body.action == "cve_check":
+        import threading
+
+        techs = body.technologies
+        if not techs:
+            raise HTTPException(status_code=400, detail="technologies list is required for cve_check")
+
+        user_id = user.id
+        r = _redis.from_url(_REDIS_URL)
+
+        def _do_cve_check():
+            try:
+                import anthropic
+                client = anthropic.Anthropic()
+                system = (
+                    "You are a CVE intelligence analyst. Given a list of technologies and versions, "
+                    "identify known CVEs, actively exploited vulnerabilities, and security advisories "
+                    "from 2024-2026. For each finding, provide: CVE ID (if known), severity, "
+                    "affected versions, brief description, and recommended action. "
+                    "Focus on critical and high severity issues. Be concise and actionable."
+                )
+                tech_list = "\n".join(f"- {t}" for t in techs)
+                response = client.messages.create(
+                    model=AI_MODEL,
+                    max_tokens=2000,
+                    system=system,
+                    messages=[{
+                        "role": "user",
+                        "content": f"Check for known CVEs and security issues for these technologies:\n{tech_list}",
+                    }],
+                )
+                reply_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        reply_text += block.text
+                if reply_text:
+                    alert_msg = _json.dumps({
+                        "role": "agent",
+                        "message": f"**Proactive CVE Alert**\n\nI checked the following technologies for known vulnerabilities:\n{tech_list}\n\n{reply_text}",
+                        "type": "cve_alert",
+                        "timestamp": _time.strftime("%H:%M:%S"),
+                        "ts": _time.time(),
+                    })
+                    r.rpush(f"global:chat:{user_id}", alert_msg)
+                    r.expire(f"global:chat:{user_id}", 86400 * 7)
+            except Exception:
+                pass
+
+        threading.Thread(target=_do_cve_check, daemon=True).start()
+        return {"action": "cve_check", "status": "checking", "technologies": techs}
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {body.action}")
+
+
+@app.get("/api/chat/alerts")
+def get_proactive_alerts(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate proactive security alerts based on detected tech stacks and recent findings."""
+    import threading
+
+    user_id = user.id
+    all_scans = db.query(Scan).filter(
+        Scan.user_id == user_id, Scan.status == "completed"
+    ).order_by(Scan.created_at.desc()).limit(10).all()
+
+    # Gather detected technologies from scan memories
+    tech_stack: list[str] = []
+    try:
+        from sqlalchemy import text as _sqltext
+        from modules.api.database import engine as _db_engine
+        with _db_engine.connect() as conn:
+            rows = conn.execute(_sqltext(
+                "SELECT content FROM scan_memory WHERE memory_type = 'finding' "
+                "AND content ILIKE '%version%' OR content ILIKE '%technology%' "
+                "ORDER BY created_at DESC LIMIT 10"
+            )).fetchall()
+            for row in rows:
+                tech_stack.append(row[0][:200])
+    except Exception:
+        pass
+
+    # Get critical findings from ES for alert summary
+    from modules.infra.elasticsearch import search as _es_search
+    crit_result = _es_search(
+        "scanner-scan-findings",
+        {"bool": {"filter": [{"terms": {"severity": ["critical", "high"]}}]}},
+        size=10,
+        sort=[{"timestamp": "desc"}],
+    )
+    crit_hits = crit_result.get("hits", {}).get("hits", [])
+    critical_findings = [
+        {
+            "severity": h["_source"].get("severity"),
+            "title": h["_source"].get("title"),
+            "target": h["_source"].get("target"),
+        }
+        for h in crit_hits
+    ]
+
+    return {
+        "scans_analyzed": len(all_scans),
+        "critical_findings_count": crit_result.get("hits", {}).get("total", {}).get("value", 0),
+        "recent_critical_findings": critical_findings,
+        "detected_tech_context": tech_stack[:5],
+        "recommendation": (
+            "Use POST /api/chat/actions with action=cve_check to check detected technologies for CVEs, "
+            "or ask the AI advisor directly: 'Check for CVEs in our tech stack'"
+        ) if not tech_stack else (
+            "Tech stack detected from scan memory. Use the chat advisor to run a CVE check."
+        ),
+    }
 
 
 # ─── Validation tasks ─────────────────────────────────────────────────

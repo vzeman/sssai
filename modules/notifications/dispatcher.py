@@ -1,8 +1,10 @@
 """
 Multi-channel notification dispatcher.
-Sends alerts via email, Slack, Discord, and webhooks.
+Sends alerts via email, Slack, Discord, webhooks, and issue trackers
+(Jira, Linear, GitHub Issues).
 """
 
+import html
 import json
 import logging
 from dataclasses import dataclass
@@ -179,9 +181,8 @@ class NotificationDispatcher:
 
         _title = html.escape(notification.title)
         _message = html.escape(notification.message)
-        _target = html.escape(notification.target) if notification.target else None
-        _report_url = html.escape(notification.report_url) if notification.report_url else None
-
+        _target = html.escape(notification.target) if notification.target else ""
+        _report_url = html.escape(notification.report_url, quote=True) if notification.report_url else ""
         html_body = f"""
         <h2>{_title}</h2>
         <p>{_message}</p>
@@ -203,6 +204,27 @@ class NotificationDispatcher:
         smtp.send_message(msg)
         smtp.quit()
         log.info("Email notification sent: %s -> %s", notification.title, config["to_email"])
+
+    async def _send_jira(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Jira channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_linear(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "Linear channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
+
+    async def _send_github_issues(self, config: dict, notification: Notification):
+        """Issue tracker channels are handled via dispatch_issue_trackers, not this path."""
+        log.info(
+            "GitHub Issues channel configured — use dispatch_issue_trackers() for findings-based tickets. "
+            "Scan notification: %s", notification.title
+        )
 
     async def _send_openclaw(self, config: dict, notification: Notification):
         """Send notification via OpenClaw gateway API for multi-channel distribution."""
