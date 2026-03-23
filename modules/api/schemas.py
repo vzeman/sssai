@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 _SUPPORTED_AUTH_TYPES = frozenset(
@@ -294,6 +294,14 @@ class CveAlertResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ─── Verification ────────────────────────────────────────────────────
+class VerificationCreate(BaseModel):
+    finding_id: str
+    scan_id: str
+    target: str
+    goal: str = "Validate and document this vulnerability with a proof of concept"
+    
 
 # ─── Tools ────────────────────────────────────────────────────────────
 class ToolInfo(BaseModel):
