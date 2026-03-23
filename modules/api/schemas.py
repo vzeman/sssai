@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ─── Auth ──────────────────────────────────────────────────────────────
@@ -150,6 +150,38 @@ class NotificationChannelResponse(BaseModel):
     min_severity: str
     is_active: bool
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Campaigns ────────────────────────────────────────────────────────
+class CampaignCreate(BaseModel):
+    name: str = ""
+    targets: list[str] = Field(..., min_length=1, max_length=50)
+    scan_type: str = "security"
+    config: dict | None = None
+
+
+class CampaignScanSummary(BaseModel):
+    id: str
+    target: str
+    status: str
+    risk_score: float | None = None
+    findings_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class CampaignResponse(BaseModel):
+    id: str
+    name: str
+    scan_type: str
+    status: str
+    targets: list[str]
+    aggregate_risk_score: float | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+    scans: list[CampaignScanSummary] = []
 
     model_config = {"from_attributes": True}
 
