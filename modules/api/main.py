@@ -125,9 +125,6 @@ app.include_router(campaigns.router, prefix="/api/campaigns", tags=["campaigns"]
 app.include_router(dashboard.router, tags=["dashboard"])
 app.include_router(audit.router, tags=["audit"])
 
-# Scan wizard routes
-app.include_router(wizard.router)
-
 
 @app.get("/health")
 def health():
