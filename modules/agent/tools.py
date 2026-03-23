@@ -37,6 +37,7 @@ TOOLS = [
             "  Visual: backstopjs\n"
             "  Auth: hydra\n"
             "  Cloud: prowler\n"
+            "  Breach Monitoring: holehe, breach-parse\n"
             "  Utility: curl, wget, jq, python3, node\n"
             "Save output files to /output/ for later reference."
         ),
@@ -440,6 +441,56 @@ TOOLS = [
                 },
             },
             "required": ["summary", "risk_score", "findings"],
+        },
+    },
+    # ── Breach & Dark Web Monitoring ─────────────────────────────────────────
+    {
+        "name": "breach_check",
+        "description": (
+            "Check if a domain has appeared in known data breaches using the Have I Been Pwned API "
+            "and other breach intelligence sources. Returns breach names, dates, data types exposed, "
+            "and affected account counts. Always run this during Phase 0 Discovery for security scans."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for breaches (e.g., 'example.com')",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/breach_check.json)",
+                },
+            },
+            "required": ["domain"],
+        },
+    },
+    {
+        "name": "credential_leak_check",
+        "description": (
+            "Search for exposed credentials and account registrations associated with a domain. "
+            "Uses holehe and related tools to identify which services domain emails are registered on, "
+            "indicating potential credential exposure surface. Run during Phase 0 Discovery."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Domain to check for credential leaks (e.g., 'example.com')",
+                },
+                "emails": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific email addresses to check (if known). If not provided, uses common patterns like admin@domain, info@domain.",
+                },
+                "save_path": {
+                    "type": "string",
+                    "description": "Output path for results (default /output/credential_leak.json)",
+                },
+            },
+            "required": ["domain"],
         },
     },
     # ── AI-first adaptive tools ──────────────────────────────────────────────

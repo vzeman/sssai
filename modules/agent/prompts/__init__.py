@@ -26,6 +26,12 @@ _FOCUS_HINTS = {
     "cloud": "Focus on cloud security and infrastructure after discovery.",
     "privacy": "Focus on privacy, data protection, cookie compliance, and GDPR signals.",
     "uptime": "Focus on availability, response times, and monitoring endpoints.",
+    "breach_monitoring": (
+        "Focus on breach and dark web exposure. Run breach_check and credential_leak_check first. "
+        "Check HIBP, credential leaks, and exposed account surfaces. "
+        "Load the breach_monitoring knowledge module. "
+        "Produce a detailed Breach Exposure Summary in your report."
+    ),
 }
 
 
