@@ -405,7 +405,7 @@ class HeartbeatService:
     def _retry_scan(self, scan_id: str) -> str:
         """Re-queue a stuck scan with checkpoint context if available."""
         try:
-            from modules.agent.checkpoint import load_checkpoint, build_resume_context
+            from modules.infra.checkpoint import load_checkpoint, build_resume_context
             from modules.infra import get_queue
 
             with self.engine.connect() as conn:
@@ -449,7 +449,7 @@ class HeartbeatService:
         """Mark a scan as failed."""
         try:
             from modules.infra import get_storage
-            from modules.agent.checkpoint import delete_checkpoint
+            from modules.infra.checkpoint import delete_checkpoint
 
             with self.engine.connect() as conn:
                 conn.execute(text("UPDATE scans SET status = 'failed' WHERE id = :sid"), {"sid": scan_id})

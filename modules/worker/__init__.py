@@ -113,7 +113,7 @@ def _recover_orphaned_scans():
         return
     try:
         from sqlalchemy import create_engine, text
-        from modules.agent.checkpoint import load_checkpoint, build_resume_context
+        from modules.infra.checkpoint import load_checkpoint, build_resume_context
 
         engine = create_engine(_DB_URL)
         queue = get_queue()

@@ -24,7 +24,7 @@ import httpx
 
 from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
-from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
+from modules.infra.checkpoint import save_checkpoint, delete_checkpoint
 from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
 
