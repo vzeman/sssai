@@ -7,7 +7,7 @@ trend analysis, and AI-generated weekly security briefs.
 from fastapi import APIRouter, Depends, Query
 from modules.api.auth import get_current_user
 from modules.api.models import User
-from modules.infra.elasticsearch import search, get_client
+from modules.infra.elasticsearch import search
 
 router = APIRouter()
 
@@ -308,7 +308,7 @@ def _generate_weekly_brief_text(overall_avg: float | None, targets: list[dict]) 
         )
 
         prompt = (
-            f"Weekly security posture brief. Overall score: {overall_avg:.1f}/100.\n"
+            f"Weekly security posture brief. Overall score: {(overall_avg or 0.0):.1f}/100.\n"
             f"Per-target data:\n{context}\n\n"
             "Write a concise 3-5 sentence weekly security brief suitable for a CISO or team lead. "
             "Highlight the most critical risks, notable improvements, and top 1-2 remediation priorities. "

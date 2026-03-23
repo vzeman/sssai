@@ -77,18 +77,19 @@ def _age_penalty(findings: list[dict], scan_timestamp: datetime) -> float:
     return penalty
 
 
-def _remediation_velocity_bonus(target: str, current_count: int) -> float:
+def _remediation_velocity_bonus(target: str, user_id: str, current_count: int) -> float:
     """Bonus (0-10) for reducing finding count vs recent scans."""
     try:
         from modules.infra.elasticsearch import search as es_search
 
-        # Look at last 5 completed scans for this target
+        # Look at last 5 completed scans for this target and user
         result = es_search(
             "scanner-security-posture",
             {
                 "bool": {
                     "filter": [
                         {"term": {"target": target}},
+                        {"term": {"user_id": user_id}},
                         {"exists": {"field": "finding_counts.total"}},
                     ]
                 }
@@ -162,7 +163,7 @@ def calculate_posture_score(
     cvss_penalty = _cvss_factor(findings)
     age_penalty = _age_penalty(findings, now)
     chain_penalty = _attack_chain_penalty(findings)
-    velocity_bonus = _remediation_velocity_bonus(target, len(findings))
+    velocity_bonus = _remediation_velocity_bonus(target, user_id, len(findings))
 
     # Incorporate existing risk_score (0-100 scale from agent) if available
     # risk_score represents vulnerability severity; convert to penalty
@@ -175,7 +176,7 @@ def calculate_posture_score(
     posture_score = round(raw_score, 2)
 
     # Determine trend vs. previous snapshot for this target
-    trend, trend_delta = _compute_trend(target, posture_score)
+    trend, trend_delta = _compute_trend(target, user_id, posture_score)
 
     return {
         "timestamp": now.isoformat(),
@@ -200,14 +201,14 @@ def calculate_posture_score(
     }
 
 
-def _compute_trend(target: str, current_score: float) -> tuple[str, float]:
+def _compute_trend(target: str, user_id: str, current_score: float) -> tuple[str, float]:
     """Compare current score against most recent snapshot. Returns (trend, delta)."""
     try:
         from modules.infra.elasticsearch import search as es_search
 
         result = es_search(
             "scanner-security-posture",
-            {"bool": {"filter": [{"term": {"target": target}}]}},
+            {"bool": {"filter": [{"term": {"target": target}}, {"term": {"user_id": user_id}}]}},
             size=1,
             sort=[{"timestamp": "desc"}],
         )
