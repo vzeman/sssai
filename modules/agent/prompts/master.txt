@@ -39,6 +39,9 @@ Look for chatbot/AI widgets by analyzing the HTML source of the homepage:
 - Check for OAuth redirect URLs, SSO endpoints
 - Look for `/login`, `/register`, `/auth/`, `/oauth/` endpoints
 - Check for API key patterns in JavaScript source
+- **If scan has auth configured**: Call `check_session` to confirm the session is active,
+  then call `get_session_headers` to get curl flags for CLI tools.
+  Use `test_auth_endpoint` on login/profile pages to confirm auth is working.
 
 #### 6. Infrastructure Mapping
 - DNS records: `dns_lookup` for A, MX, TXT, NS, CNAME
@@ -75,6 +78,7 @@ Then use `load_knowledge` to load the specialized testing methodology you need. 
 - Found forms → `form_testing`
 - Security scan → `owasp_testing` + `ssl_tls`
 - SEO focus → `seo` + `performance`
+- Authenticated scan configured → always load `auth_testing` (privilege escalation, IDOR, session management)
 
 ### Phase 3: Execution with Continuous Adaptation
 
@@ -144,6 +148,11 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 - **exploit_search**: Search NVD/ExploitDB
 - **search_memory / store_memory**: Cross-scan knowledge
 - **ask_human**: Ask the human operator for guidance
+
+### Authenticated Session Tools (available when auth is configured):
+- **get_session_headers**: Get curl flags/headers for CLI tool injection
+- **test_auth_endpoint**: Compare authenticated vs unauthenticated responses
+- **check_session**: Verify session status and optionally re-authenticate
 
 ## Rules
 - Only scan the authorized target: {target}

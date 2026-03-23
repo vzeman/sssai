@@ -409,6 +409,69 @@ TOOLS = [
         },
     },
     {
+        "name": "get_session_headers",
+        "description": (
+            "Return the current authenticated session as curl flags and HTTP headers. "
+            "Use when you need to inject authentication into shell tool commands like curl, "
+            "nuclei, sqlmap, ffuf, etc. Returns empty strings if no session is active. "
+            "Example: pass the curl_flags into a curl command to test authenticated endpoints."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "test_auth_endpoint",
+        "description": (
+            "Test an endpoint both WITH and WITHOUT authentication and compare the responses. "
+            "Use this to discover authenticated-only content, identify access control boundaries, "
+            "detect IDOR vulnerabilities, and compare the authenticated vs unauthenticated "
+            "attack surface. Reports status codes, response sizes, and key differences."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to test",
+                },
+                "method": {
+                    "type": "string",
+                    "description": "HTTP method (default GET)",
+                    "enum": ["GET", "HEAD", "POST", "OPTIONS"],
+                },
+                "extra_headers": {
+                    "type": "object",
+                    "description": "Additional headers to include in both requests",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Request body for POST requests",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "check_session",
+        "description": (
+            "Check the status of the current authentication session. "
+            "Returns whether the session is active, which cookies/headers are set, "
+            "and whether re-authentication may be needed. "
+            "Use before running a long batch of authenticated tests."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reauthenticate": {
+                    "type": "boolean",
+                    "description": "If true, attempt to re-authenticate if session is invalid (default false)",
+                },
+            },
+        },
+    },
+    {
         "name": "update_attack_surface",
         "description": (
             "Update the structured attack surface map with discoveries. "

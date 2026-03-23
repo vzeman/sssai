@@ -34,10 +34,14 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     Uses the master prompt (AI-first adaptive) with a focus hint from scan_type.
     Falls back to legacy {scan_type}.txt if master.txt doesn't exist.
     """
-    config = config or {}
+    # Work on a shallow copy so we do not mutate the caller's config dict.
+    config = dict(config) if config else {}
 
-    # Extract retry_context before passing to template format (it has curly braces)
+    # Extract keys that must not be passed to template.format() — they contain
+    # nested dicts with curly braces or are not template placeholders.
     retry_context = config.pop("retry_context", None)
+    config.pop("auth", None)          # auth config: nested dict, not a template var
+    config.pop("resume_context", None)  # resume_context also handled separately
 
     # Try master prompt first (AI-first adaptive mode)
     master_path = os.path.join(_DIR, "master.txt")

@@ -1,9 +1,70 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
-# ─── Auth ──────────────────────────────────────────────────────────────
+_SUPPORTED_AUTH_TYPES = frozenset(
+    {"form_login", "bearer_token", "basic_auth", "oauth2", "cookie", "api_key"}
+)
+
+
+# ─── Auth (scan credentials) ──────────────────────────────────────────
+class AuthConfig(BaseModel):
+    """Configuration for authenticated scanning.
+
+    Nested inside ScanCreate.config under the ``auth`` key::
+
+        {
+            "auth": {
+                "type": "form_login",
+                "login_url": "https://target.com/login",
+                "username_field": "email",
+                "password_field": "password",
+                "credentials": {"email": "user@example.com", "password": "secret"},
+                "success_indicator": "dashboard"
+            }
+        }
+    """
+
+    type: str
+    # form_login
+    login_url: str | None = None
+    username_field: str | None = None
+    password_field: str | None = None
+    credentials: dict | None = None
+    success_indicator: str | None = None
+    extra_fields: dict | None = None
+    csrf_field: str | None = None
+    # bearer_token
+    token: str | None = None
+    expires_at: float | None = None
+    # basic_auth (shares credentials)
+    # oauth2
+    token_url: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    scope: str | None = None
+    grant_type: str = "client_credentials"
+    # cookie
+    cookies: dict | None = None
+    cookie_string: str | None = None
+    # api_key
+    key: str | None = None
+    header_name: str = "X-API-Key"
+    query_param: str | None = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_auth_type(cls, v: str) -> str:
+        if v not in _SUPPORTED_AUTH_TYPES:
+            raise ValueError(
+                f"Unsupported auth type '{v}'. "
+                f"Must be one of: {sorted(_SUPPORTED_AUTH_TYPES)}"
+            )
+        return v
+
+
+# ─── Platform Auth (JWT) ──────────────────────────────────────────────
 class UserCreate(BaseModel):
     email: str
     password: str
@@ -33,6 +94,15 @@ class ScanCreate(BaseModel):
     target: str
     scan_type: str = "security"
     config: dict | None = None
+
+    @field_validator("config")
+    @classmethod
+    def validate_auth_config(cls, v: dict | None) -> dict | None:
+        """If config contains an 'auth' key, validate it as AuthConfig."""
+        if v and "auth" in v:
+            # Raises ValidationError with descriptive message if invalid
+            AuthConfig(**v["auth"])
+        return v
 
 
 class ScanResponse(BaseModel):
