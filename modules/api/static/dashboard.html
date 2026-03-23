@@ -947,6 +947,9 @@ function filterAssets() {
   renderAssets(filtered);
 }
 
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function renderAssets(assets) {
   var el = document.getElementById('assets-list');
   if (!assets || !assets.length) { el.innerHTML = '<div class="empty">No assets discovered yet</div>'; return; }
@@ -955,15 +958,15 @@ function renderAssets(assets) {
     var a = assets[i];
     var label = a.hostname || a.ip || a.service || a.asset_type;
     var detail = [];
-    if (a.ip && a.hostname) detail.push(a.ip);
-    if (a.port) detail.push(':' + a.port);
-    if (a.service) detail.push(a.service);
-    if (a.technology) detail.push(a.technology);
+    if (a.ip && a.hostname) detail.push(esc(a.ip));
+    if (a.port) detail.push(':' + esc(String(a.port)));
+    if (a.service) detail.push(esc(a.service));
+    if (a.technology) detail.push(esc(a.technology));
     html += '<div class="asset-row">';
-    html += '<span class="asset-type-pill ' + a.asset_type + '">' + a.asset_type + '</span>';
-    html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (label||'') + '">' + (label||'') + '</span>';
+    html += '<span class="asset-type-pill ' + esc(a.asset_type) + '">' + esc(a.asset_type) + '</span>';
+    html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(label) + '">' + esc(label) + '</span>';
     if (detail.length) html += '<span style="font-size:0.72rem;color:var(--muted)">' + detail.join('') + '</span>';
-    html += '<span style="font-size:0.68rem;color:var(--muted);margin-left:0.4rem">' + new Date(a.last_seen).toLocaleDateString() + '</span>';
+    html += '<span style="font-size:0.68rem;color:var(--muted);margin-left:0.4rem">' + esc(new Date(a.last_seen).toLocaleDateString()) + '</span>';
     html += '</div>';
   }
   el.innerHTML = html;
