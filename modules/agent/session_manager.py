@@ -39,7 +39,7 @@ class SessionManager:
 
     def __init__(self, auth_config: dict):
         self.auth_type: str = auth_config.get("type", "")
-        self._config: dict = auth_config
+        self._config: dict = dict(auth_config)
         self._session_cookies: dict[str, str] = {}
         self._session_headers: dict[str, str] = {}
         self._authenticated: bool = False
