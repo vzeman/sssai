@@ -1664,10 +1664,21 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Index findings to Elasticsearch ──
     try:
         from modules.infra.elasticsearch import bulk_index
+        from modules.agent.finding_dedup import deduplicate_findings, mark_resolved_in_es
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
+
+        raw_findings = report.get("findings", [])
+
+        # Deduplicate against previous findings for this target and assign lifecycle status
+        enriched_findings, resolved_ids = deduplicate_findings(raw_findings, target, scan_id, now)
+
+        # Mark previously-seen findings that are no longer present as resolved
+        if resolved_ids:
+            mark_resolved_in_es(resolved_ids, scan_id, now)
+
         es_findings = []
-        for f in report.get("findings", []):
+        for f in enriched_findings:
             es_findings.append({
                 "timestamp": now,
                 "scan_id": scan_id,
@@ -1683,6 +1694,13 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "tool": f.get("tool"),
                 "evidence": f.get("evidence", ""),
                 "risk_score": report.get("risk_score"),
+                # Lifecycle fields
+                "finding_status": f.get("finding_status", "new"),
+                "dedup_key": f.get("dedup_key"),
+                "affected_url": f.get("affected_url", ""),
+                "first_seen_scan_id": f.get("first_seen_scan_id"),
+                "first_seen_date": f.get("first_seen_date"),
+                "last_seen_scan_id": f.get("last_seen_scan_id"),
             })
         if es_findings:
             bulk_index("scanner-scan-findings", es_findings)

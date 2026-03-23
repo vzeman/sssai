@@ -149,6 +149,7 @@
 <div class="tabs">
   <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
   <div class="tab" data-tab="findings" onclick="switchTab('findings')">Findings</div>
+  <div class="tab" data-tab="lifecycle" onclick="switchTab('lifecycle')">Lifecycle</div>
   <div class="tab" data-tab="uptime-analytics" onclick="switchTab('uptime-analytics')">Uptime</div>
   <div class="tab" data-tab="search" onclick="switchTab('search')">Search</div>
   <div class="tab" data-tab="logs" onclick="switchTab('logs')">Logs</div>
@@ -190,6 +191,17 @@
         <div class="chart-container small"><canvas id="activityChart"></canvas></div>
       </div>
     </div>
+    <div class="grid-2" style="margin-top:0;">
+      <div class="card">
+        <h2>Finding Lifecycle (30d)</h2>
+        <div id="lifecycleOverviewStats" class="grid-4" style="margin-bottom:0.75rem;"></div>
+        <div class="chart-container small"><canvas id="lifecycleOverviewChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>MTTR by Severity</h2>
+        <div id="mttrOverview"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Findings Tab -->
@@ -219,6 +231,33 @@
       </div>
       <div id="findingsAggs" class="grid-3" style="margin-bottom:0.75rem;"></div>
       <div id="findingsResults"><p class="loading">Loading recent findings...</p></div>
+    </div>
+  </div>
+
+  <!-- Lifecycle Tab -->
+  <div class="tab-content" id="tab-lifecycle">
+    <div class="grid-4" id="lifecycleStats"></div>
+    <div class="grid-2" style="margin-top:1rem;">
+      <div class="card">
+        <h2>New vs Resolved Findings Over Time</h2>
+        <div class="chart-container"><canvas id="lifecycleTrendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Status Distribution</h2>
+        <div class="chart-container"><canvas id="lifecycleStatusChart"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:0;">
+      <div class="card">
+        <h2>Mean Time to Remediate (MTTR)</h2>
+        <div id="mttrTable">
+          <p class="loading">Loading MTTR data...</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Top Recurring Findings</h2>
+        <div id="lifecycleRecurring"><p class="loading">Loading...</p></div>
+      </div>
     </div>
   </div>
 
@@ -340,9 +379,11 @@ async function apiFetch(url) {
 }
 
 // ─── Tabs ───
+let lifecycleLoaded = false;
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === 'tab-' + name));
+  if (name === 'lifecycle' && !lifecycleLoaded) { lifecycleLoaded = true; loadLifecycle(); }
 }
 
 // ─── Chart helpers ───
@@ -477,6 +518,130 @@ async function searchFindings() {
       ${f.description ? `<div class="snippet">${esc(f.description).slice(0, 200)}</div>` : ''}
     </div>
   `).join('');
+}
+
+// ─── Finding Lifecycle ───
+const LIFECYCLE_COLORS = { new: '#3b82f6', existing: '#eab308', resolved: '#22c55e', regressed: '#ef4444' };
+
+async function loadLifecycle() {
+  const [lifecycle, mttr] = await Promise.all([
+    apiFetch('/api/search/analytics/lifecycle?days=30'),
+    apiFetch('/api/search/analytics/mttr?days=90'),
+  ]);
+  if (!lifecycle) return;
+
+  const sd = lifecycle.status_distribution || {};
+  const newCount = sd.new || 0;
+  const existingCount = sd.existing || 0;
+  const resolvedCount = sd.resolved || 0;
+  const regressedCount = sd.regressed || 0;
+  const regressionRate = lifecycle.regression_rate_pct || 0;
+
+  // Stats (full lifecycle tab)
+  document.getElementById('lifecycleStats').innerHTML = `
+    <div class="stat-card ok"><div class="val">${newCount}</div><div class="label">New (30d)</div></div>
+    <div class="stat-card"><div class="val">${existingCount}</div><div class="label">Recurring</div></div>
+    <div class="stat-card ok"><div class="val">${resolvedCount}</div><div class="label">Resolved</div></div>
+    <div class="stat-card critical"><div class="val">${regressedCount}</div><div class="label">Regressed</div></div>
+  `;
+
+  // Mini-stats for overview card
+  const overviewEl = document.getElementById('lifecycleOverviewStats');
+  if (overviewEl) {
+    overviewEl.innerHTML = `
+      <div class="stat-card ok"><div class="val">${newCount}</div><div class="label">New</div></div>
+      <div class="stat-card"><div class="val">${existingCount}</div><div class="label">Recurring</div></div>
+      <div class="stat-card ok"><div class="val">${resolvedCount}</div><div class="label">Resolved</div></div>
+      <div class="stat-card critical"><div class="val">${regressedCount}</div><div class="label">Regressed</div></div>
+    `;
+  }
+
+  // New vs Resolved trend chart
+  const timeline = lifecycle.timeline || [];
+  createChart('lifecycleTrendChart', {
+    type: 'line',
+    data: {
+      labels: timeline.map(d => d.date ? d.date.split('T')[0].slice(5) : ''),
+      datasets: [
+        { label: 'New', data: timeline.map(d => d.new || 0), borderColor: LIFECYCLE_COLORS.new, backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 },
+        { label: 'Resolved', data: timeline.map(d => d.resolved || 0), borderColor: LIFECYCLE_COLORS.resolved, backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.3 },
+        { label: 'Regressed', data: timeline.map(d => d.regressed || 0), borderColor: LIFECYCLE_COLORS.regressed, fill: false, tension: 0.3, borderDash: [4,4] },
+      ],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } } } },
+  });
+
+  // Mini overview lifecycle chart (donut)
+  const overviewChartEl = document.getElementById('lifecycleOverviewChart');
+  if (overviewChartEl) {
+    createChart('lifecycleOverviewChart', {
+      type: 'doughnut',
+      data: {
+        labels: ['New', 'Recurring', 'Resolved', 'Regressed'],
+        datasets: [{ data: [newCount, existingCount, resolvedCount, regressedCount], backgroundColor: [LIFECYCLE_COLORS.new, LIFECYCLE_COLORS.existing, LIFECYCLE_COLORS.resolved, LIFECYCLE_COLORS.regressed] }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e2e8f0' } } } },
+    });
+  }
+
+  // Status distribution donut
+  createChart('lifecycleStatusChart', {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(sd),
+      datasets: [{ data: Object.values(sd), backgroundColor: Object.keys(sd).map(k => LIFECYCLE_COLORS[k] || '#64748b') }],
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e2e8f0' } } } },
+  });
+
+  // Top recurring findings
+  const recurring = lifecycle.top_recurring_findings || {};
+  const recurringHtml = Object.entries(recurring).slice(0, 10).map(([title, count]) =>
+    `<div class="result-item"><span class="title">${esc(title)}</span> <span style="float:right; color:var(--orange)">${count}x seen</span></div>`
+  ).join('') || '<p class="empty">No recurring findings</p>';
+  const recurringEl = document.getElementById('lifecycleRecurring');
+  if (recurringEl) recurringEl.innerHTML = recurringHtml;
+
+  // MTTR table (full lifecycle tab)
+  if (mttr) {
+    const mttrData = mttr.mttr_by_severity || {};
+    const severityOrder = ['critical', 'high', 'medium', 'low', 'info'];
+    const rows = severityOrder
+      .filter(s => mttrData[s])
+      .map(s => {
+        const d = mttrData[s];
+        const avg = d.avg_days != null ? d.avg_days + ' days' : 'N/A';
+        return `<tr>
+          <td><span class="badge ${s}">${s}</span></td>
+          <td>${avg}</td>
+          <td>${d.resolved_count || 0}</td>
+        </tr>`;
+      }).join('');
+    const mttrTableEl = document.getElementById('mttrTable');
+    if (mttrTableEl) {
+      mttrTableEl.innerHTML = rows ? `
+        <table>
+          <thead><tr><th>Severity</th><th>Avg MTTR</th><th>Resolved</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem;">Regression rate: <b style="color:var(--red)">${regressionRate}%</b> of resolved findings recurred</p>
+      ` : '<p class="empty">No resolved findings yet — MTTR will appear once findings are remediated</p>';
+    }
+
+    // MTTR overview card
+    const mttrOverviewEl = document.getElementById('mttrOverview');
+    if (mttrOverviewEl) {
+      const ovRows = severityOrder.filter(s => mttrData[s]).map(s => {
+        const d = mttrData[s];
+        return `<div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid var(--border);">
+          <span><span class="badge ${s}">${s}</span></span>
+          <span style="color:var(--text)">${d.avg_days != null ? d.avg_days + ' days' : 'N/A'}</span>
+        </div>`;
+      }).join('');
+      mttrOverviewEl.innerHTML = ovRows ||
+        '<p class="empty" style="padding:1rem">No MTTR data yet</p>';
+    }
+  }
 }
 
 // ─── Uptime Analytics ───
@@ -636,6 +801,8 @@ async function init() {
 
   loadOverview();
   loadUptimeAnalytics();
+  loadLifecycle();
+  lifecycleLoaded = true;
   searchFindings();
   searchLogs();
   globalSearch();

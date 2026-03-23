@@ -289,6 +289,135 @@ def findings_analytics(
     }
 
 
+@router.get("/analytics/lifecycle")
+def lifecycle_analytics(
+    days: int = Query(30, le=90),
+    target: str = Query("", description="Filter by target"),
+    user: User = Depends(get_current_user),
+):
+    """Finding lifecycle analytics — new/existing/resolved/regressed counts and trends."""
+    filters: list[dict] = [{"range": {"timestamp": {"gte": f"now-{days}d"}}}]
+    if target:
+        filters.append({"wildcard": {"target": f"*{target}*"}})
+
+    query = {"bool": {"filter": filters}}
+    result = search(
+        "scanner-scan-findings", query, size=0,
+        aggs={
+            "status_distribution": {"terms": {"field": "finding_status", "size": 10}},
+            "status_over_time": {
+                "date_histogram": {"field": "timestamp", "calendar_interval": "day"},
+                "aggs": {"by_status": {"terms": {"field": "finding_status", "size": 10}}},
+            },
+            "top_recurring": {
+                "filter": {"terms": {"finding_status": ["existing", "regressed"]}},
+                "aggs": {"titles": {"terms": {"field": "title.raw", "size": 10}}},
+            },
+            "regression_rate_base": {
+                "filter": {"term": {"finding_status": "resolved"}},
+            },
+            "regression_count": {
+                "filter": {"term": {"finding_status": "regressed"}},
+            },
+        },
+    )
+
+    aggs = result.get("aggregations", {})
+
+    status_dist = {
+        b["key"]: b["doc_count"]
+        for b in aggs.get("status_distribution", {}).get("buckets", [])
+    }
+
+    timeline = []
+    for bucket in aggs.get("status_over_time", {}).get("buckets", []):
+        day_data: dict = {"date": bucket["key_as_string"], "total": bucket["doc_count"]}
+        for s in bucket.get("by_status", {}).get("buckets", []):
+            day_data[s["key"]] = s["doc_count"]
+        timeline.append(day_data)
+
+    top_recurring = {
+        b["key"]: b["doc_count"]
+        for b in aggs.get("top_recurring", {}).get("titles", {}).get("buckets", [])
+    }
+
+    resolved_count = aggs.get("regression_rate_base", {}).get("doc_count", 0)
+    regressed_count = aggs.get("regression_count", {}).get("doc_count", 0)
+    regression_rate = (
+        round(regressed_count / (resolved_count + regressed_count) * 100, 1)
+        if (resolved_count + regressed_count) > 0
+        else 0
+    )
+
+    return {
+        "status_distribution": status_dist,
+        "timeline": timeline,
+        "top_recurring_findings": top_recurring,
+        "regression_rate_pct": regression_rate,
+    }
+
+
+@router.get("/analytics/mttr")
+def mttr_analytics(
+    days: int = Query(90, le=365),
+    user: User = Depends(get_current_user),
+):
+    """Mean Time to Remediate per severity level (days from first_seen to resolved)."""
+    try:
+        es = get_client()
+        # Use scripted metric to compute MTTR per severity
+        body = {
+            "size": 0,
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"term": {"finding_status": "resolved"}},
+                        {"exists": {"field": "first_seen_date"}},
+                        {"exists": {"field": "resolved_date"}},
+                        {"range": {"resolved_date": {"gte": f"now-{days}d"}}},
+                    ]
+                }
+            },
+            "aggs": {
+                "by_severity": {
+                    "terms": {"field": "severity", "size": 10},
+                    "aggs": {
+                        "avg_days_to_fix": {
+                            "avg": {
+                                "script": {
+                                    "source": """
+                                        if (doc.containsKey('resolved_date') && doc.containsKey('first_seen_date')
+                                            && !doc['resolved_date'].empty && !doc['first_seen_date'].empty) {
+                                            return (doc['resolved_date'].value.toInstant().toEpochMilli()
+                                                    - doc['first_seen_date'].value.toInstant().toEpochMilli())
+                                                   / 86400000.0;
+                                        }
+                                        return null;
+                                    """
+                                }
+                            }
+                        },
+                        "count": {"value_count": {"field": "severity"}},
+                    },
+                }
+            },
+        }
+        resp = es.search(index="scanner-scan-findings", body=body)
+        aggs = resp.get("aggregations", {})
+        mttr: dict = {}
+        for bucket in aggs.get("by_severity", {}).get("buckets", []):
+            avg = bucket.get("avg_days_to_fix", {}).get("value")
+            mttr[bucket["key"]] = {
+                "avg_days": round(avg, 1) if avg is not None else None,
+                "resolved_count": bucket.get("count", {}).get("value", 0),
+            }
+        return {"mttr_by_severity": mttr, "days_window": days}
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).warning("mttr_analytics failed: %s", e)
+        return {"mttr_by_severity": {}, "days_window": days}
+
+
 @router.get("/analytics/uptime")
 def uptime_analytics(
     days: int = Query(7, le=30),
