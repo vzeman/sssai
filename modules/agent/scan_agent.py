@@ -164,8 +164,8 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             domain = input["domain"]
             record_type = input.get("record_type", "ANY")
             result = subprocess.run(
-                f"dig {domain} {record_type} +noall +answer +authority",
-                shell=True,
+                ["dig", domain, record_type, "+noall", "+answer", "+authority"],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -179,8 +179,8 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             path = input["path"]
             query = input.get("query", ".")
             result = subprocess.run(
-                f"jq '{query}' {path}",
-                shell=True,
+                ["jq", query, path],
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -229,14 +229,15 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             if mobile:
                 width, height = 375, 812
 
-            cmd = (
-                f"chromium-browser --headless --disable-gpu --no-sandbox "
-                f"--screenshot={output_path} "
-                f"--window-size={width},{height} "
-                f"'{url}'"
-            )
             result = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=60,
+                [
+                    "chromium-browser", "--headless", "--disable-gpu", "--no-sandbox",
+                    f"--screenshot={output_path}", f"--window-size={width},{height}", url,
+                ],
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if Path(output_path).exists():
                 return f"Screenshot saved to {output_path}"
@@ -489,6 +490,48 @@ def _handle_web_search(input: dict) -> str:
         return f"ERROR: Web search failed: {e}"
 
 
+def _fetch_cvss_from_nvd(cve_id: str) -> dict | None:
+    """Fetch CVSS vector and score for a specific CVE from NVD. Returns dict or None."""
+    try:
+        resp = httpx.get(
+            "https://services.nvd.nist.gov/rest/json/cves/2.0",
+            params={"cveId": cve_id},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        vulns = data.get("vulnerabilities", [])
+        if not vulns:
+            return None
+        cve = vulns[0].get("cve", {})
+        metrics = cve.get("metrics", {})
+        # Prefer CVSS 3.1, fall back to 3.0, then 4.0
+        for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV40"):
+            entries = metrics.get(key, [])
+            if entries:
+                cvss_data = entries[0].get("cvssData", {})
+                return {
+                    "cvss_score": cvss_data.get("baseScore"),
+                    "cvss_vector": cvss_data.get("vectorString"),
+                    "cvss_version": cvss_data.get("version"),
+                }
+        return None
+    except Exception:
+        return None
+
+
+def _severity_from_cvss(score: float) -> str:
+    """Derive severity label from CVSS base score."""
+    if score >= 9.0:
+        return "critical"
+    if score >= 7.0:
+        return "high"
+    if score >= 4.0:
+        return "medium"
+    return "low"
+
+
 def _handle_exploit_search(input: dict) -> str:
     """Search for exploits/CVEs using multiple sources."""
     try:
@@ -510,11 +553,16 @@ def _handle_exploit_search(input: dict) -> str:
                     desc_list = cve.get("descriptions", [])
                     desc = next((d["value"] for d in desc_list if d["lang"] == "en"), "")
                     metrics = cve.get("metrics", {})
-                    score = ""
-                    for m in metrics.get("cvssMetricV31", []):
-                        score = f" (CVSS: {m['cvssData']['baseScore']})"
-                        break
-                    results.append(f"- {cve_id}{score}: {desc[:200]}")
+                    score_str = ""
+                    for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV40"):
+                        entries = metrics.get(key, [])
+                        if entries:
+                            cvss_data = entries[0].get("cvssData", {})
+                            base_score = cvss_data.get("baseScore", "")
+                            vector = cvss_data.get("vectorString", "")
+                            score_str = f" (CVSS: {base_score}, Vector: {vector})"
+                            break
+                    results.append(f"- {cve_id}{score_str}: {desc[:200]}")
         except Exception:
             pass
 
@@ -543,6 +591,95 @@ def _handle_exploit_search(input: dict) -> str:
         return f"Exploit/CVE search results for '{query}':\n\n" + "\n".join(results)
     except Exception as e:
         return f"ERROR: Exploit search failed: {e}"
+
+
+# ── CVSS scoring pass ────────────────────────────────────────────────────
+
+_CVSS_SCORING_SYSTEM = (
+    "You are a CVSS 3.1 scoring expert. Given a security finding's title, description, "
+    "and category, determine the appropriate CVSS 3.1 vector string and base score.\n\n"
+    "CVSS 3.1 vector format: CVSS:3.1/AV:[N|A|L|P]/AC:[L|H]/PR:[N|L|H]/UI:[N|R]/"
+    "S:[U|C]/C:[N|L|H]/I:[N|L|H]/A:[N|L|H]\n\n"
+    "Respond ONLY with a JSON object containing:\n"
+    "- cvss_vector: the full CVSS 3.1 vector string\n"
+    "- cvss_score: the numeric base score (0.0-10.0)\n"
+    "- severity: critical/high/medium/low based on score\n"
+    "No other text."
+)
+
+
+def _ai_calculate_cvss(finding: dict, client) -> dict | None:
+    """Use Claude to calculate CVSS vector for a finding without a CVE."""
+    try:
+        prompt = (
+            f"Finding title: {finding.get('title', '')}\n"
+            f"Category: {finding.get('category', '')}\n"
+            f"Description: {finding.get('description', '')[:500]}\n\n"
+            "Calculate the CVSS 3.1 vector and base score for this finding."
+        )
+        resp = client.messages.create(
+            model=AI_MODEL_LIGHT,
+            max_tokens=256,
+            system=_CVSS_SCORING_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = resp.content[0].text.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text)
+        return result
+    except Exception:
+        return None
+
+
+def _run_cvss_scoring_pass(report: dict, client, token_tracker) -> None:
+    """
+    Post-process all findings to populate cvss_score, cvss_vector, and severity.
+
+    - Findings with CVE IDs: fetch from NVD
+    - Findings without CVEs: use Claude AI to calculate based on characteristics
+    - Severity is re-derived from the CVSS score using standard ranges
+    """
+    findings = report.get("findings", [])
+    if not findings:
+        return
+
+    for finding in findings:
+        # Skip if already has both CVSS fields populated
+        if finding.get("cvss_score") is not None and finding.get("cvss_vector"):
+            # Still normalise severity from existing score
+            score = finding["cvss_score"]
+            if isinstance(score, (int, float)):
+                finding["severity"] = _severity_from_cvss(float(score))
+            continue
+
+        cve_ids = finding.get("cve_ids") or []
+        if not cve_ids and finding.get("cve_id"):
+            cve_ids = [finding["cve_id"]]
+
+        cvss_info = None
+
+        # Try NVD lookup for each CVE ID
+        for cve_id in cve_ids:
+            cvss_info = _fetch_cvss_from_nvd(cve_id)
+            if cvss_info:
+                break
+
+        # Fall back to AI calculation for findings without CVEs or when NVD lookup fails
+        if not cvss_info:
+            cvss_info = _ai_calculate_cvss(finding, client)
+
+        if cvss_info:
+            score = cvss_info.get("cvss_score")
+            vector = cvss_info.get("cvss_vector")
+            if score is not None:
+                finding["cvss_score"] = float(score)
+                finding["severity"] = _severity_from_cvss(float(score))
+            if vector:
+                finding["cvss_vector"] = vector
 
 
 # ── Sub-agent delegation ─────────────────────────────────────────────────
@@ -1658,6 +1795,12 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Clean up checkpoint ──
     delete_checkpoint(scan_id)
 
+    # ── CVSS scoring pass ──
+    try:
+        _run_cvss_scoring_pass(report, client, token_tracker)
+    except Exception as exc:
+        log.warning("CVSS scoring pass failed: %s", exc)
+
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
 
@@ -1679,6 +1822,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "category": f.get("category", ""),
                 "remediation": f.get("remediation", ""),
                 "cvss_score": f.get("cvss_score"),
+                "cvss_vector": f.get("cvss_vector"),
                 "cve_id": f.get("cve_id"),
                 "tool": f.get("tool"),
                 "evidence": f.get("evidence", ""),
