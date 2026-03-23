@@ -139,6 +139,7 @@ def store_technologies_from_report(
                         user_id=user_id,
                         scan_id=scan_id,
                         target=target,
+                        asset_type="technology",  # technology type for CVE matching
                         technology_name=tech_name,
                         technology_version=tech_version,
                         cpe_entries=cpe_entries,
