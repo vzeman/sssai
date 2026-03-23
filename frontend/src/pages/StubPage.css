@@ -1,0 +1,69 @@
+.stub-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.feature-card {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 24px;
+  transition: all 0.2s;
+}
+
+.feature-card:hover {
+  border-color: #3a4050;
+  background: #252c3a;
+}
+
+.feature-card h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.feature-card p {
+  margin: 0 0 16px;
+  color: #aaa;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.feature-card ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.feature-card li {
+  color: #aaa;
+  font-size: 13px;
+  margin-bottom: 8px;
+  position: relative;
+  padding-left: 20px;
+}
+
+.feature-card li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #44ff44;
+  font-weight: 700;
+}
+
+.coming-soon {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.coming-soon-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+}
+
+.coming-soon-text {
+  font-size: 14px;
+  margin: 0;
+}
