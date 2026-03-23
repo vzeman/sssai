@@ -224,6 +224,62 @@ class NotificationDispatcher:
             log.info("OpenClaw notification sent: %s -> %s", notification.title, channel)
 
 
+def build_verification_notification(scan_id: str, target: str, report: dict) -> Notification:
+    """Build a notification from a completed verification scan report."""
+    verification_of = report.get("verification_of", "unknown")
+    remediation_rate = report.get("remediation_rate", 0.0)
+    days_since = report.get("days_since_original", 0)
+    results = report.get("verification_results", [])
+
+    fixed = sum(1 for r in results if r.get("status") == "verified_fixed")
+    still_vuln = sum(1 for r in results if r.get("status") == "still_vulnerable")
+    partial = sum(1 for r in results if r.get("status") == "partially_fixed")
+    regression = sum(1 for r in results if r.get("status") == "new_regression")
+    total = len(results)
+
+    if remediation_rate >= 1.0:
+        severity = "info"
+    elif still_vuln > 0 or regression > 0:
+        original_risk = report.get("risk_score", 0)
+        severity = "critical" if original_risk >= 80 else "warning"
+    else:
+        severity = "warning"
+
+    rate_pct = int(remediation_rate * 100)
+    message = (
+        f"Remediation rate: {rate_pct}% ({fixed}/{total} findings fixed). "
+        f"Verified {days_since} day(s) after original scan {verification_of}."
+    )
+    if still_vuln or regression:
+        parts = []
+        if still_vuln:
+            parts.append(f"{still_vuln} still vulnerable")
+        if partial:
+            parts.append(f"{partial} partially fixed")
+        if regression:
+            parts.append(f"{regression} new regression(s)")
+        message += f"\nRemaining issues: {', '.join(parts)}."
+
+    return Notification(
+        title=f"Verification Complete: {target}",
+        message=message,
+        severity=severity,
+        scan_id=scan_id,
+        target=target,
+        risk_score=report.get("risk_score"),
+        findings_count=total,
+        metadata={
+            "verification_of": verification_of,
+            "remediation_rate": remediation_rate,
+            "days_since_original": days_since,
+            "verified_fixed": fixed,
+            "still_vulnerable": still_vuln,
+            "partially_fixed": partial,
+            "new_regression": regression,
+        },
+    )
+
+
 def build_scan_notification(scan_id: str, target: str, report: dict) -> Notification:
     """Build a notification from a completed scan report."""
     risk_score = report.get("risk_score", 0)

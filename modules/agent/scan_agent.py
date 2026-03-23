@@ -1708,13 +1708,20 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
     # Send notifications
     try:
-        from modules.notifications.dispatcher import NotificationDispatcher, build_scan_notification
+        from modules.notifications.dispatcher import (
+            NotificationDispatcher,
+            build_scan_notification,
+            build_verification_notification,
+        )
         import asyncio
 
         notification_channels = json.loads(os.getenv("NOTIFICATION_CHANNELS", "[]"))
         if notification_channels:
             dispatcher = NotificationDispatcher(notification_channels)
-            notification = build_scan_notification(scan_id, target, report)
+            if scan_type == "verification":
+                notification = build_verification_notification(scan_id, target, report)
+            else:
+                notification = build_scan_notification(scan_id, target, report)
             asyncio.run(dispatcher.dispatch(notification))
     except Exception:
         pass

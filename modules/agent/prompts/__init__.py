@@ -25,6 +25,13 @@ _FOCUS_HINTS = {
     "cloud": "Focus on cloud security and infrastructure after discovery.",
     "privacy": "Focus on privacy, data protection, cookie compliance, and GDPR signals.",
     "uptime": "Focus on availability, response times, and monitoring endpoints.",
+    "verification": (
+        "This is a VERIFICATION scan. Do NOT run a full scan. "
+        "Test ONLY the specific findings listed in the Verification Context below. "
+        "For each finding, determine its current status: verified_fixed, still_vulnerable, "
+        "partially_fixed, or new_regression. Your final report MUST include a "
+        "'verification_results' array and a 'remediation_rate' (0.0-1.0)."
+    ),
 }
 
 
@@ -36,8 +43,9 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     """
     config = config or {}
 
-    # Extract retry_context before passing to template format (it has curly braces)
+    # Extract special contexts before passing to template format (they have curly braces)
     retry_context = config.pop("retry_context", None)
+    verification_context = config.pop("verification_context", None)
 
     # Try master prompt first (AI-first adaptive mode)
     master_path = os.path.join(_DIR, "master.txt")
@@ -65,7 +73,77 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     if retry_context:
         prompt += _build_retry_section(retry_context)
 
+    # Append verification instructions if this is a verification scan
+    if verification_context:
+        prompt += _build_verification_section(verification_context)
+
     return prompt
+
+
+def _build_verification_section(ctx: dict) -> str:
+    """Build a verification instruction section for the system prompt."""
+    import datetime as _dt
+
+    original_scan_id = ctx.get("verification_of", "unknown")
+    original_created_at = ctx.get("original_scan_created_at")
+    original_risk_score = ctx.get("original_risk_score", 0)
+    findings = ctx.get("findings", [])
+
+    # Calculate days since original scan
+    days_since = None
+    if original_created_at:
+        try:
+            orig_dt = _dt.datetime.fromisoformat(original_created_at.replace("Z", "+00:00"))
+            now = _dt.datetime.now(_dt.timezone.utc)
+            days_since = (now - orig_dt).days
+        except Exception:
+            pass
+
+    parts = [
+        "\n\n## VERIFICATION MODE — Targeted Remediation Check",
+        f"This is a verification scan for original scan: {original_scan_id}",
+        f"Original risk score: {original_risk_score}/100",
+    ]
+    if days_since is not None:
+        parts.append(f"Days since original scan: {days_since}")
+
+    parts.extend([
+        f"\nOriginal findings to verify ({len(findings)} total):",
+    ])
+
+    for i, finding in enumerate(findings, 1):
+        title = finding.get("title", "Unknown")
+        severity = finding.get("severity", "info")
+        urls = finding.get("affected_urls", [])
+        evidence = finding.get("evidence", "")
+        desc = finding.get("description", "")[:200]
+        parts.append(f"\n  {i}. [{severity.upper()}] {title}")
+        if desc:
+            parts.append(f"     Description: {desc}")
+        if evidence:
+            parts.append(f"     Original evidence: {evidence[:200]}")
+        if urls:
+            parts.append(f"     Affected URLs: {', '.join(urls[:3])}")
+
+    parts.extend([
+        "\n## Verification Instructions",
+        "1. Test ONLY the findings listed above — do NOT run a full scan",
+        "2. For each finding, use targeted tests to determine its current status:",
+        "   - verified_fixed: The vulnerability is no longer present",
+        "   - still_vulnerable: The vulnerability still exists",
+        "   - partially_fixed: Some but not all instances are fixed",
+        "   - new_regression: A new related vulnerability appeared after the fix",
+        "3. Collect concrete evidence for each status determination",
+        "4. In your final report() call, include:",
+        "   - 'verification_results': array of {finding, status, evidence} for each finding",
+        "   - 'remediation_rate': fraction of findings verified_fixed (0.0 to 1.0)",
+        f"   - 'verification_of': '{original_scan_id}'",
+        f"   - 'days_since_original': {days_since if days_since is not None else 0}",
+        "5. Set risk_score to reflect remaining open vulnerabilities only",
+        "6. Keep the scan fast — use minimal targeted tests per finding",
+    ])
+
+    return "\n".join(parts)
 
 
 def _build_retry_section(ctx: dict) -> str:
