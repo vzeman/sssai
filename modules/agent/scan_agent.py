@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import subprocess
+import tempfile
 import time
 from collections import Counter
 from pathlib import Path
@@ -237,6 +238,12 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             return json.dumps(result, indent=2)
         except Exception as e:
             return f"ERROR: {e}"
+
+    elif name == "browser_test":
+        return _handle_browser_test(input)
+
+    elif name == "browser_crawl":
+        return _handle_browser_crawl(input)
 
     elif name == "screenshot":
         try:
@@ -702,6 +709,14 @@ def _handle_update_attack_surface(input: dict, scan_context: dict | None) -> str
                 )
         if input.get("infrastructure", {}).get("waf"):
             suggestions.append(f"WAF DETECTED ({input['infrastructure']['waf']}) — adapt payloads to bypass WAF rules")
+        spa_frameworks = ["react", "vue", "angular", "svelte", "ember", "next", "nuxt"]
+        detected_techs = [t.lower() for t in input.get("technologies", [])]
+        if any(fw in t for fw in spa_frameworks for t in detected_techs):
+            suggestions.append(
+                "SPA FRAMEWORK DETECTED — load browser_testing knowledge, use browser_crawl to discover "
+                "SPA routes, then use browser_test to check DOM XSS sinks, prototype pollution, "
+                "client-side redirects, and localStorage/sessionStorage exposure"
+            )
 
         # Summary
         total_components = sum(
