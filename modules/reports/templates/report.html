@@ -153,9 +153,133 @@
         }
         .metadata-grid dt { font-weight: bold; font-size: 13px; color: #666; }
         .metadata-grid dd { font-size: 15px; margin-bottom: 8px; }
+        /* Compliance Report Styles */
+        .compliance-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .compliance-framework-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-top: 4px solid #ddd;
+        }
+        .compliance-framework-card.status-pass { border-top-color: #28a745; }
+        .compliance-framework-card.status-partial { border-top-color: #ffc107; }
+        .compliance-framework-card.status-fail { border-top-color: #dc3545; }
+        .compliance-framework-card h3 { font-size: 15px; margin-bottom: 12px; color: #333; }
+        .compliance-status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .compliance-status-badge.pass { background: #28a745; }
+        .compliance-status-badge.partial { background: #ffc107; color: #333; }
+        .compliance-status-badge.fail { background: #dc3545; }
+        .pass-rate-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        .pass-rate-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s;
+        }
+        .compliance-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+            color: #555;
+        }
+        .compliance-stat { text-align: center; }
+        .compliance-stat .num { font-size: 20px; font-weight: bold; display: block; }
+        .compliance-stat .num.green { color: #28a745; }
+        .compliance-stat .num.red { color: #dc3545; }
+        .compliance-stat .num.yellow { color: #856404; }
+        .compliance-requirements-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+        .compliance-requirements-table th {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #dee2e6;
+            color: #555;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .compliance-requirements-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+        .compliance-requirements-table tr:hover { background: #f8f9fa; }
+        .req-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .req-status.pass { background: #28a745; }
+        .req-status.fail { background: #dc3545; }
+        .req-status.partial { background: #ffc107; }
+        .req-id { font-family: monospace; font-size: 12px; color: #555; white-space: nowrap; }
+        .req-evidence {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            font-style: italic;
+        }
+        .req-finding-ref {
+            display: inline-block;
+            background: #e9ecef;
+            color: #555;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: monospace;
+            margin-right: 3px;
+        }
+        .compliance-section { margin-bottom: 32px; }
+        .compliance-framework-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .compliance-framework-header h3 { font-size: 18px; margin: 0; }
+        .critical-gaps-badge {
+            background: #dc3545;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
         @media print {
             body { background: white; max-width: 100%; }
             .finding { break-inside: avoid; }
+            .compliance-framework-card { break-inside: avoid; }
+            .compliance-requirements-table tr { break-inside: avoid; }
         }
     </style>
 </head>
@@ -259,6 +383,103 @@
         {% endfor %}
         {% endfor %}
     </div>
+
+    <!-- Compliance Reports -->
+    {% if has_compliance and compliance_reports %}
+    <div class="section">
+        <h2>Compliance Report Overview</h2>
+        <div class="compliance-overview">
+            {% for fw_id, fw_data in compliance_reports.items() %}
+            <div class="compliance-framework-card status-{{ fw_data.overall }}">
+                <h3>{{ fw_data.get('framework_name', fw_id) }}</h3>
+                <span class="compliance-status-badge {{ fw_data.overall }}">{{ fw_data.overall | upper }}</span>
+                <div class="pass-rate-bar">
+                    <div class="pass-rate-fill" style="width: {{ (fw_data.pass_rate * 100) | int }}%"></div>
+                </div>
+                <div class="compliance-stats">
+                    <div class="compliance-stat">
+                        <span class="num green">{{ fw_data.passed_requirements }}</span>
+                        <span>Pass</span>
+                    </div>
+                    <div class="compliance-stat">
+                        <span class="num red">{{ fw_data.failed_requirements }}</span>
+                        <span>Fail</span>
+                    </div>
+                    <div class="compliance-stat">
+                        <span class="num yellow">{{ fw_data.partial_requirements }}</span>
+                        <span>Partial</span>
+                    </div>
+                </div>
+                <div style="font-size:12px;color:#888;margin-top:8px">
+                    Pass rate: {{ (fw_data.pass_rate * 100) | int }}%
+                    {% if fw_data.critical_gaps > 0 %}
+                    &bull; <span style="color:#dc3545;font-weight:bold">{{ fw_data.critical_gaps }} critical gap{{ 's' if fw_data.critical_gaps != 1 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Per-Framework Detailed Requirements -->
+    {% for fw_id, fw_data in compliance_reports.items() %}
+    <div class="section compliance-section">
+        <div class="compliance-framework-header">
+            <h3>{{ fw_data.get('framework_name', fw_id) }} — Requirements</h3>
+            <span class="compliance-status-badge {{ fw_data.overall }}">{{ fw_data.overall | upper }}</span>
+            {% if fw_data.critical_gaps > 0 %}
+            <span class="critical-gaps-badge">{{ fw_data.critical_gaps }} Critical Gap{{ 's' if fw_data.critical_gaps != 1 }}</span>
+            {% endif %}
+            <span style="margin-left:auto;font-size:13px;color:#666">
+                {{ (fw_data.pass_rate * 100) | int }}% passing ({{ fw_data.passed_requirements }}/{{ fw_data.total_requirements }})
+            </span>
+        </div>
+        <table class="compliance-requirements-table">
+            <thead>
+                <tr>
+                    <th style="width:110px">Requirement</th>
+                    <th>Title</th>
+                    <th style="width:80px;text-align:center">Status</th>
+                    <th>Findings / Evidence</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in fw_data.requirements | sort(attribute='status') %}
+                <tr>
+                    <td><span class="req-id">{{ req.id }}</span></td>
+                    <td>{{ req.title }}</td>
+                    <td style="text-align:center">
+                        <span class="req-status {{ req.status }}"></span>
+                        <span style="font-size:12px;font-weight:bold;color:
+                            {%- if req.status == 'pass' %}#28a745
+                            {%- elif req.status == 'fail' %}#dc3545
+                            {%- else %}#856404{% endif -%}
+                        ">{{ req.status | upper }}</span>
+                    </td>
+                    <td>
+                        {% if req.findings %}
+                        <div>
+                            {% for fid in req.findings %}
+                            <span class="req-finding-ref">{{ fid }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% if req.evidence %}
+                        <div class="req-evidence">{{ req.evidence }}</div>
+                        {% endif %}
+                        {% if req.remediation and req.status != 'pass' %}
+                        <div style="font-size:12px;color:#2d6a4f;margin-top:4px">
+                            <strong>Fix:</strong> {{ req.remediation | truncate(150) }}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+    {% endif %}
 
     <!-- Scan Metadata -->
     {% if report.get('scan_metadata') %}
