@@ -27,6 +27,8 @@ class User(Base):
     scheduled_scans: Mapped[list["ScheduledScan"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     notification_channels: Mapped[list["NotificationChannel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     campaigns: Mapped[list["Campaign"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    assets: Mapped[list["Asset"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    webhook_configs: Mapped[list["WebhookConfig"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Campaign(Base):
