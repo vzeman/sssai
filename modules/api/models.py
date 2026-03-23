@@ -138,6 +138,9 @@ class Asset(Base):
     port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     service: Mapped[str | None] = mapped_column(String, nullable=True)
     technology: Mapped[str | None] = mapped_column(String, nullable=True)
+    technology_name: Mapped[str | None] = mapped_column(String, nullable=True)  # normalized technology name (alias for cve_monitor)
+    technology_version: Mapped[str | None] = mapped_column(String, nullable=True)  # version detected for technology
+    cpe_entries: Mapped[list | None] = mapped_column(JSON, nullable=True)  # CPE identifiers for CVE matching
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # additional metadata
     first_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
