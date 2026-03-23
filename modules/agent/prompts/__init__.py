@@ -47,6 +47,7 @@ def get_prompt(scan_type: str, *, target: str, config: dict | None = None) -> st
     # Extract keys that must not be passed to template.format() — they contain
     # nested dicts with curly braces or are not template placeholders.
     retry_context = config.pop("retry_context", None)
+    verification_context = config.pop("verification_context", None)
     config.pop("auth", None)          # auth config: nested dict, not a template var
     config.pop("resume_context", None)  # resume_context also handled separately
 
