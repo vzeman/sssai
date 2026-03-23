@@ -11,7 +11,8 @@ RUN pip install --no-cache-dir \
     "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt<4.1" \
     python-multipart httpx alembic \
     jinja2 weasyprint pyyaml anthropic "elasticsearch>=8.13,<9" \
-    pyotp "qrcode[pil]"
+    pyotp "qrcode[pil]" \
+    python-socketio python-socketio-client aiofiles
 
 COPY modules/ /app/modules/
 COPY config/ /app/config/
