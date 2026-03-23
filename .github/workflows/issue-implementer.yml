@@ -231,12 +231,15 @@ jobs:
             const mode = process.env.MODE;
 
             let issue = {};
-            try { issue = JSON.parse(process.env.ISSUE_JSON || '{}'); } catch {}
+            try {
+              const parsed = JSON.parse(process.env.ISSUE_JSON || '{}');
+              if (parsed && typeof parsed === 'object') issue = parsed;
+            } catch {}
 
             const issueNumber = process.env.ISSUE_NUMBER;
             const issueTitle = process.env.ISSUE_TITLE;
-            const issueBody = issue.body || '';
-            const issueAuthor = (issue.user || {}).login || 'unknown';
+            const issueBody = (issue && issue.body) || '';
+            const issueAuthor = (issue && issue.user && issue.user.login) || 'unknown';
 
             let conventions = '';
             try { conventions = fs.readFileSync('CLAUDE.md', 'utf-8').slice(0, 6000); } catch {}
