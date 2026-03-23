@@ -43,13 +43,13 @@ Look for chatbot/AI widgets by analyzing the HTML source of the homepage:
 - Attempt service reflection: `grpcurl -plaintext {target}:50051 list` (try TLS variant without `-plaintext` too)
 - **If gRPC found → load `grpc_testing` knowledge and perform deep testing**
 
-#### 4. Form Enumeration
+#### 6. Form Enumeration
 - Parse all `<form>` elements from the HTML
 - Identify form types: login, registration, search, contact, file upload, payment
 - Note form fields, methods, actions, and any CSRF tokens
 - Check for hidden forms and JavaScript-rendered forms
 
-#### 5. Authentication Detection
+#### 7. Authentication Detection
 - Check response headers for `Set-Cookie` (session cookies, JWT in cookies)
 - Look for `Authorization: Bearer` patterns in JavaScript
 - Check for OAuth redirect URLs, SSO endpoints

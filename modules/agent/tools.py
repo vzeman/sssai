@@ -379,7 +379,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -401,7 +401,7 @@ TOOLS = [
                     "enum": [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
-                        "form_testing", "auth_testing",
+                        "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
                     ],
                 },
             },
