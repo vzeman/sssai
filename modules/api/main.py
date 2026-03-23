@@ -708,9 +708,6 @@ def _answer_global_chat(user, question: str, r, db):
                     reply_text += block.text
 
             if reply_text:
-                # Parse and auto-execute create_scan action blocks
-                _execute_chat_actions(reply_text, user_id, db)
-
                 agent_msg = _json.dumps({
                     "role": "agent",
                     "message": reply_text,

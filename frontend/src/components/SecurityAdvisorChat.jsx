@@ -137,6 +137,7 @@ export function SecurityAdvisorChat({ token }) {
   const [lastTs, setLastTs] = useState(0)
   const bottomRef = useRef(null)
   const pollTimer = useRef(null)
+  const pollStartRef = useRef(null)
 
   // Load history on mount
   useEffect(() => {
@@ -159,9 +160,27 @@ export function SecurityAdvisorChat({ token }) {
   useEffect(() => {
     if (!loading) {
       clearInterval(pollTimer.current)
+      pollStartRef.current = null
       return
     }
+    pollStartRef.current = Date.now()
     pollTimer.current = setInterval(() => {
+      // Timeout after 60 s to avoid locking the user out indefinitely
+      if (Date.now() - pollStartRef.current > 60000) {
+        clearInterval(pollTimer.current)
+        setLoading(false)
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'agent',
+            message: 'The advisor did not respond in time. Please try again.',
+            type: 'error',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            ts: Date.now() / 1000,
+          },
+        ])
+        return
+      }
       fetchChatHistory(token).then((data) => {
         const msgs = data.messages || []
         if (msgs.length > 0) {
