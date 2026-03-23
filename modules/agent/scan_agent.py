@@ -2257,9 +2257,16 @@ def run_validation(task_id: str, user_id: str, request: dict):
 
     start_time = time.time()
     max_iterations = 40
+    max_time_seconds = 300  # 5-minute timeout
     result = None
+    end_turn_count = 0  # Track consecutive end_turn responses
 
     for iteration in range(max_iterations):
+        # Check timeout
+        if time.time() - start_time > max_time_seconds:
+            _post_chat(f"Validation timeout after {max_time_seconds}s", "warning")
+            break
+
         try:
             response = client.messages.create(
                 model=AI_MODEL,
@@ -2273,6 +2280,7 @@ def run_validation(task_id: str, user_id: str, request: dict):
             break
 
         if response.stop_reason == "tool_use":
+            end_turn_count = 0  # Reset counter on tool_use
             tool_results = []
 
             for block in response.content:
@@ -2306,8 +2314,15 @@ def run_validation(task_id: str, user_id: str, request: dict):
                 break
 
         elif response.stop_reason == "end_turn":
+            end_turn_count += 1
             text = "".join(b.text for b in response.content if hasattr(b, "text"))
             messages.append({"role": "assistant", "content": response.content})
+            
+            # If 3+ end_turn in a row without progress, force break
+            if end_turn_count >= 3:
+                _post_chat(f"Agent unable to complete validation after {end_turn_count} attempts", "warning")
+                break
+            
             messages.append({"role": "user", "content": (
                 "You must call submit_result with your findings, even if you could not validate "
                 "the vulnerability. Explain what you tested and what the outcome was."
