@@ -178,6 +178,11 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
         try:
             domain = input["domain"]
             record_type = input.get("record_type", "ANY")
+            _ALLOWED_RECORD_TYPES = {
+                "A", "AAAA", "ANY", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT"
+            }
+            if record_type not in _ALLOWED_RECORD_TYPES:
+                return f"ERROR: unsupported record_type {record_type!r}"
             result = subprocess.run(
                 ["dig", domain, record_type, "+noall", "+answer", "+authority"],
                 shell=False,
