@@ -89,8 +89,12 @@ function ScansPage({ token }) {
               </tr>
             </thead>
             <tbody>
-              {scans.map(scan => {
+              {scans.map((scan, idx) => {
                 const risk = getRiskLabel(scan.risk_score)
+                // Find the previous completed scan for the same target
+                const previousScan = scans.slice(idx + 1).find(
+                  s => s.status === 'completed' && (s.target || s.target_url) === (scan.target || scan.target_url)
+                )
                 return (
                   <tr key={scan.id} onClick={() => setSelectedScan(scan)} style={{cursor: 'pointer'}}>
                     <td className="scan-target">{scan.target_url || scan.target || 'Unknown'}</td>
@@ -106,8 +110,16 @@ function ScansPage({ token }) {
                     <td className="scan-date">
                       {scan.created_at ? new Date(scan.created_at).toLocaleDateString() : '-'}
                     </td>
-                    <td>
+                    <td className="scan-actions" onClick={e => e.stopPropagation()}>
                       <Link to={`/scans/${scan.id}`} className="view-link">View</Link>
+                      {previousScan && scan.status === 'completed' && (
+                        <Link
+                          to={`/scans/${scan.id}/compare/${previousScan.id}`}
+                          className="compare-link"
+                        >
+                          Compare
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 )

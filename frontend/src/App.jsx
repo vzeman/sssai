@@ -20,6 +20,7 @@ import SettingsPage from './pages/SettingsPage'
 import PosturePage from './pages/PosturePage'
 import AuditLogsPage from './pages/AuditLogsPage'
 import ScansPage from './pages/ScansPage'
+import ScanComparisonPage from './pages/ScanComparisonPage'
 import ScanWizard from './components/ScanWizard'
 import Navigation from './components/Navigation'
 import './App.css'
@@ -101,6 +102,7 @@ function AppLayout({ token, onLogout }) {
           <Route path="/scans" element={<ScansPage token={token} />} />
           <Route path="/scans/new" element={<ScanWizard token={token} />} />
           <Route path="/scans/:scanId" element={<ScanDetailsPage token={token} />} />
+          <Route path="/scans/:scanId/compare/:baselineId" element={<ScanComparisonPage token={token} />} />
           <Route path="/findings" element={<FindingsPage token={token} />} />
           <Route path="/reports" element={<ReportsPage token={token} />} />
           <Route path="/compliance" element={<CompliancePage token={token} />} />

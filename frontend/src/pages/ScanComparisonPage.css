@@ -1,0 +1,241 @@
+.comparison-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.comparison-page code {
+  background: #2a2d3a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #00d4ff;
+}
+
+.back-link {
+  color: #00d4ff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* Summary cards */
+.summary-cards {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.summary-card {
+  flex: 1;
+  min-width: 140px;
+  background: #1e2230;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid #2a2d3a;
+}
+
+.card-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.card-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-new {
+  border-color: #ff4444;
+}
+
+.card-new .card-value {
+  color: #ff6666;
+}
+
+.card-resolved {
+  border-color: #44cc88;
+}
+
+.card-resolved .card-value {
+  color: #44cc88;
+}
+
+.card-unchanged {
+  border-color: #555;
+}
+
+.card-unchanged .card-value {
+  color: #888;
+}
+
+.card-changed {
+  border-color: #ffcc44;
+}
+
+.card-changed .card-value {
+  color: #ffcc44;
+}
+
+/* Collapsible sections */
+.collapsible-section {
+  margin-bottom: 24px;
+  background: #1e2230;
+  border-radius: 12px;
+  border: 1px solid #2a2d3a;
+  overflow: hidden;
+}
+
+.section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.section-toggle:hover {
+  background: #252838;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: #888;
+  width: 16px;
+}
+
+.section-count {
+  margin-left: auto;
+  background: #2a2d3a;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.section-content {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Finding cards */
+.comparison-finding {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border-left: 4px solid #2a2d3a;
+  background: #171a24;
+}
+
+.finding-new {
+  border-left-color: #ff4444;
+  background: #1a1015;
+}
+
+.finding-resolved {
+  border-left-color: #44cc88;
+  background: #101a15;
+}
+
+.finding-changed {
+  border-left-color: #ffcc44;
+  background: #1a1a10;
+}
+
+.finding-unchanged {
+  border-left-color: #555;
+}
+
+.finding-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.finding-title {
+  font-weight: 600;
+  color: #eee;
+  font-size: 14px;
+}
+
+.finding-category {
+  display: inline-block;
+  font-size: 11px;
+  color: #888;
+  background: #2a2d3a;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.finding-description {
+  font-size: 13px;
+  color: #999;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+/* Severity badges */
+.severity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.severity-critical {
+  background: #2a1015;
+  color: #ff4444;
+}
+
+.severity-high {
+  background: #2a1a10;
+  color: #ff8844;
+}
+
+.severity-medium {
+  background: #2a2a10;
+  color: #ffcc44;
+}
+
+.severity-low {
+  background: #102a15;
+  color: #44cc88;
+}
+
+.severity-info {
+  background: #1a2a3a;
+  color: #44aaff;
+}
+
+.severity-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.severity-change .arrow {
+  color: #888;
+  font-size: 14px;
+}

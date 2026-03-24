@@ -137,3 +137,20 @@
 .view-link:hover {
   text-decoration: underline;
 }
+
+.scan-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.compare-link {
+  color: #ffcc44;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.compare-link:hover {
+  text-decoration: underline;
+}
