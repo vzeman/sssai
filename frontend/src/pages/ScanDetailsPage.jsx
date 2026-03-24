@@ -21,6 +21,7 @@ function ScanDetailsPage({ token }) {
 
   useEffect(() => {
     fetchScanDetails()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanId])
 
   async function fetchScanDetails() {

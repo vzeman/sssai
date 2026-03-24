@@ -19,10 +19,12 @@ function InventoryPage({ token }) {
     } else {
       fetchCveAlerts()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   useEffect(() => {
     applyAlertFilters()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cveAlerts, severityFilter])
 
   async function fetchTechnologies() {

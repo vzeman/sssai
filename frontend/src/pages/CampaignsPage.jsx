@@ -22,6 +22,7 @@ function CampaignsPage({ token }) {
 
   useEffect(() => {
     fetchCampaigns()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchCampaigns() {
