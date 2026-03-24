@@ -66,7 +66,7 @@ function SchedulesPage({ token }) {
     try {
       setLoading(true)
       const data = await apiFetch('/?limit=500')
-      setSchedules(data.items || [])
+      setSchedules(Array.isArray(data) ? data : (data.items || []))
       setError('')
     } catch (err) {
       setError(err.message)

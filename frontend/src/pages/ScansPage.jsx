@@ -26,8 +26,10 @@ function ScansPage({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data.items || [])
-      setTotalScans(data.total || 0)
+      const items = Array.isArray(data) ? data : (data.items || [])
+      const total = Array.isArray(data) ? data.length : (data.total || 0)
+      setScans(items)
+      setTotalScans(total)
       setError('')
     } catch (err) {
       setError(err.message)

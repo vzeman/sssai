@@ -159,7 +159,7 @@ function NotificationsSection({ token }) {
         })
         if (!resp.ok) throw new Error('Failed to fetch channels')
         const data = await resp.json()
-        setChannels(data.items || [])
+        setChannels(Array.isArray(data) ? data : (data.items || []))
       } catch (err) {
         setError(err.message)
       } finally {

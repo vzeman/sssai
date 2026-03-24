@@ -29,9 +29,10 @@ function Dashboard({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      const items = data.items || []
+      const items = Array.isArray(data) ? data : (data.items || [])
+      const total = Array.isArray(data) ? data.length : (data.total || 0)
       setScans(items)
-      setTotalScans(data.total || 0)
+      setTotalScans(total)
 
       let critical = 0, high = 0, medium = 0
       items.forEach(scan => {
@@ -44,7 +45,7 @@ function Dashboard({ token }) {
         }
       })
 
-      setStats({ total: data.total || 0, critical, high, medium })
+      setStats({ total, critical, high, medium })
       setLastUpdated(new Date())
       setSecondsAgo(0)
       setError('')
