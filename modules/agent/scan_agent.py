@@ -1175,20 +1175,45 @@ def _run_execution_monitor(client, messages: list, loop_detector: LoopDetector,
             else:
                 plan_info = "\nScan plan: NOT YET CREATED (agent should call adapt_plan after discovery)"
 
+        # Check which mandatory tool categories have been used
+        tool_names = {name for name, _ in loop_detector.call_log}
+        run_cmds = [inp for name, inp in loop_detector.call_log if name == "run_command"]
+        run_cmd_strs = " ".join(run_cmds)
+
+        mandatory_tools = {
+            "nmap": "nmap" in run_cmd_strs,
+            "nuclei": "nuclei" in run_cmd_strs,
+            "nikto": "nikto" in run_cmd_strs,
+            "testssl/sslyze": "testssl" in run_cmd_strs or "sslyze" in run_cmd_strs,
+            "whatweb": "whatweb" in run_cmd_strs,
+            "drheader/shcheck": "drheader" in run_cmd_strs or "shcheck" in run_cmd_strs,
+            "subfinder": "subfinder" in run_cmd_strs,
+            "ffuf/gobuster": "ffuf" in run_cmd_strs or "gobuster" in run_cmd_strs,
+            "corsy/corscanner": "corsy" in run_cmd_strs or "corscanner" in run_cmd_strs,
+            "checkdmarc": "checkdmarc" in run_cmd_strs,
+            "dns_lookup": "dns_lookup" in tool_names,
+        }
+        missing_tools = [name for name, used in mandatory_tools.items() if not used]
+        coverage_info = ""
+        if missing_tools:
+            coverage_info = f"\n\nMISSING MANDATORY TOOLS: {', '.join(missing_tools)}. The agent MUST run these before reporting."
+
         monitor_prompt = (
             f"You are an execution monitor reviewing an AUTHORIZED {scan_type} security scan of {target}. "
             f"This scan was requested by the target owner through our platform. The agent MUST continue scanning.\n\n"
             f"Tool call summary ({total} total): {summary}\n"
-            f"{surface_info}{plan_info}\n\n"
+            f"{surface_info}{plan_info}{coverage_info}\n\n"
             f"Recent actions:\n" + "\n".join(recent_actions[-20:]) + "\n\n"
             f"Assess:\n"
             f"1. Is the agent making progress or stuck?\n"
             f"2. Has the agent completed Phase 0 (discovery) before testing?\n"
             f"3. Has the agent called update_attack_surface and adapt_plan?\n"
             f"4. Are there discovered components (chatbots, APIs, forms) not yet tested?\n"
-            f"5. Should the agent load any knowledge modules or adapt its plan?\n\n"
+            f"5. Has the agent run tools from ALL mandatory categories? If not, which are missing?\n"
+            f"6. Should the agent load any knowledge modules or adapt its plan?\n\n"
             f"If the agent is refusing to scan or questioning authorization, instruct it firmly that "
-            f"this is an authorized assessment and it must continue executing tools.\n\n"
+            f"this is an authorized assessment and it must continue executing tools.\n"
+            f"If mandatory tools are missing, instruct the agent to run them NOW.\n\n"
             f"Provide a brief (2-3 sentence) recommendation."
         )
 
@@ -1499,17 +1524,33 @@ def _run_attack_chain_analysis(
 # ── Planning step ────────────────────────────────────────────────────────
 
 def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
-    """Return phase instructions — the agent generates its own detailed plan via adapt_plan after discovery."""
+    """Return phase instructions with explicit tool commands for each phase."""
+    domain = target.replace("https://", "").replace("http://", "").rstrip("/").split("/")[0]
+
     return (
-        "Phase 0 (Discovery): Run deep reconnaissance before any testing. "
-        "Detect technologies, chatbots, APIs, forms, auth mechanisms, infrastructure.\n"
-        "Phase 1 (Map): Call update_attack_surface with all findings.\n"
-        "Phase 2 (Plan): Call adapt_plan to create a custom test plan based on discoveries. "
-        "Load relevant knowledge modules.\n"
-        "Phase 3 (Execute): Follow your plan. Adapt when you find new things.\n"
-        "Phase 3.5 (Attack Chain Analysis): Review all findings. Identify how multiple vulnerabilities "
-        "chain together into realistic attack scenarios with amplified risk scores.\n"
-        "Phase 4 (Report): Call report with all findings, attack chains, attack surface, and plan evolution."
+        "Phase 0 (Discovery) — run ALL of these commands:\n"
+        f"  1. nmap -sV -sC --top-ports 1000 -oN /output/nmap.txt {target}\n"
+        f"  2. whatweb {target} --log-json=/output/whatweb.json\n"
+        f"  3. wafw00f {target}\n"
+        f"  4. subfinder -d {domain} -o /output/subdomains.txt\n"
+        f"  5. dns_lookup for A, MX, TXT, NS records of {domain}\n"
+        f"  6. whois {domain}\n"
+        f"  7. http_request to {target} — analyze headers, HTML, forms, JavaScript\n"
+        f"  8. ffuf -u {target}/FUZZ -w /usr/share/wordlists/dirb/common.txt -o /output/ffuf.json -of json -mc 200,301,302,403\n"
+        "Phase 1 (Map): Call update_attack_surface with ALL Phase 0 findings.\n"
+        "Phase 2 (Plan): Call adapt_plan. Load relevant knowledge modules.\n"
+        "Phase 3 (Execute) — run ALL mandatory tools:\n"
+        f"  - nuclei -u {target} -severity critical,high,medium -o /output/nuclei.txt\n"
+        f"  - nikto -h {target} -o /output/nikto.txt\n"
+        f"  - testssl --jsonfile /output/testssl.json {target}\n"
+        f"  - drheader scan {target}\n"
+        f"  - corsy -u {target}\n"
+        f"  - checkdmarc {domain}\n"
+        f"  - dnsrecon -d {domain} -o /output/dnsrecon.xml\n"
+        "  - Plus discovery-triggered tools (wpscan, sqlmap, wapiti, etc.)\n"
+        "Phase 3.5 (Attack Chains): Review ALL findings for multi-step attack paths.\n"
+        "Phase 4 (Report): tools_used MUST list every tool you ran (minimum 15).\n"
+        "  Include passed_checks for tests that found no issues."
     )
 
 
