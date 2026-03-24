@@ -574,7 +574,8 @@ async function loadScans() {
   try {
     var res = await apiCall('/api/scans/');
     if (!res.ok) return;
-    var scans = await res.json();
+    var data = await res.json();
+    var scans = Array.isArray(data) ? data : (data.items || []);
     var tbody = document.getElementById('scans-table');
     if (!scans.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No scans yet. Start one above!</td></tr>'; return; }
     var running=0, totalFindings=0, totalCost=0;
@@ -627,7 +628,8 @@ async function loadChecks() {
   try {
     var res = await apiCall('/api/scans/');
     if (!res.ok) return;
-    var scans = await res.json();
+    var data = await res.json();
+    var scans = Array.isArray(data) ? data : (data.items || []);
     var runningScan = null;
     for (var i=0; i<scans.length; i++) { if (scans[i].status==='running'||scans[i].status==='queued') { runningScan=scans[i]; break; } }
     if (!runningScan) {
