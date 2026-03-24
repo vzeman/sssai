@@ -40,9 +40,12 @@ log = logging.getLogger(__name__)
 
 class ScanPhase(Enum):
     """Scan phase state machine."""
+    INIT = "init"                     # Initial state before any work begins
     DISCOVERY = "discovery"           # Reconnaissance - identify targets & tech
     ENUMERATION = "enumeration"       # Deep enumeration - find endpoints, users, configs
+    PLANNING = "planning"             # Adaptive test planning based on discoveries
     VULNERABILITY_SCANNING = "vulnerability_scanning"  # Run scanners - find vulns
+    TESTING = "testing"               # Active security testing
     EXPLOITATION = "exploitation"     # Prove exploitability - run POCs
     REPORTING = "reporting"           # Generate final report
     COMPLETED = "completed"
@@ -56,7 +59,7 @@ class DecisionContext:
         self.scan_id = scan_id
         self.target = target
         self.scan_type = scan_type
-        self.current_phase = ScanPhase.DISCOVERY
+        self.current_phase = ScanPhase.INIT
         
         # Discovered attack surface
         self.endpoints = []
@@ -99,16 +102,19 @@ class StateManager:
     
     def __init__(self):
         self.transitions: List[StateTransition] = []
-        self.current_phase = ScanPhase.DISCOVERY
+        self.current_phase = ScanPhase.INIT
         self.phase_start_time = time.time()
     
     def can_transition_to(self, to_phase: ScanPhase, context: DecisionContext) -> bool:
         """Check if transition to target phase is valid."""
         # Define valid transitions
         valid_transitions = {
-            ScanPhase.DISCOVERY: [ScanPhase.ENUMERATION, ScanPhase.FAILED],
-            ScanPhase.ENUMERATION: [ScanPhase.VULNERABILITY_SCANNING, ScanPhase.FAILED],
-            ScanPhase.VULNERABILITY_SCANNING: [ScanPhase.EXPLOITATION, ScanPhase.REPORTING, ScanPhase.FAILED],
+            ScanPhase.INIT: [ScanPhase.DISCOVERY, ScanPhase.PLANNING, ScanPhase.FAILED],
+            ScanPhase.DISCOVERY: [ScanPhase.ENUMERATION, ScanPhase.PLANNING, ScanPhase.FAILED],
+            ScanPhase.ENUMERATION: [ScanPhase.PLANNING, ScanPhase.VULNERABILITY_SCANNING, ScanPhase.FAILED],
+            ScanPhase.PLANNING: [ScanPhase.TESTING, ScanPhase.VULNERABILITY_SCANNING, ScanPhase.FAILED],
+            ScanPhase.VULNERABILITY_SCANNING: [ScanPhase.TESTING, ScanPhase.EXPLOITATION, ScanPhase.REPORTING, ScanPhase.FAILED],
+            ScanPhase.TESTING: [ScanPhase.EXPLOITATION, ScanPhase.REPORTING, ScanPhase.FAILED],
             ScanPhase.EXPLOITATION: [ScanPhase.REPORTING, ScanPhase.FAILED],
             ScanPhase.REPORTING: [ScanPhase.COMPLETED],
             ScanPhase.COMPLETED: [],
@@ -487,13 +493,19 @@ Respond with ONLY one word:
             if "next" in decision:
                 # Determine next phase
                 phase_order = [
+                    ScanPhase.INIT,
                     ScanPhase.DISCOVERY,
                     ScanPhase.ENUMERATION,
+                    ScanPhase.PLANNING,
                     ScanPhase.VULNERABILITY_SCANNING,
+                    ScanPhase.TESTING,
                     ScanPhase.EXPLOITATION,
                     ScanPhase.REPORTING,
                 ]
-                current_idx = phase_order.index(context.current_phase)
+                try:
+                    current_idx = phase_order.index(context.current_phase)
+                except ValueError:
+                    return ScanPhase.DISCOVERY
                 if current_idx < len(phase_order) - 1:
                     return phase_order[current_idx + 1]
             elif "end" in decision:
@@ -759,13 +771,16 @@ class AutonomousAgent:
         """Transition to next phase."""
         current_phase = self.state_manager.current_phase
         phase_order = [
+            ScanPhase.INIT,
             ScanPhase.DISCOVERY,
             ScanPhase.ENUMERATION,
+            ScanPhase.PLANNING,
             ScanPhase.VULNERABILITY_SCANNING,
+            ScanPhase.TESTING,
             ScanPhase.EXPLOITATION,
             ScanPhase.REPORTING,
         ]
-        
+
         try:
             current_idx = phase_order.index(current_phase)
             if current_idx < len(phase_order) - 1:

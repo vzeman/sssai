@@ -34,9 +34,18 @@ def index_doc(index: str, body: dict, doc_id: str | None = None) -> str | None:
 
 def search(index: str, query: dict, size: int = 50, sort: list | None = None,
            aggs: dict | None = None, from_: int = 0) -> dict:
-    """Run a search query. Returns the raw ES response body."""
+    """Run a search query. Returns the raw ES response body.
+
+    ``query`` should be the inner query clause (e.g. ``{"bool": {...}}``).
+    If a caller accidentally passes a pre-wrapped body like
+    ``{"query": {"bool": {...}}}``, we unwrap it to avoid double-nesting.
+    """
     try:
         es = get_client()
+        # Guard against double-wrapped queries: if query has a single "query"
+        # key, unwrap it so we don't produce {"query": {"query": {...}}}
+        if isinstance(query, dict) and list(query.keys()) == ["query"]:
+            query = query["query"]
         body: dict[str, Any] = {"query": query, "size": size, "from": from_}
         if sort:
             body["sort"] = sort
