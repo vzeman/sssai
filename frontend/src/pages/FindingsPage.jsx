@@ -15,8 +15,6 @@ function FindingsPage({ token }) {
   const [selectedFinding, setSelectedFinding] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
 
-  const [exporting, setExporting] = useState(false)
-
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
