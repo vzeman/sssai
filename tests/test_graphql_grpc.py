@@ -105,7 +105,7 @@ class TestGraphQLComplexityAndDepthAttacks:
     def test_query_depth_escalation(self):
         """Deeply nested queries to trigger resource exhaustion."""
         nested_query = {
-            "query": "{users{posts{comments{author{posts{comments{author{id}}}}}}}"
+            "query": "{users{posts{comments{author{posts{comments{author{id}}}}}}}}"
         }
         assert "{users" in nested_query["query"]
         assert nested_query["query"].count("{") == nested_query["query"].count("}")
@@ -457,17 +457,15 @@ class TestKnowledgeBase:
 
     def test_graphql_knowledge_module_exists(self):
         """GraphQL testing knowledge module should be available."""
-        import os
-        graphql_kb = os.path.exists(
-            "modules/agent/prompts/knowledge/graphql_testing.txt"
-        )
-        assert graphql_kb is True
+        from pathlib import Path
+        kb_path = Path(__file__).parents[1] / "modules" / "agent" / "prompts" / "knowledge" / "graphql_testing.txt"
+        assert kb_path.exists() is True
 
     def test_grpc_knowledge_module_exists(self):
         """gRPC testing knowledge module should be available."""
-        import os
-        grpc_kb = os.path.exists("modules/agent/prompts/knowledge/grpc_testing.txt")
-        assert grpc_kb is True
+        from pathlib import Path
+        kb_path = Path(__file__).parents[1] / "modules" / "agent" / "prompts" / "knowledge" / "grpc_testing.txt"
+        assert kb_path.exists() is True
 
     def test_knowledge_modules_loaded_on_discovery(self):
         """Agent should load appropriate knowledge when GraphQL/gRPC detected."""
