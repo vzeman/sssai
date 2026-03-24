@@ -101,6 +101,10 @@ RUN pip3 install --no-cache-dir \
     anthropic boto3 redis httpx pydantic jinja2 weasyprint pyyaml \
     sqlalchemy psycopg2-binary "elasticsearch>=8.13,<9"
 
+# ─── Playwright (browser-based DOM XSS testing, SPA crawling) ────
+RUN pip3 install --no-cache-dir playwright \
+    && python3 -m playwright install --with-deps chromium 2>/dev/null || true
+
 # ─── Python security tools (best-effort) ──────────────────────────────
 RUN pip3 install --no-cache-dir \
     sslyze drheader checkdmarc dnstwist semgrep 2>/dev/null || true
