@@ -22,10 +22,12 @@ function FindingsPage({ token }) {
 
   useEffect(() => {
     fetchFindings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     applyFilters()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [findings, filters])
 
   useEffect(() => {

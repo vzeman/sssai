@@ -12,6 +12,7 @@ function PosturePage({ token }) {
 
   useEffect(() => {
     fetchPosture()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchPosture() {

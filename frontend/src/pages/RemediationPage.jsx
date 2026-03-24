@@ -23,6 +23,7 @@ function RemediationPage({ token }) {
 
   useEffect(() => {
     fetchScansAndFindings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchScansAndFindings() {

@@ -10,6 +10,7 @@ function AssetDiffModal({ target, token, onClose }) {
 
   useEffect(() => {
     fetchDiff()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target])
 
   async function fetchDiff() {
@@ -113,10 +114,12 @@ function AssetsPage({ token }) {
 
   useEffect(() => {
     fetchAssets()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     applyFilters()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, filters])
 
   async function fetchAssets() {
