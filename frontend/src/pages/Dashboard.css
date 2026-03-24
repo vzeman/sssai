@@ -263,3 +263,56 @@
   border-color: #4a6080;
   color: #6ab4ff;
 }
+
+/* WebSocket connection status indicator */
+.ws-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.ws-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ws-connected {
+  color: #4aff4a;
+  background: rgba(74, 255, 74, 0.1);
+}
+
+.ws-connected .ws-dot {
+  background: #4aff4a;
+  box-shadow: 0 0 6px rgba(74, 255, 74, 0.6);
+}
+
+.ws-connecting {
+  color: #ffaa44;
+  background: rgba(255, 170, 68, 0.1);
+}
+
+.ws-connecting .ws-dot {
+  background: #ffaa44;
+  animation: ws-pulse 1.2s ease-in-out infinite;
+}
+
+.ws-disconnected {
+  color: #ff4a4a;
+  background: rgba(255, 74, 74, 0.1);
+}
+
+.ws-disconnected .ws-dot {
+  background: #ff4a4a;
+}
+
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

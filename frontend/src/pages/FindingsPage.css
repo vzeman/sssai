@@ -189,28 +189,126 @@
   color: #44ff44;
 }
 
-.status-badge {
+.finding-status-badge {
   display: inline-block;
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  text-transform: capitalize;
+  white-space: nowrap;
 }
 
-.status-badge.open {
-  background: #2a3a4a;
+.status-dropdown-wrapper {
+  position: relative;
+}
+
+.status-select {
+  background: #0f1117;
+  border: 1px solid #3a3d4a;
+  border-radius: 6px;
+  color: #e8eaed;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 130px;
+  transition: border-color 0.2s;
+}
+
+.status-select:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.status-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.reason-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: #1a1d27;
+  border: 1px solid #3a3d4a;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 4px;
+  min-width: 280px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.reason-popover label {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+.reason-popover textarea {
+  width: 100%;
+  background: #0f1117;
+  border: 1px solid #3a3d4a;
+  border-radius: 6px;
+  color: #e8eaed;
+  padding: 8px;
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.reason-popover textarea:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.reason-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  background: #2a3d50;
   color: #4a9eff;
+  border: 1px solid #3a5070;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.status-badge.resolved {
-  background: #2a4a2a;
-  color: #44ff44;
+.btn-primary:hover {
+  background: #3a4d60;
 }
 
-.status-badge.false-positive {
-  background: #3a3a2a;
-  color: #ffaa44;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: #4a9eff;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.toggle-text {
+  font-size: 13px;
+  color: #aaa;
+  white-space: nowrap;
 }
 
 .scan-ref {

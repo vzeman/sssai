@@ -5,6 +5,7 @@ import { SearchModal } from './components/SearchModal'
 import { ToastProvider } from './components/ToastContext'
 import ThemeProvider from './contexts/ThemeContext'
 import Toast from './components/Toast'
+import wsManager from './services/WebSocketManager'
 import Dashboard from './pages/Dashboard'
 import FindingsPage from './pages/FindingsPage'
 import ScanDetailsPage from './pages/ScanDetailsPage'
@@ -192,6 +193,16 @@ function App() {
     // Refresh every 25 minutes (token expires at 30)
     const interval = setInterval(refreshToken, 25 * 60 * 1000)
     return () => clearInterval(interval)
+  }, [token])
+
+  // Connect/disconnect WebSocket based on auth state
+  useEffect(() => {
+    if (token) {
+      wsManager.connect(token)
+    } else {
+      wsManager.disconnect()
+    }
+    return () => wsManager.disconnect()
   }, [token])
 
   // Listen for 401 responses globally to handle expired tokens

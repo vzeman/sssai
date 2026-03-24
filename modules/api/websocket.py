@@ -4,7 +4,6 @@ Handles live updates from scans, monitors, and aggregated data.
 """
 
 import json
-from typing import Dict, Set
 from fastapi import WebSocket
 import logging
 
@@ -15,7 +14,7 @@ class ConnectionManager:
     """Manages WebSocket connections and broadcasts real-time updates."""
 
     def __init__(self):
-        self.active_connections: Dict[str, Set[WebSocket]] = {}
+        self.active_connections: dict[str, set[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
         """Register a new WebSocket connection."""
@@ -31,7 +30,7 @@ class ConnectionManager:
             self.active_connections[user_id].discard(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
-            logger.info(f"User {user_id} disconnected. Active connections: {len(self.active_connections.get(user_id, set()))}")
+            logger.info(f"User {user_id} disconnected.")
 
     async def broadcast_to_user(self, user_id: str, message: dict):
         """Send a message to all connections of a specific user."""
@@ -49,6 +48,22 @@ class ConnectionManager:
         # Clean up disconnected connections
         for conn in disconnected:
             self.active_connections[user_id].discard(conn)
+
+    async def broadcast_scan_update(self, user_id: str, scan_id: str, status: str, data: dict | None = None):
+        """Broadcast a scan status update to all user connections."""
+        message = {
+            "type": "scan_update",
+            "scan_id": scan_id,
+            "status": status,
+        }
+        if data:
+            message["data"] = data
+        await self.broadcast_to_user(user_id, message)
+
+    async def broadcast_all(self, message: dict):
+        """Send a message to all connected users."""
+        for user_id in list(self.active_connections.keys()):
+            await self.broadcast_to_user(user_id, message)
 
     async def send_to_connection(self, websocket: WebSocket, message: dict):
         """Send a message to a specific connection."""
