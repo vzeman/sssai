@@ -24,7 +24,7 @@ if not SECRET_KEY or SECRET_KEY == "dev-secret-change-in-production":
     log.warning("JWT_SECRET not set — generated ephemeral key. Set JWT_SECRET env var for persistence.")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))  # 8 hours default
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")

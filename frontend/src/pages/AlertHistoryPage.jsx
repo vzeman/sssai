@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -85,8 +86,18 @@ function AlertHistoryPage({ token }) {
       </div>
 
       {alerts.length === 0 ? (
-        <div className="empty-state">
-          <p>No alerts in history</p>
+        <div className="empty-state-card">
+          <div className="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </div>
+          <h3 className="empty-state-title">No alerts yet</h3>
+          <p className="empty-state-text">
+            Alerts are generated when scans detect security issues. Run a scan to start receiving alerts.
+          </p>
+          <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

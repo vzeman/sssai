@@ -6,15 +6,20 @@ function Navigation({ token, onLogout }) {
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: '📊' },
-    { label: 'Findings', path: '/findings', icon: '🔍' },
-    { label: 'Scans', path: '/reports', icon: '🔧' },
+    { label: 'Scans', path: '/scans', icon: '🔍' },
+    { label: 'Findings', path: '/findings', icon: '🐛' },
+    { label: 'Assets', path: '/assets', icon: '🖥' },
+    { label: 'Inventory', path: '/inventory', icon: '📡' },
     { label: 'Reports', path: '/reports', icon: '📋' },
+    { label: 'Campaigns', path: '/campaigns', icon: '🎯' },
     { label: 'Compliance', path: '/compliance', icon: '✓' },
     { label: 'Remediation', path: '/remediation', icon: '🔧' },
     { label: 'Schedules', path: '/schedules', icon: '⏰' },
     { label: 'Webhooks', path: '/webhooks', icon: '🔗' },
     { label: 'Queue', path: '/queue', icon: '📦' },
+    { label: 'Posture', path: '/posture', icon: '🛡' },
     { label: 'Alerts', path: '/alerts', icon: '🚨' },
+    { label: 'Audit Logs', path: '/audit-logs', icon: '📜' },
     { label: 'Advisor', path: '/advisor', icon: '💡' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
   ]
@@ -25,10 +30,14 @@ function Navigation({ token, onLogout }) {
         <div className="nav-brand">🛡️ SSSAI</div>
         <div className="nav-subtitle">Security Scanner</div>
       </div>
-      
+
+      <div className="nav-new-scan">
+        <Link to="/scans/new" className="new-scan-btn">+ New Scan</Link>
+      </div>
+
       <ul className="nav-menu">
         {navItems.map((item) => (
-          <li key={item.path}>
+          <li key={item.label}>
             <Link
               to={item.path}
               className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}

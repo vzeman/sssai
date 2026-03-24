@@ -1,133 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import '../styles/ScanWizard.css';
+import { useState, useEffect } from 'react'
+import '../styles/ScanWizard.css'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
-export default function ScanWizard() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [target, setTarget] = useState('');
-  const [targetDetection, setTargetDetection] = useState(null);
-  const [selectedTemplate, setSelectedTemplate] = useState('quick');
-  const [templates, setTemplates] = useState([]);
-  const [customConfig, setCustomConfig] = useState({});
-  const [validationErrors, setValidationErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [createdScan, setCreatedScan] = useState(null);
+async function apiFetch(url, options = {}) {
+  const resp = await fetch(url, options)
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}))
+    throw new Error(data.detail || `Request failed (${resp.status})`)
+  }
+  return resp.json()
+}
+
+export default function ScanWizard({ token }) {
+  const [currentStep, setCurrentStep] = useState(0)
+  const [target, setTarget] = useState('')
+  const [targetDetection, setTargetDetection] = useState(null)
+  const [selectedTemplate, setSelectedTemplate] = useState('quick')
+  const [templates, setTemplates] = useState([])
+  const [customConfig, setCustomConfig] = useState({})
+  const [validationErrors, setValidationErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [createdScan, setCreatedScan] = useState(null)
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  }
 
   const STEPS = [
     { id: 0, name: 'Target', description: 'Enter target to scan' },
     { id: 1, name: 'Template', description: 'Choose scan template' },
     { id: 2, name: 'Advanced', description: 'Custom configuration (optional)' },
     { id: 3, name: 'Review', description: 'Review and confirm' },
-  ];
+  ]
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    loadTemplates()
+  }, [])
 
-  const loadTemplates = async () => {
+  async function loadTemplates() {
     try {
-      const response = await axios.get(`${API_BASE}/wizard/templates`);
-      setTemplates(response.data);
+      const data = await apiFetch(`${API_BASE}/api/wizard/templates`, { headers })
+      setTemplates(data)
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      console.error('Failed to load templates:', error)
     }
-  };
+  }
 
-  const detectTarget = async (value) => {
-    setTarget(value);
+  async function detectTarget(value) {
+    setTarget(value)
     if (value.length < 3) {
-      setTargetDetection(null);
-      return;
+      setTargetDetection(null)
+      return
     }
 
     try {
-      setLoading(true);
-      const response = await axios.post(`${API_BASE}/wizard/detect-target`, {
-        target: value,
-      });
-      setTargetDetection(response.data);
+      setLoading(true)
+      const data = await apiFetch(`${API_BASE}/api/wizard/detect-target`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target: value }),
+      })
+      setTargetDetection(data)
 
-      // Auto-recommend template
-      const recommendResponse = await axios.post(
-        `${API_BASE}/wizard/recommend-template`,
-        { target: value }
-      );
-      setSelectedTemplate(recommendResponse.data.recommended_template);
+      const recommendData = await apiFetch(`${API_BASE}/api/wizard/recommend-template`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target: value }),
+      })
+      setSelectedTemplate(recommendData.recommended_template)
     } catch (error) {
-      console.error('Detection failed:', error);
-      setTargetDetection(null);
+      console.error('Detection failed:', error)
+      setTargetDetection(null)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const validateStep = async () => {
+  async function validateStep() {
     try {
-      setLoading(true);
-      const response = await axios.post(`${API_BASE}/wizard/validate`, {
-        target,
-        template: selectedTemplate,
-        custom_config: customConfig,
-      });
+      setLoading(true)
+      const data = await apiFetch(`${API_BASE}/api/wizard/validate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          target,
+          template: selectedTemplate,
+          custom_config: customConfig,
+        }),
+      })
 
-      if (!response.data.is_valid) {
-        setValidationErrors(response.data.errors);
-        return false;
+      if (!data.is_valid) {
+        setValidationErrors(data.errors)
+        return false
       }
 
-      setValidationErrors({});
-      return true;
+      setValidationErrors({})
+      return true
     } catch (error) {
-      console.error('Validation failed:', error);
-      setValidationErrors({ general: 'Validation failed' });
-      return false;
+      console.error('Validation failed:', error)
+      setValidationErrors({ general: 'Validation failed' })
+      return false
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const handleNext = async () => {
+  async function handleNext() {
     if (await validateStep()) {
       if (currentStep < STEPS.length - 1) {
-        setCurrentStep(currentStep + 1);
+        setCurrentStep(currentStep + 1)
       }
     }
-  };
+  }
 
-  const handlePrevious = () => {
+  function handlePrevious() {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(currentStep - 1)
     }
-  };
+  }
 
-  const handleCreateScan = async () => {
+  async function handleCreateScan() {
     try {
-      setLoading(true);
-      const response = await axios.post(`${API_BASE}/wizard/create`, {
-        target,
-        template: selectedTemplate,
-        custom_config: customConfig,
-      });
+      setLoading(true)
+      const data = await apiFetch(`${API_BASE}/api/wizard/create`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          target,
+          template: selectedTemplate,
+          custom_config: customConfig,
+        }),
+      })
 
-      setCreatedScan(response.data);
-      // Could redirect to scan details here
+      setCreatedScan(data)
     } catch (error) {
-      console.error('Failed to create scan:', error);
+      console.error('Failed to create scan:', error)
       setValidationErrors({
-        general: error.response?.data?.detail || 'Failed to create scan',
-      });
+        general: error.message || 'Failed to create scan',
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   if (createdScan) {
     return (
       <div className="scan-wizard-success">
         <div className="success-card">
-          <h2>✓ Scan Created Successfully</h2>
+          <h2>Scan Created Successfully</h2>
           <p>Scan ID: <code>{createdScan.scan_id}</code></p>
           <p>Target: {createdScan.target}</p>
           <p>Template: {createdScan.template}</p>
@@ -142,11 +164,11 @@ export default function ScanWizard() {
             </button>
             <button
               onClick={() => {
-                setCurrentStep(0);
-                setTarget('');
-                setSelectedTemplate('quick');
-                setCustomConfig({});
-                setCreatedScan(null);
+                setCurrentStep(0)
+                setTarget('')
+                setSelectedTemplate('quick')
+                setCustomConfig({})
+                setCreatedScan(null)
               }}
               className="btn btn-secondary"
             >
@@ -155,7 +177,7 @@ export default function ScanWizard() {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -292,7 +314,7 @@ export default function ScanWizard() {
                   value={JSON.stringify(customConfig, null, 2)}
                   onChange={(e) => {
                     try {
-                      setCustomConfig(JSON.parse(e.target.value || '{}'));
+                      setCustomConfig(JSON.parse(e.target.value || '{}'))
                     } catch {
                       // Invalid JSON, ignore
                     }
@@ -383,5 +405,5 @@ export default function ScanWizard() {
         </div>
       </div>
     </div>
-  );
+  )
 }

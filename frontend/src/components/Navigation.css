@@ -68,6 +68,27 @@
   font-size: 14px;
 }
 
+.nav-new-scan {
+  padding: 12px 16px 4px;
+}
+
+.new-scan-btn {
+  display: block;
+  text-align: center;
+  background: #00d4ff;
+  color: #1a1d27;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.new-scan-btn:hover {
+  background: #00b8e6;
+}
+
 .nav-footer {
   padding: 16px;
   border-top: 1px solid #2a2d3a;

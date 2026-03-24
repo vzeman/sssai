@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useToast } from '../components/ToastContext'
 import './ReportsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function ReportsPage({ token }) {
+  const { showToast } = useToast()
   const [scans, setScans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -35,7 +37,7 @@ function ReportsPage({ token }) {
     try {
       const completedScan = scans.find(s => s.status === 'completed') || scans[0]
       if (!completedScan) {
-        alert('No scans available to generate a brief from.')
+        showToast('No scans available to generate a brief from.', 'warning')
         return
       }
       const scanId = completedScan.id
@@ -47,7 +49,7 @@ function ReportsPage({ token }) {
       const reportToken = data.token
       window.open(`${API_BASE}/api/reports/${scanId}/executive-brief/html?rt=${reportToken}`, '_blank')
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      showToast(err.message, 'error')
     }
   }
 
@@ -72,8 +74,21 @@ function ReportsPage({ token }) {
 
       <div className="reports-grid">
         {scans.length === 0 ? (
-          <div className="empty-state">
-            <p>No scans available yet. Start by running a scan to generate reports.</p>
+          <div className="empty-state-card">
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+            </div>
+            <h3 className="empty-state-title">No reports available</h3>
+            <p className="empty-state-text">
+              Reports are generated from completed scans. Run a security scan first to create a report.
+            </p>
+            <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
           </div>
         ) : (
           scans.map(scan => (
@@ -147,7 +162,7 @@ function ReportsPage({ token }) {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      showToast(err.message, 'error')
     }
   }
 }

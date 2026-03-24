@@ -86,7 +86,7 @@ app = FastAPI(
     description="AI-powered autonomous security scanning, SEO analysis, and compliance monitoring platform",
 )
 
-_ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8000").split(",")
+_ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8000,http://localhost:5173,http://localhost:3000").split(",")
 
 app.add_middleware(
     CORSMiddleware,

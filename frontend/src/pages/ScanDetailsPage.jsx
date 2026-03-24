@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useToast } from '../components/ToastContext'
 import './ScanDetailsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -7,6 +8,7 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 function ScanDetailsPage({ token }) {
   const { scanId } = useParams()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [scan, setScan] = useState(null)
   const [findings, setFindings] = useState([])
   const [logs, setLogs] = useState('')
@@ -49,10 +51,10 @@ function ScanDetailsPage({ token }) {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to retry scan')
-      alert('Scan retry initiated')
+      showToast('Scan retry initiated', 'success')
       fetchScanDetails()
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      showToast(err.message, 'error')
     }
   }
 
@@ -72,7 +74,7 @@ function ScanDetailsPage({ token }) {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (err) {
-      alert(`Error: ${err.message}`)
+      showToast(err.message, 'error')
     }
   }
 

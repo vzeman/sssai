@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
-function FindingDetailsModal({ finding, onClose }) {
+function FindingDetailsModal({ finding, onClose, onUpdateStatus }) {
   if (!finding) return null
 
   return (
@@ -61,8 +62,18 @@ function FindingDetailsModal({ finding, onClose }) {
 
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn btn-success">Mark as Resolved</button>
-          <button className="btn btn-warning">Mark as False Positive</button>
+          <button
+            className="btn btn-success"
+            onClick={() => onUpdateStatus(finding, 'resolved')}
+          >
+            Mark as Resolved
+          </button>
+          <button
+            className="btn btn-warning"
+            onClick={() => onUpdateStatus(finding, 'false-positive')}
+          >
+            Mark as False Positive
+          </button>
         </div>
       </div>
     </div>
@@ -75,6 +86,7 @@ function FindingsPage({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedFinding, setSelectedFinding] = useState(null)
+  const [successMessage, setSuccessMessage] = useState('')
 
   const [filters, setFilters] = useState({
     severity: 'all',
@@ -90,6 +102,13 @@ function FindingsPage({ token }) {
   useEffect(() => {
     applyFilters()
   }, [findings, filters])
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(''), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [successMessage])
 
   async function fetchFindings() {
     try {
@@ -125,6 +144,18 @@ function FindingsPage({ token }) {
     setFilters(prev => ({ ...prev, [name]: value }))
   }
 
+  function handleUpdateStatus(finding, newStatus) {
+    setFindings(prev =>
+      prev.map(f =>
+        f === finding ? { ...f, status: newStatus } : f
+      )
+    )
+    setSelectedFinding(null)
+
+    const label = newStatus === 'resolved' ? 'resolved' : 'marked as false positive'
+    setSuccessMessage(`"${finding.title || 'Finding'}" has been ${label}.`)
+  }
+
   if (loading) {
     return <div className="page-container"><div className="loading">Loading findings...</div></div>
   }
@@ -137,6 +168,10 @@ function FindingsPage({ token }) {
       </div>
 
       {error && <div className="error-message">{error}</div>}
+
+      {successMessage && (
+        <div className="success-message">{successMessage}</div>
+      )}
 
       <div className="filters-section">
         <div className="filter-group">
@@ -192,23 +227,48 @@ function FindingsPage({ token }) {
         Found {filteredFindings.length} finding{filteredFindings.length !== 1 ? 's' : ''}
       </div>
 
-      <div className="findings-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Severity</th>
-              <th>CVSS</th>
-              <th>Status</th>
-              <th>Scan</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredFindings.length === 0 ? (
-              <tr><td colSpan="6" className="empty-cell">No findings match your filters</td></tr>
-            ) : (
-              filteredFindings.map((finding, idx) => (
+      {findings.length === 0 ? (
+        <div className="empty-state-card">
+          <div className="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </div>
+          <h3 className="empty-state-title">No findings yet</h3>
+          <p className="empty-state-text">
+            Run a security scan to discover vulnerabilities and findings across your targets.
+          </p>
+          <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
+        </div>
+      ) : filteredFindings.length === 0 ? (
+        <div className="empty-state-card">
+          <div className="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <h3 className="empty-state-title">No findings match your filters</h3>
+          <p className="empty-state-text">
+            Try adjusting the severity, CVSS score range, or status filters to see more results.
+          </p>
+        </div>
+      ) : (
+        <div className="findings-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Severity</th>
+                <th>CVSS</th>
+                <th>Status</th>
+                <th>Scan</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFindings.map((finding, idx) => (
                 <tr key={idx} className="finding-row">
                   <td className="title-cell">
                     <span className="finding-title">{finding.title || 'Unknown'}</span>
@@ -238,13 +298,17 @@ function FindingsPage({ token }) {
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <FindingDetailsModal finding={selectedFinding} onClose={() => setSelectedFinding(null)} />
+      <FindingDetailsModal
+        finding={selectedFinding}
+        onClose={() => setSelectedFinding(null)}
+        onUpdateStatus={handleUpdateStatus}
+      />
     </div>
   )
 }

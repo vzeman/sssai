@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -48,8 +49,18 @@ function QueuePage({ token }) {
       </div>
 
       {queue.length === 0 ? (
-        <div className="empty-state">
-          <p>No scans in queue. All systems operational.</p>
+        <div className="empty-state-card">
+          <div className="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          </div>
+          <h3 className="empty-state-title">Queue is clear</h3>
+          <p className="empty-state-text">
+            No scans are queued or running right now. Start a new scan to see it appear here.
+          </p>
+          <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
         </div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
