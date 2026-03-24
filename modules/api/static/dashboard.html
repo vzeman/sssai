@@ -1073,7 +1073,7 @@ async function loadHeartbeat() {
 
 // ═══ INIT ═══
 (async function init() {
-  token = localStorage.getItem('scanner_token') || '';
+  token = localStorage.getItem('scanner_token') || localStorage.getItem('auth_token') || '';
   userEmail = localStorage.getItem('scanner_email') || '';
   if (token) {
     try {

@@ -301,7 +301,7 @@
 
 <script>
 const API = '';
-let TOKEN = localStorage.getItem('scanner_token') || '';
+let TOKEN = localStorage.getItem('scanner_token') || localStorage.getItem('auth_token') || '';
 let charts = {};
 
 // ─── Auth ───
