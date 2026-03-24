@@ -1,0 +1,139 @@
+# DOM XSS Client-Side Testing Knowledge Module
+
+## Purpose
+Test for DOM-based Cross-Site Scripting vulnerabilities where the attack payload is
+executed as a result of modifying the DOM in the victim's browser, rather than being
+reflected from the server.
+
+## Key Concepts
+
+### Dangerous Sources (user-controllable input)
+- `location.hash` — URL fragment after #
+- `location.search` — URL query string
+- `location.href` — full URL
+- `document.URL` / `document.documentURI`
+- `document.referrer`
+- `window.name`
+- `postMessage` data
+- `localStorage` / `sessionStorage`
+- `document.cookie`
+
+### Dangerous Sinks (code execution points)
+- `innerHTML` / `outerHTML`
+- `document.write()` / `document.writeln()`
+- `eval()` / `Function()`
+- `setTimeout()` / `setInterval()` with string args
+- `element.setAttribute()` with event handlers
+- `location.href = ...` / `location.assign()` / `location.replace()`
+- `element.src` / `element.href` / `element.action`
+- jQuery: `$()`, `.html()`, `.append()`, `.after()`, `.before()`
+
+## Testing Methodology
+
+### Phase 1: JavaScript Source Analysis
+```bash
+# Download all JavaScript files
+curl -s TARGET_URL | grep -oP 'src="[^"]*\.js"' | sed 's/src="//;s/"//' > /output/js_files.txt
+
+# Download and analyze each
+while read js_url; do
+  if [[ "$js_url" != http* ]]; then
+    js_url="TARGET_BASE/$js_url"
+  fi
+  curl -s "$js_url" >> /output/all_js.txt
+done < /output/js_files.txt
+
+# Find dangerous sinks
+grep -n 'innerHTML\|outerHTML\|document\.write\|eval(\|setTimeout(\|setInterval(\|\.html(\|\.append(' /output/all_js.txt > /output/dangerous_sinks.txt
+
+# Find dangerous sources
+grep -n 'location\.hash\|location\.search\|document\.URL\|document\.referrer\|window\.name\|postMessage\|localStorage\|sessionStorage' /output/all_js.txt > /output/dangerous_sources.txt
+
+# Find source-to-sink flows
+grep -n 'innerHTML.*location\|innerHTML.*hash\|innerHTML.*search\|document\.write.*location\|eval.*location\|\.html(.*location' /output/all_js.txt > /output/source_to_sink.txt
+```
+
+### Phase 2: Dynamic Testing with Hash/Query Payloads
+```bash
+# Test hash-based DOM XSS
+# Use unique canary to detect reflection into DOM
+CANARY="SSSAI_DOM_XSS_$(date +%s)"
+
+# Test common hash patterns
+for payload in "$CANARY" "<img src=x>" "javascript:$CANARY" "data:text/html,$CANARY"; do
+  ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$payload'))")
+  curl -s "TARGET_URL#$ENCODED" -o /output/dom_test_hash.html
+done
+
+# Test query parameter reflection into DOM
+for param in $(curl -s TARGET_URL | grep -oP 'name="[^"]*"' | sed 's/name="//;s/"//'); do
+  curl -s "TARGET_URL?$param=$CANARY" -o /output/dom_test_$param.html
+  grep -l "$CANARY" /output/dom_test_$param.html && echo "REFLECTED in DOM via param: $param"
+done
+```
+
+### Phase 3: Framework-Specific Tests
+
+#### Angular/AngularJS
+```bash
+# Check for AngularJS (vulnerable to template injection)
+curl -s TARGET_URL | grep -i "ng-app\|angular\.js\|angular\.min\.js"
+
+# AngularJS sandbox escape test (for versions < 1.6)
+curl -s "TARGET_URL?q={{constructor.constructor('return+this')()}}"
+```
+
+#### React
+```bash
+# React is generally safe against DOM XSS via dangerouslySetInnerHTML
+curl -s TARGET_URL | grep "dangerouslySetInnerHTML"
+# Also check for:
+grep -r "dangerouslySetInnerHTML" /output/all_js.txt
+```
+
+#### jQuery
+```bash
+# jQuery selector injection (pre-3.0)
+curl -s TARGET_URL | grep -oP 'jquery[/-][\d.]+'
+# Check for $() with user input
+grep '\$(\s*location\|\$(\s*window\|\$(\s*document\.URL' /output/all_js.txt
+```
+
+### Phase 4: postMessage Testing
+```bash
+# Find postMessage listeners
+grep -n 'addEventListener.*message\|onmessage' /output/all_js.txt
+
+# Check if origin is validated
+grep -A5 'addEventListener.*message' /output/all_js.txt | grep -v 'origin'
+# If no origin check found, it's vulnerable to cross-origin message injection
+```
+
+### Phase 5: URL Redirect/Open Redirect Testing
+```bash
+# Test URL parameter redirects
+for param in url redirect next return_url callback goto dest destination rurl redirect_uri; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" "TARGET_URL?$param=https://evil.com" --max-time 5)
+  LOCATION=$(curl -sI "TARGET_URL?$param=https://evil.com" --max-time 5 | grep -i "^location:" | head -1)
+  if echo "$LOCATION" | grep -qi "evil.com"; then
+    echo "OPEN REDIRECT via $param: $LOCATION"
+  fi
+done
+```
+
+## Nuclei Templates for DOM XSS
+```bash
+# Run nuclei with DOM XSS templates
+nuclei -u TARGET_URL -tags xss,domxss -severity medium,high,critical -o /output/nuclei_domxss.txt
+
+# Run with headless browser mode for JS-rendered pages
+nuclei -u TARGET_URL -headless -tags xss -o /output/nuclei_headless_xss.txt
+```
+
+## Evidence Documentation
+For each DOM XSS finding:
+1. Identify the source (where user input enters)
+2. Trace the flow to the sink (where it's executed)
+3. Provide the exact payload that triggers it
+4. Show the affected JavaScript code snippet
+5. Rate: direct DOM XSS (high), indirect via storage (medium), requires user interaction (low)

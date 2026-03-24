@@ -26,6 +26,7 @@ from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
 from modules.agent.triage import apply_triage
 from modules.agent.scheduling import recommend_scan_interval
+from modules.agent.state_machine import ScanStateMachine
 from modules.infra.checkpoint import save_checkpoint, delete_checkpoint
 from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
@@ -1617,6 +1618,43 @@ def _extract_findings_from_messages(messages: list) -> list:
     return findings[:50]  # cap at 50 findings
 
 
+def _load_scan_history(storage, target: str, limit: int = 10) -> list[dict]:
+    """Load previous scan reports for the same target."""
+    try:
+        # List scan reports — storage adapter should support listing
+        # For now, use ES to find previous scans
+        from modules.infra.elasticsearch import search
+        results = search("scanner-scan-findings", {
+            "query": {"term": {"target.keyword": target}},
+            "size": 0,
+            "aggs": {
+                "scans": {
+                    "terms": {"field": "scan_id.keyword", "size": limit, "order": {"max_ts": "desc"}},
+                    "aggs": {"max_ts": {"max": {"field": "timestamp"}}}
+                }
+            }
+        })
+        scan_ids = [b["key"] for b in results.get("aggregations", {}).get("scans", {}).get("buckets", [])]
+
+        history = []
+        for sid in scan_ids:
+            try:
+                report_data = storage.get_json(f"scans/{sid}/report.json")
+                if report_data:
+                    history.append({
+                        "scan_id": sid,
+                        "findings": report_data.get("findings", []),
+                        "risk_score": report_data.get("risk_score", 0),
+                        "timestamp": report_data.get("scan_metadata", {}).get("duration_seconds", ""),
+                    })
+            except Exception:
+                pass
+        return history
+    except Exception as e:
+        log.debug("Could not load scan history for %s: %s", target, e)
+        return []
+
+
 # ── Main scan loop ───────────────────────────────────────────────────────
 
 def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = None):
@@ -1634,6 +1672,9 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "scan_type": scan_type,
         "_token_tracker": token_tracker,
     }
+
+    state_machine = ScanStateMachine(scan_id)
+    scan_context["_state_machine"] = state_machine
 
     # ── Planning step ──
     _log_activity(scan_id, {
@@ -1852,6 +1893,8 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
             for block in response.content:
                 if block.type == "tool_use":
+                    state_machine.try_auto_transition(block.name)
+
                     # ── Loop detection ──
                     loop_warning = loop_detector.record(block.name, block.input)
                     if loop_warning:
@@ -1943,6 +1986,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             }
                         if scan_context.get("_plan_history"):
                             report["scan_metadata"]["plan_evolution"] = scan_context["_plan_history"]
+                        report["scan_metadata"]["state_transitions"] = state_machine.summary()
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -2073,6 +2117,37 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     except Exception as exc:
         log.warning("Auto-triage failed for scan %s: %s", scan_id, exc)
 
+    # ── Posture score calculation ──
+    try:
+        from modules.agent.posture import calculate_posture_score
+        posture = calculate_posture_score(report.get("findings", []))
+        report["posture_score"] = posture["posture_score"]
+        report["posture_components"] = posture["component_scores"]
+        report["posture_trend"] = posture["trend"]
+        log.info("Scan %s: posture score = %.1f (%s)", scan_id, posture["posture_score"], posture["trend"])
+    except Exception as exc:
+        log.warning("Posture score calculation failed for scan %s: %s", scan_id, exc)
+
+    # ── Cross-scan vulnerability correlation ──
+    try:
+        from modules.agent.correlation import correlate_with_history
+        # Load scan history from storage
+        scan_history = _load_scan_history(storage, target)
+        if scan_history:
+            correlation = correlate_with_history(
+                report.get("findings", []), scan_history, target
+            )
+            report["vulnerability_correlation"] = correlation
+            persistent_count = len(correlation.get("persistent_vulnerabilities", []))
+            new_count = len(correlation.get("new_vulnerabilities", []))
+            resolved_count = len(correlation.get("resolved_vulnerabilities", []))
+            log.info(
+                "Scan %s: correlation — %d persistent, %d new, %d resolved",
+                scan_id, persistent_count, new_count, resolved_count,
+            )
+    except Exception as exc:
+        log.warning("Vulnerability correlation failed for scan %s: %s", scan_id, exc)
+
     # ── Intelligent scan scheduling recommendation ──
     try:
         scheduling = recommend_scan_interval(target, report)
@@ -2088,6 +2163,25 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
+
+    # ── Index posture snapshot to Elasticsearch ──
+    try:
+        from modules.infra.elasticsearch import index_doc
+        from datetime import datetime, timezone
+        if report.get("posture_score") is not None:
+            index_doc("scanner-security-posture", {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "target": target,
+                "scan_id": scan_id,
+                "scan_type": scan_type,
+                "posture_score": report["posture_score"],
+                "component_scores": report.get("posture_components", {}),
+                "trend": report.get("posture_trend", "stable"),
+                "findings_count": len(report.get("findings", [])),
+                "risk_score": report.get("risk_score", 0),
+            })
+    except Exception as exc:
+        log.warning("Posture ES indexing failed for scan %s: %s", scan_id, exc)
 
     # ── Post scan completion to advisor chat ──
     findings_count = len(report.get("findings", []))

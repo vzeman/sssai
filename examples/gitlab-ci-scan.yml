@@ -1,0 +1,60 @@
+# Security Scanner - GitLab CI Integration
+# Include this in your .gitlab-ci.yml or copy the security-scan job
+#
+# Required variables (Settings > CI/CD > Variables):
+#   SCANNER_API_KEY: Your webhook API key
+#   SCANNER_URL: URL of your scanner instance
+
+security-scan:
+  stage: test
+  image: curlimages/curl:latest
+  variables:
+    SCAN_TARGET: "${CI_ENVIRONMENT_URL:-$CI_PROJECT_URL}"
+    SCAN_TYPE: "security"
+  script:
+    - |
+      # Trigger scan
+      RESPONSE=$(curl -s -X POST "$SCANNER_URL/api/webhooks/scan" \
+        -H "X-API-Key: $SCANNER_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"target\": \"$SCAN_TARGET\",
+          \"scan_type\": \"$SCAN_TYPE\",
+          \"deployment\": {
+            \"commit_sha\": \"$CI_COMMIT_SHA\",
+            \"branch\": \"$CI_COMMIT_BRANCH\",
+            \"environment\": \"$CI_ENVIRONMENT_NAME\",
+            \"deployer\": \"$GITLAB_USER_LOGIN\"
+          },
+          \"quality_gates\": {
+            \"max_critical\": 0,
+            \"max_high\": 5,
+            \"max_risk_score\": 70
+          }
+        }")
+      SCAN_ID=$(echo "$RESPONSE" | jq -r '.scan_id')
+      echo "Scan triggered: $SCAN_ID"
+
+      # Poll for results
+      for i in $(seq 1 60); do
+        RESULT=$(curl -s "$SCANNER_URL/api/webhooks/scan/$SCAN_ID/result" \
+          -H "X-API-Key: $SCANNER_API_KEY")
+        STATUS=$(echo "$RESULT" | jq -r '.status')
+        if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+          echo "$RESULT" | jq '.'
+          GATE=$(echo "$RESULT" | jq -r '.gate_passed // true')
+          if [ "$GATE" = "false" ]; then
+            echo "Security quality gate FAILED"
+            exit 1
+          fi
+          echo "Security quality gate PASSED"
+          exit 0
+        fi
+        echo "Scan in progress... ($i/60)"
+        sleep 30
+      done
+      echo "Scan timed out"
+      exit 1
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

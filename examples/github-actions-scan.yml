@@ -1,0 +1,78 @@
+# Security Scanner - GitHub Actions Integration
+# Add this to .github/workflows/security-scan.yml in your project
+#
+# Required secrets:
+#   SCANNER_API_KEY: Your webhook API key from the scanner dashboard
+#   SCANNER_URL: URL of your scanner instance (e.g., https://scanner.example.com)
+
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Security Scan
+        id: scan
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.SCANNER_URL }}/api/webhooks/scan" \
+            -H "X-API-Key: ${{ secrets.SCANNER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "target": "${{ github.event.repository.homepage || github.event.repository.html_url }}",
+              "scan_type": "security",
+              "deployment": {
+                "commit_sha": "${{ github.sha }}",
+                "branch": "${{ github.ref_name }}",
+                "environment": "${{ github.event_name == 'push' && 'production' || 'staging' }}",
+                "deployer": "${{ github.actor }}"
+              },
+              "quality_gates": {
+                "max_critical": 0,
+                "max_high": 5,
+                "max_risk_score": 70
+              },
+              "wait_for_result": false
+            }')
+          SCAN_ID=$(echo "$RESPONSE" | jq -r '.scan_id')
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Scan Results
+        id: results
+        run: |
+          SCAN_ID="${{ steps.scan.outputs.scan_id }}"
+          for i in $(seq 1 60); do
+            RESULT=$(curl -s "${{ secrets.SCANNER_URL }}/api/webhooks/scan/$SCAN_ID/result" \
+              -H "X-API-Key: ${{ secrets.SCANNER_API_KEY }}")
+            STATUS=$(echo "$RESULT" | jq -r '.status')
+            if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+              echo "result<<EOF" >> $GITHUB_OUTPUT
+              echo "$RESULT" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              GATE=$(echo "$RESULT" | jq -r '.gate_passed // true')
+              echo "gate_passed=$GATE" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "Scan in progress... (attempt $i/60)"
+            sleep 30
+          done
+
+      - name: Check Quality Gate
+        if: steps.results.outputs.gate_passed == 'false'
+        run: |
+          echo "::error::Security quality gate FAILED"
+          echo "${{ steps.results.outputs.result }}" | jq '.gate_details'
+          exit 1
+
+      - name: Post Scan Summary
+        if: always() && steps.results.outputs.result
+        run: |
+          echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.results.outputs.result }}" | jq -r '"Risk Score: \(.risk_score // "N/A")\nFindings: \(.findings_count // 0)\nGate: \(if .gate_passed then "PASSED ✅" else "FAILED ❌" end)"' >> $GITHUB_STEP_SUMMARY
