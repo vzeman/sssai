@@ -24,6 +24,7 @@ try:
             ("last_login", "NULL"),
             ("totp_secret", "NULL"),
             ("totp_enabled", "FALSE"),
+            ("is_admin", "FALSE"),
         ]:
             try:
                 type_map = {
@@ -33,6 +34,7 @@ try:
                     "last_login": f"TIMESTAMP {default}",
                     "totp_secret": f"VARCHAR {default}",
                     "totp_enabled": f"BOOLEAN DEFAULT {default}",
+                    "is_admin": f"BOOLEAN DEFAULT {default}",
                 }
                 col_type = type_map.get(col, f"VARCHAR {default}")
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))

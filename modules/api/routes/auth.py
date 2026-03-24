@@ -36,9 +36,11 @@ def register(body: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email.lower()).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    is_first_user = db.query(User).count() == 0
     user = User(
         email=body.email.lower().strip(),
         hashed_password=hash_password(body.password),
+        is_admin=is_first_user,
     )
     db.add(user)
     db.commit()
@@ -344,6 +346,7 @@ class UserUpdateRequest(BaseModel):
     email: str | None = None
     plan: str | None = None
     is_active: bool | None = None
+    is_admin: bool | None = None
 
 
 class AdminCreateUserRequest(BaseModel):
@@ -388,6 +391,8 @@ def admin_update_user(user_id: str, body: UserUpdateRequest, user: User = Depend
         target.plan = body.plan
     if body.is_active is not None:
         target.is_active = body.is_active
+    if body.is_admin is not None:
+        target.is_admin = body.is_admin
     db.commit()
     db.refresh(target)
     return target
@@ -449,6 +454,5 @@ def admin_disable_2fa(user_id: str, user: User = Depends(get_current_user), db: 
 
 
 def _require_admin(user: User, db: Session):
-    first_user = db.query(User).order_by(User.created_at.asc()).first()
-    if not first_user or first_user.id != user.id:
+    if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
