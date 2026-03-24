@@ -27,8 +27,8 @@
   gap: 16px;
   margin-bottom: 24px;
   padding: 16px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
 }
 
@@ -40,7 +40,7 @@
 
 .filter-group label {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -48,10 +48,10 @@
 
 .filter-group select,
 .filter-group input {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 8px 12px;
   font-size: 13px;
   transition: border-color 0.2s;
@@ -74,12 +74,12 @@
 }
 
 .cvss-range span {
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 .findings-summary {
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -90,33 +90,33 @@
 .findings-table table {
   width: 100%;
   border-collapse: collapse;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .findings-table th {
-  background: #111420;
-  border-bottom: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .findings-table td {
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   font-size: 13px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .finding-row:hover {
-  background: #252c3a;
+  background: var(--card-hover-bg);
 }
 
 .title-cell {
@@ -203,10 +203,10 @@
 }
 
 .status-select {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 4px 8px;
   font-size: 12px;
   cursor: pointer;
@@ -229,8 +229,8 @@
   top: 100%;
   left: 0;
   z-index: 100;
-  background: #1a1d27;
-  border: 1px solid #3a3d4a;
+  background: var(--card-bg);
+  border: 1px solid var(--input-border);
   border-radius: 8px;
   padding: 12px;
   margin-top: 4px;
@@ -241,16 +241,16 @@
 .reason-popover label {
   display: block;
   font-size: 12px;
-  color: #aaa;
+  color: var(--nav-link-color);
   margin-bottom: 8px;
 }
 
 .reason-popover textarea {
   width: 100%;
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 8px;
   font-size: 13px;
   resize: vertical;
@@ -307,12 +307,12 @@
 
 .toggle-text {
   font-size: 13px;
-  color: #aaa;
+  color: var(--nav-link-color);
   white-space: nowrap;
 }
 
 .scan-ref {
-  color: #666;
+  color: var(--app-text-muted);
   font-family: monospace;
   font-size: 12px;
 }
@@ -335,7 +335,7 @@
 
 .empty-cell {
   text-align: center;
-  color: #666;
+  color: var(--app-text-muted);
   padding: 40px !important;
 }
 
@@ -352,8 +352,8 @@
 }
 
 .modal-content {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   max-width: 600px;
   width: 100%;
@@ -367,7 +367,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .modal-header h2 {
@@ -379,7 +379,7 @@
 .close-btn {
   background: transparent;
   border: none;
-  color: #666;
+  color: var(--app-text-muted);
   font-size: 20px;
   cursor: pointer;
   transition: color 0.2s;
@@ -402,7 +402,7 @@
 .detail-section h3 {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -411,7 +411,7 @@
 .detail-section p {
   margin: 0;
   font-size: 13px;
-  color: #aaa;
+  color: var(--nav-link-color);
   line-height: 1.6;
 }
 
@@ -452,7 +452,7 @@
 
 .cvss-vector {
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   font-family: monospace;
 }
 
@@ -466,13 +466,13 @@
   display: flex;
   justify-content: space-between;
   padding: 8px;
-  background: #111420;
+  background: var(--app-bg);
   border-radius: 4px;
   font-size: 12px;
 }
 
 .history-date {
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 .history-status {
@@ -484,7 +484,7 @@
   display: flex;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid #2a2d3a;
+  border-top: 1px solid var(--card-border);
 }
 
 .btn {
@@ -500,8 +500,8 @@
 
 .btn-secondary {
   background: transparent;
-  border: 1px solid #3a3d4a;
-  color: #aaa;
+  border: 1px solid var(--input-border);
+  color: var(--nav-link-color);
 }
 
 .btn-secondary:hover {
@@ -553,8 +553,8 @@
   align-items: center;
   justify-content: center;
   padding: 60px 24px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   text-align: center;
 }
@@ -568,13 +568,13 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--app-text);
 }
 
 .empty-state-text {
   margin: 0 0 24px;
   font-size: 14px;
-  color: #888;
+  color: var(--app-text-secondary);
   max-width: 400px;
   line-height: 1.5;
 }
@@ -620,8 +620,8 @@
 
 .btn-save-filter {
   background: transparent;
-  border: 1px dashed #3a3d4a;
-  color: #888;
+  border: 1px dashed var(--input-border);
+  color: var(--app-text-secondary);
   padding: 6px 14px;
   border-radius: 6px;
   cursor: pointer;
@@ -641,10 +641,10 @@
 }
 
 .save-filter-input {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 6px 10px;
   font-size: 12px;
   width: 180px;
@@ -678,8 +678,8 @@
 
 .btn-save-cancel {
   background: transparent;
-  border: 1px solid #3a3d4a;
-  color: #888;
+  border: 1px solid var(--input-border);
+  color: var(--app-text-secondary);
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -688,8 +688,8 @@
 }
 
 .btn-save-cancel:hover {
-  border-color: #666;
-  color: #aaa;
+  border-color: var(--app-text-muted);
+  color: var(--nav-link-color);
 }
 
 .saved-filters-list {
@@ -701,15 +701,15 @@
 
 .saved-filters-label {
   font-size: 12px;
-  color: #666;
+  color: var(--app-text-muted);
   font-weight: 600;
 }
 
 .saved-filter-chip {
   display: flex;
   align-items: center;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -731,8 +731,8 @@
 .saved-filter-chip-delete {
   background: transparent;
   border: none;
-  border-left: 1px solid #2a2d3a;
-  color: #666;
+  border-left: 1px solid var(--card-border);
+  color: var(--app-text-muted);
   padding: 4px 8px;
   cursor: pointer;
   font-size: 11px;

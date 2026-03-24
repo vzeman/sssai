@@ -10,8 +10,8 @@
 
 .back-btn {
   background: transparent;
-  border: 1px solid #3a3d4a;
-  color: #aaa;
+  border: 1px solid var(--input-border);
+  color: var(--nav-link-color);
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -41,9 +41,9 @@
 .btn {
   padding: 8px 16px;
   border-radius: 6px;
-  border: 1px solid #3a3d4a;
+  border: 1px solid var(--input-border);
   background: transparent;
-  color: #aaa;
+  color: var(--nav-link-color);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
@@ -67,8 +67,8 @@
 
 .btn-secondary {
   background: transparent;
-  border-color: #3a3d4a;
-  color: #aaa;
+  border-color: var(--input-border);
+  color: var(--nav-link-color);
 }
 
 .scan-metadata {
@@ -76,8 +76,8 @@
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
   padding: 16px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   margin-bottom: 24px;
 }
@@ -90,14 +90,14 @@
 
 .metadata-item .label {
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .metadata-item span {
   font-size: 13px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .badge {
@@ -129,14 +129,14 @@
   display: flex;
   gap: 0;
   margin-bottom: 24px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .tab {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #666;
+  color: var(--app-text-muted);
   padding: 12px 16px;
   cursor: pointer;
   font-size: 13px;
@@ -145,7 +145,7 @@
 }
 
 .tab:hover {
-  color: #aaa;
+  color: var(--nav-link-color);
 }
 
 .tab.active {
@@ -168,8 +168,8 @@
 
 /* Findings Section */
 .findings-section {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -179,20 +179,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #2a2d3a;
-  background: #111420;
+  border-bottom: 1px solid var(--card-border);
+  background: var(--app-bg);
 }
 
 .findings-count {
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .findings-controls select {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 4px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 6px 10px;
   font-size: 12px;
 }
@@ -203,31 +203,31 @@
 }
 
 .findings-table th {
-  background: #111420;
-  border-bottom: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .findings-table td {
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   font-size: 13px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .findings-table tbody tr:hover {
-  background: #252c3a;
+  background: var(--card-hover-bg);
 }
 
 .empty-row {
   text-align: center;
-  color: #666;
+  color: var(--app-text-muted);
   padding: 40px !important;
 }
 
@@ -301,7 +301,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #2a2d3a;
+  background: var(--card-border);
 }
 
 .timeline-item {
@@ -317,7 +317,7 @@
   width: 16px;
   height: 16px;
   background: #2a3d50;
-  border: 2px solid #1a1d27;
+  border: 2px solid var(--card-bg);
   border-radius: 50%;
 }
 
@@ -347,8 +347,8 @@
 }
 
 .timeline-content {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 12px;
 }
@@ -356,13 +356,13 @@
 .timeline-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e8eaed;
+  color: var(--app-text);
   margin-bottom: 4px;
 }
 
 .timeline-time {
   font-size: 12px;
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 /* Logs Section */
@@ -371,8 +371,8 @@
 }
 
 .logs-viewer {
-  background: #111420;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 16px;
   font-size: 11px;

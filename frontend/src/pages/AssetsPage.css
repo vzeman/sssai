@@ -1,6 +1,6 @@
 .assets-summary {
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -11,33 +11,33 @@
 .assets-table table {
   width: 100%;
   border-collapse: collapse;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .assets-table th {
-  background: #111420;
-  border-bottom: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .assets-table td {
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   font-size: 13px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .asset-row:hover {
-  background: #252c3a;
+  background: var(--card-hover-bg);
 }
 
 .asset-row.asset-new {
@@ -60,12 +60,12 @@
 .mono-cell {
   font-family: monospace;
   font-size: 12px;
-  color: #aaa;
+  color: var(--nav-link-color);
 }
 
 .date-cell {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   white-space: nowrap;
 }
 

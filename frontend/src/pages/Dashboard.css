@@ -199,7 +199,7 @@
 .dashboard-new-scan {
   display: inline-block;
   background: #00d4ff;
-  color: #1a1d27;
+  color: var(--card-bg);
   font-weight: 600;
   font-size: 14px;
   padding: 10px 20px;

@@ -17,8 +17,8 @@
 }
 
 .fdm-modal {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   width: 100%;
   max-width: 720px;
@@ -37,8 +37,8 @@
 /* Header */
 .fdm-header {
   padding: 20px 24px 16px;
-  border-bottom: 1px solid #2a2d3a;
-  border-top: 3px solid #888;
+  border-bottom: 1px solid var(--card-border);
+  border-top: 3px solid var(--app-text-secondary);
   border-radius: 12px 12px 0 0;
 }
 
@@ -64,13 +64,13 @@
 .fdm-severity-pill.medium { background: #4a4a2a; color: #ffaa44; }
 .fdm-severity-pill.low { background: #2a4a2a; color: #44ff44; }
 .fdm-severity-pill.info { background: #2a3a4a; color: #4a9eff; }
-.fdm-severity-pill.unknown { background: #2a2d3a; color: #888; }
+.fdm-severity-pill.unknown { background: var(--card-border); color: var(--app-text-secondary); }
 
 .fdm-cvss {
   font-size: 12px;
   font-weight: 700;
-  color: #e8eaed;
-  background: #111420;
+  color: var(--app-text);
+  background: var(--app-bg);
   padding: 3px 10px;
   border-radius: 4px;
   font-family: 'Fira Code', monospace;
@@ -80,7 +80,7 @@
   margin-left: auto;
   background: none;
   border: none;
-  color: #666;
+  color: var(--app-text-muted);
   font-size: 24px;
   cursor: pointer;
   padding: 0 4px;
@@ -93,7 +93,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e8eaed;
+  color: var(--app-text);
   line-height: 1.4;
 }
 
@@ -110,7 +110,7 @@
   border-radius: 3px;
   font-size: 11px;
   font-weight: 500;
-  background: #252c3a;
+  background: var(--card-hover-bg);
   color: #94a3b8;
   border: 1px solid #334155;
 }
@@ -164,8 +164,8 @@
 
 .fdm-code {
   display: block;
-  background: #0f1117;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 12px 16px;
   font-family: 'Fira Code', 'Courier New', monospace;
@@ -179,8 +179,8 @@
 
 .fdm-url {
   display: block;
-  background: #0f1117;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 4px;
   padding: 8px 12px;
   font-family: 'Fira Code', monospace;
@@ -221,7 +221,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
-  background: #111420;
+  background: var(--app-bg);
   border-radius: 6px;
   border: 1px solid #1e2433;
 }
@@ -272,7 +272,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #111420;
+  background: var(--app-bg);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -291,7 +291,7 @@
   display: flex;
   justify-content: flex-end;
   padding: 12px 24px;
-  border-top: 1px solid #2a2d3a;
+  border-top: 1px solid var(--card-border);
 }
 
 .fdm-btn {
@@ -305,7 +305,7 @@
 }
 
 .fdm-btn-close {
-  background: #252c3a;
+  background: var(--card-hover-bg);
   color: #94a3b8;
   border: 1px solid #334155;
 }

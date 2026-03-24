@@ -3,7 +3,7 @@
   display: flex;
   gap: 4px;
   margin-bottom: 24px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding-bottom: 0;
 }
 
@@ -11,7 +11,7 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #888;
+  color: var(--app-text-secondary);
   font-size: 13px;
   padding: 10px 16px;
   cursor: pointer;
@@ -19,7 +19,7 @@
 }
 
 .settings-tab:hover {
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .settings-tab-active {
@@ -33,8 +33,8 @@
 }
 
 .settings-card {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 20px;
@@ -51,7 +51,7 @@
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .settings-card-header .settings-card-title {
@@ -81,13 +81,13 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
+  color: var(--app-text-muted);
   font-weight: 600;
 }
 
 .settings-field span {
   font-size: 14px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 /* ─── Badges ──────────────────────────────────────────────────────── */
@@ -118,7 +118,7 @@
   font-size: 12px;
   font-weight: 600;
   background: #2a2a2a;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .settings-badge-red {
@@ -147,17 +147,17 @@
 
 .settings-form-field label {
   font-size: 12px;
-  color: #aaa;
+  color: var(--nav-link-color);
   font-weight: 500;
 }
 
 .settings-form-field input,
 .settings-select {
-  background: #111420;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 10px 12px;
-  color: #e8eaed;
+  color: var(--app-text);
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
@@ -174,8 +174,8 @@
 }
 
 .settings-select option {
-  background: #111420;
-  color: #e8eaed;
+  background: var(--app-bg);
+  color: var(--app-text);
 }
 
 /* ─── Buttons ─────────────────────────────────────────────────────── */
@@ -213,7 +213,7 @@
 }
 
 .settings-btn-sm:hover {
-  background: #3a4050;
+  background: var(--card-hover-border);
 }
 
 .settings-btn-danger {
@@ -245,7 +245,7 @@
 }
 
 .settings-muted {
-  color: #888;
+  color: var(--app-text-secondary);
   font-size: 13px;
   margin: 0;
 }
@@ -266,16 +266,16 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #666;
+  color: var(--app-text-muted);
   font-weight: 600;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .settings-table td {
   padding: 10px 12px;
   font-size: 13px;
-  color: #e8eaed;
-  border-bottom: 1px solid #1e2030;
+  color: var(--app-text);
+  border-bottom: 1px solid var(--card-bg);
 }
 
 .settings-table tr:last-child td {
@@ -313,8 +313,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #111420;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 4px;
   padding: 8px 12px;
 }
@@ -323,7 +323,7 @@
   flex: 1;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12px;
-  color: #e8eaed;
+  color: var(--app-text);
   word-break: break-all;
 }
 
@@ -335,11 +335,11 @@
 }
 
 .settings-inline-input {
-  background: #111420;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 10px 12px;
-  color: #e8eaed;
+  color: var(--app-text);
   font-size: 13px;
   outline: none;
   flex: 1;

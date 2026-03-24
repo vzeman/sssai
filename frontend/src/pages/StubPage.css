@@ -5,16 +5,16 @@
 }
 
 .feature-card {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 24px;
   transition: all 0.2s;
 }
 
 .feature-card:hover {
-  border-color: #3a4050;
-  background: #252c3a;
+  border-color: var(--card-hover-border);
+  background: var(--card-hover-bg);
 }
 
 .feature-card h2 {
@@ -25,7 +25,7 @@
 
 .feature-card p {
   margin: 0 0 16px;
-  color: #aaa;
+  color: var(--nav-link-color);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -37,7 +37,7 @@
 }
 
 .feature-card li {
-  color: #aaa;
+  color: var(--nav-link-color);
   font-size: 13px;
   margin-bottom: 8px;
   position: relative;
@@ -55,7 +55,7 @@
 .coming-soon {
   text-align: center;
   padding: 60px 20px;
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 .coming-soon-icon {
@@ -74,8 +74,8 @@
   align-items: center;
   justify-content: center;
   padding: 60px 24px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   text-align: center;
 }
@@ -89,13 +89,13 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--app-text);
 }
 
 .empty-state-text {
   margin: 0 0 24px;
   font-size: 14px;
-  color: #888;
+  color: var(--app-text-secondary);
   max-width: 400px;
   line-height: 1.5;
 }
