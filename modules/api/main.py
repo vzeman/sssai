@@ -1,11 +1,12 @@
 import os
 import subprocess
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from modules.api.auth import get_current_user
 from modules.api.database import engine, Base
 from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, campaigns, dashboard, audit, posture, webhooks, export, findings
 from modules.infra import get_queue
@@ -143,7 +144,7 @@ _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 
 
 @app.get("/api/heartbeat")
-def heartbeat_messages():
+def heartbeat_messages(user=Depends(get_current_user)):
     """Return recent heartbeat status messages."""
     try:
         r = _redis.from_url(_REDIS_URL)
@@ -160,7 +161,7 @@ def heartbeat_messages():
 
 
 @app.get("/api/logs/worker")
-def worker_logs():
+def worker_logs(user=Depends(get_current_user)):
     """Return recent worker log lines stored in Redis."""
     try:
         r = _redis.from_url(_REDIS_URL)
@@ -171,7 +172,7 @@ def worker_logs():
 
 
 @app.get("/api/scans/{scan_id}/activity")
-def scan_activity(scan_id: str):
+def scan_activity(scan_id: str, user=Depends(get_current_user)):
     """Return live scan activity (commands executed, current tool) from Redis."""
     try:
         r = _redis.from_url(_REDIS_URL)
@@ -192,9 +193,8 @@ def scan_activity(scan_id: str):
 # ─── Chat endpoints (human ↔ agent communication) ───────────────────
 import time as _time
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel
-from modules.api.auth import get_current_user
 from modules.api.models import User, Scan
 from modules.config import AI_MODEL
 from modules.api.database import get_db
