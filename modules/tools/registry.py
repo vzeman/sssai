@@ -765,6 +765,7 @@ CATEGORIES = {
     "cloud": "Cloud Security",
     "breach_monitoring": "Breach & Dark Web Monitoring",
     "utility": "Utilities",
+    "commerce_protocol": "Commerce Protocol Testing (UCP/ACP)",
 }
 
 # Scan type → which tool categories are relevant
@@ -781,6 +782,7 @@ SCAN_TYPE_CATEGORIES = {
     "recon": ["recon", "osint", "dns", "takeover", "ct", "email", "phishing"],
     "privacy": ["headers", "seo", "accessibility", "email"],
     "breach_monitoring": ["breach_monitoring", "osint", "email"],
+    "ecommerce": ["commerce_protocol", "api_security", "ssl", "headers", "cors", "vulnerability", "seo", "performance", "browser"],
 }
 
 
