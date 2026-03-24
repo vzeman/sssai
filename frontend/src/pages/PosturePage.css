@@ -27,7 +27,7 @@
 
 .posture-score-label {
   font-size: 14px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 8px;
@@ -54,7 +54,7 @@
 
 .posture-score-range {
   font-size: 12px;
-  color: #666;
+  color: var(--app-text-muted);
   margin-top: 4px;
 }
 
@@ -72,7 +72,7 @@
 }
 
 .trend-stable {
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .trend-degrading {
@@ -157,7 +157,7 @@
 
 .target-findings {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .brief-section {
@@ -175,7 +175,7 @@
   border: 1px solid #333;
   border-radius: 8px;
   padding: 20px;
-  color: #ccc;
+  color: var(--app-text);
   line-height: 1.6;
 }
 

@@ -7,8 +7,8 @@
   margin-bottom: 28px;
   flex-wrap: wrap;
   padding: 20px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
 }
 
@@ -22,15 +22,15 @@
 
 .control-group label {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .control-group select {
-  background: #12141c;
-  border: 1px solid #2a2d3a;
-  color: #e8eaed;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
+  color: var(--app-text);
   padding: 10px 12px;
   border-radius: 6px;
   font-size: 13px;
@@ -44,7 +44,7 @@
 
 .control-hint {
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   font-style: italic;
 }
 
@@ -67,8 +67,8 @@
 }
 
 .score-section {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 24px;
 }
@@ -88,7 +88,7 @@
 
 .framework-version {
   font-size: 12px;
-  color: #666;
+  color: var(--app-text-muted);
   background: #252830;
   padding: 2px 8px;
   border-radius: 4px;
@@ -163,8 +163,8 @@
 /* Controls Table */
 
 .controls-list {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 24px;
 }
@@ -184,10 +184,10 @@
   text-align: left;
   padding: 10px 12px;
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .controls-table td {
@@ -205,13 +205,13 @@
 }
 
 .control-name {
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .control-id {
   display: inline-block;
   font-weight: 700;
-  color: #aaa;
+  color: var(--nav-link-color);
   margin-right: 8px;
   min-width: 36px;
 }
@@ -246,7 +246,7 @@
 }
 
 .findings-count .no-findings {
-  color: #555;
+  color: var(--app-text-muted);
 }
 
 /* Frameworks Overview Grid */
@@ -268,8 +268,8 @@
 }
 
 .framework-card {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 20px;
   cursor: pointer;
@@ -289,7 +289,7 @@
 
 .fw-version {
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   background: #252830;
   padding: 2px 8px;
   border-radius: 4px;
@@ -298,6 +298,6 @@
 .fw-description {
   margin: 12px 0 0;
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
   line-height: 1.5;
 }

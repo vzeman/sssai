@@ -5,8 +5,8 @@
 }
 
 .campaign-form {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 24px;
@@ -23,7 +23,7 @@
 
 .campaign-form .form-group label {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -31,10 +31,10 @@
 .campaign-form input,
 .campaign-form textarea,
 .campaign-form select {
-  background: #12141c;
-  border: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 10px 12px;
   font-size: 13px;
   font-family: inherit;
@@ -55,14 +55,14 @@
 }
 
 .campaign-card {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   transition: all 0.2s;
 }
 
 .campaign-card:hover {
-  border-color: #3a4050;
+  border-color: var(--card-hover-border);
 }
 
 .campaign-header {
@@ -90,7 +90,7 @@
 
 .meta-text {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .campaign-actions {
@@ -102,18 +102,18 @@
 
 .expand-icon {
   font-size: 14px;
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 .campaign-details {
-  border-top: 1px solid #2a2d3a;
+  border-top: 1px solid var(--card-border);
   padding: 16px 20px;
 }
 
 .campaign-details h4 {
   margin: 0 0 12px;
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -127,16 +127,16 @@
   text-align: left;
   padding: 8px 12px;
   font-size: 11px;
-  color: #666;
+  color: var(--app-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .campaign-details td {
   padding: 10px 12px;
   font-size: 13px;
-  color: #ccc;
+  color: var(--app-text);
   border-bottom: 1px solid #1e2130;
 }
 
@@ -147,13 +147,13 @@
 
 .empty-cell {
   text-align: center;
-  color: #666;
+  color: var(--app-text-muted);
   padding: 24px 12px;
 }
 
 .campaign-report {
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   margin-bottom: 24px;
   overflow: hidden;
@@ -164,7 +164,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .report-header-bar h3 {
@@ -180,7 +180,7 @@
 
 .report-summary {
   font-size: 14px;
-  color: #ccc;
+  color: var(--app-text);
   line-height: 1.6;
   margin: 0 0 16px;
 }
@@ -192,7 +192,7 @@
 .report-section h4 {
   margin: 0 0 8px;
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -208,9 +208,9 @@
 
 .report-findings-list li {
   font-size: 13px;
-  color: #ccc;
+  color: var(--app-text);
   padding: 6px 10px;
-  background: #12141c;
+  background: var(--app-bg);
   border-radius: 4px;
 }
 
@@ -225,13 +225,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #12141c;
+  background: var(--app-bg);
   border-radius: 4px;
 }
 
 .risk-target {
   font-size: 13px;
-  color: #ccc;
+  color: var(--app-text);
   word-break: break-all;
 }
 
@@ -244,11 +244,11 @@
 }
 
 .report-raw {
-  background: #12141c;
+  background: var(--app-bg);
   border-radius: 4px;
   padding: 16px;
   font-size: 12px;
-  color: #aaa;
+  color: var(--nav-link-color);
   overflow-x: auto;
   margin: 0;
 }
@@ -269,7 +269,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #666;
+  color: var(--app-text-muted);
 }
 
 .empty-state p {

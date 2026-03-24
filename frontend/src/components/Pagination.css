@@ -6,8 +6,8 @@
   gap: 12px;
   margin-top: 16px;
   padding: 12px 16px;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
 }
 
@@ -16,7 +16,7 @@
   align-items: center;
   gap: 16px;
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .pagination-size {
@@ -27,14 +27,14 @@
 
 .pagination-size label {
   font-size: 12px;
-  color: #888;
+  color: var(--app-text-secondary);
 }
 
 .pagination-size select {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 4px 8px;
   font-size: 13px;
   cursor: pointer;
@@ -52,10 +52,10 @@
 }
 
 .pagination-btn {
-  background: #0f1117;
-  border: 1px solid #3a3d4a;
+  background: var(--app-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  color: #e8eaed;
+  color: var(--app-text);
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
@@ -64,7 +64,7 @@
 
 .pagination-btn:hover:not(:disabled) {
   border-color: #4a9eff;
-  background: #1a1d27;
+  background: var(--card-bg);
 }
 
 .pagination-btn:disabled {
@@ -86,7 +86,7 @@
 }
 
 .pagination-ellipsis {
-  color: #666;
+  color: var(--app-text-muted);
   padding: 0 4px;
   font-size: 14px;
 }

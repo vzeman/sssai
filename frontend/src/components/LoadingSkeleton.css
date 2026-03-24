@@ -1,5 +1,5 @@
 .skeleton-table {
-  border: 1px solid #2a2d3a;
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -9,8 +9,8 @@
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 16px;
   padding: 12px 16px;
-  background: #1a1d27;
-  border-bottom: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--card-border);
 }
 
 .skeleton-row {
@@ -27,7 +27,7 @@
 
 .skeleton-cell {
   height: 14px;
-  background: #2a2d3a;
+  background: var(--card-border);
   border-radius: 4px;
 }
 

@@ -3,7 +3,7 @@
   display: flex;
   gap: 4px;
   margin-bottom: 24px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding-bottom: 0;
 }
 
@@ -11,7 +11,7 @@
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #888;
+  color: var(--app-text-secondary);
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
@@ -20,7 +20,7 @@
 }
 
 .tab-btn:hover {
-  color: #ccc;
+  color: var(--app-text);
 }
 
 .tab-btn.active {
@@ -35,7 +35,7 @@
 
 .inventory-summary {
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-secondary);
   margin-bottom: 16px;
 }
 
@@ -46,34 +46,34 @@
 .inventory-table table {
   width: 100%;
   border-collapse: collapse;
-  background: #1a1d27;
-  border: 1px solid #2a2d3a;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .inventory-table th {
-  background: #111420;
-  border-bottom: 1px solid #2a2d3a;
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--app-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .inventory-table td {
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--card-border);
   padding: 12px 16px;
   font-size: 13px;
-  color: #e8eaed;
+  color: var(--app-text);
 }
 
 .tech-row:hover,
 .cve-row:hover {
-  background: #252c3a;
+  background: var(--card-hover-bg);
 }
 
 .tech-name {
