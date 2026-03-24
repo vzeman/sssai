@@ -2484,6 +2484,10 @@ def _load_scan_history(target: str) -> str | None:
 
     Returns a formatted string suitable for injection into the system prompt,
     or None if no history is available.
+
+    Note: queries by target across all users intentionally — scan history is
+    shared intelligence about a target's security posture, not user-private data.
+    Access control is enforced at the API layer, not here.
     """
     try:
         from modules.infra.elasticsearch import search

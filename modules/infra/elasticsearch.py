@@ -179,6 +179,7 @@ INDICES = {
                 "first_seen_date": {"type": "date"},
                 "last_seen_scan_id": {"type": "keyword"},
                 "resolved_date": {"type": "date"},
+                "confidence": {"type": "float"},
             }
         },
     },
