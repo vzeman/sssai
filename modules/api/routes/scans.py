@@ -12,6 +12,7 @@ from modules.api.schemas import ScanCreate, ScanResponse, VerificationCreate
 from modules.api.auth import get_current_user
 from modules.infra import get_queue, get_storage
 from modules.infra.checkpoint import load_checkpoint, build_resume_context, delete_checkpoint
+from modules.infra.elasticsearch import search as es_search
 
 import redis as _redis
 
@@ -322,3 +323,99 @@ def stop_scan(scan_id: str, user: User = Depends(get_current_user), db: Session 
         raise HTTPException(status_code=500, detail=f"Could not signal stop: {e}")
 
     return {"scan_id": scan_id, "status": "stopping"}
+
+
+_SEVERITY_WEIGHTS = {"critical": 10, "high": 7, "medium": 4, "low": 1, "info": 0}
+_FINDINGS_INDEX = "scanner-scan-findings"
+
+
+def _fetch_findings(scan_id: str) -> list[dict]:
+    """Fetch all findings for a scan from Elasticsearch."""
+    result = es_search(
+        _FINDINGS_INDEX,
+        {"bool": {"filter": [{"term": {"scan_id": scan_id}}]}},
+        size=10000,
+    )
+    return [hit["_source"] for hit in result.get("hits", {}).get("hits", [])]
+
+
+def _compute_risk_score(findings: list[dict]) -> float:
+    """Compute a simple risk score from findings based on severity weights."""
+    if not findings:
+        return 0.0
+    total = sum(_SEVERITY_WEIGHTS.get(f.get("severity", "info"), 0) for f in findings)
+    return round(total, 2)
+
+
+@router.get("/{scan_id}/compare/{baseline_scan_id}")
+def compare_scans(
+    scan_id: str,
+    baseline_scan_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Compare findings between a current scan and a baseline scan."""
+    current_scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not current_scan:
+        raise HTTPException(status_code=404, detail="Current scan not found")
+
+    baseline_scan = db.query(Scan).filter(Scan.id == baseline_scan_id, Scan.user_id == user.id).first()
+    if not baseline_scan:
+        raise HTTPException(status_code=404, detail="Baseline scan not found")
+
+    current_findings = _fetch_findings(scan_id)
+    baseline_findings = _fetch_findings(baseline_scan_id)
+
+    # Index by dedup_key
+    current_by_key = {}
+    for f in current_findings:
+        key = f.get("dedup_key")
+        if key:
+            current_by_key[key] = f
+
+    baseline_by_key = {}
+    for f in baseline_findings:
+        key = f.get("dedup_key")
+        if key:
+            baseline_by_key[key] = f
+
+    current_keys = set(current_by_key.keys())
+    baseline_keys = set(baseline_by_key.keys())
+
+    new_keys = current_keys - baseline_keys
+    resolved_keys = baseline_keys - current_keys
+    common_keys = current_keys & baseline_keys
+
+    new_findings = [current_by_key[k] for k in new_keys]
+    resolved_findings = [baseline_by_key[k] for k in resolved_keys]
+    unchanged_findings = []
+    changed_findings = []
+
+    for k in common_keys:
+        curr = current_by_key[k]
+        base = baseline_by_key[k]
+        if curr.get("severity") != base.get("severity"):
+            changed_findings.append({"current": curr, "baseline": base})
+        else:
+            unchanged_findings.append(curr)
+
+    current_risk = _compute_risk_score(current_findings)
+    baseline_risk = _compute_risk_score(baseline_findings)
+
+    return {
+        "current_scan_id": scan_id,
+        "baseline_scan_id": baseline_scan_id,
+        "summary": {
+            "new_count": len(new_findings),
+            "resolved_count": len(resolved_findings),
+            "unchanged_count": len(unchanged_findings),
+            "changed_count": len(changed_findings),
+            "current_risk_score": current_risk,
+            "baseline_risk_score": baseline_risk,
+            "risk_delta": round(current_risk - baseline_risk, 2),
+        },
+        "new_findings": new_findings,
+        "resolved_findings": resolved_findings,
+        "unchanged_findings": unchanged_findings,
+        "changed_findings": changed_findings,
+    }
