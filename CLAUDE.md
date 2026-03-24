@@ -110,7 +110,7 @@ Changes to these paths require additional test coverage, must be reviewed by a h
 
 ## Autonomous Development Mode (AutoDev)
 
-When running in autonomous loop mode (`/loop 15m /implement`), follow this continuous development cycle. Inspired by Karpathy's autoresearch — but adapted for security software engineering.
+When running in autonomous loop mode (`/loop 15m /implement`), follow this continuous development cycle. 
 
 ### Philosophy
 
@@ -130,8 +130,15 @@ SURVEY → PLAN → IMPLEMENT → TEST → REVIEW → DECIDE → LOOP
 
 Check for work in priority order:
 
-1. `gh issue list --state open --sort priority` — open issues are highest priority
-2. `gh pr list --state open` — check if any PRs need fixes from review comments
+1. **PR Maintenance (highest priority)** — check open PRs before creating new work:
+   - `gh pr list --state open` — list all open PRs
+   - For each PR: check CI status (`gh pr checks <N>`), review comments (`gh api repos/OWNER/REPO/pulls/N/comments`), and merge readiness
+   - **Fix CI failures**: lint errors, test failures, build issues — push fixes to the PR branch
+   - **Address review comments**: read reviewer feedback and push fixes
+   - **Re-trigger stale CI**: if checks failed on old code (e.g., before a CI fix was merged), re-run them
+   - **Merge green PRs**: if all checks pass and no review changes requested, merge with `gh pr merge <N> --merge --delete-branch`
+   - Only move to new work after all mergeable PRs are merged
+2. `gh issue list --state open` — open issues are highest priority for new work
 3. `grep -r "TODO\|FIXME\|HACK" modules/ frontend/src/ --include="*.py" --include="*.jsx" --include="*.js"` — code debt
 4. Review recent `git log --oneline -20` for incomplete or broken work
 5. If nothing above yields work, self-generate improvements (see below)
