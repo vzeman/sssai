@@ -355,10 +355,55 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "verify_scan":
         return _handle_verify_scan(input, scan_context)
 
+    elif name == "run_exploitation":
+        return _handle_run_exploitation(input, scan_context)
+
     elif name == "report":
         return "__REPORT__"
 
     return "Unknown tool"
+
+
+# ── Exploitation handler ──────────────────────────────────────────────
+
+def _handle_run_exploitation(input: dict, scan_context: dict | None) -> str:
+    """Run automated exploitation against discovered findings."""
+    from modules.agent.exploitation_engine import ExploitationFramework
+
+    findings = input.get("findings", [])
+    if not findings:
+        return "ERROR: findings list is required and must not be empty"
+
+    target = input.get("target", "")
+    if not target and scan_context:
+        target = scan_context.get("target", "")
+    if not target:
+        return "ERROR: target URL is required (pass explicitly or via scan context)"
+
+    try:
+        framework = ExploitationFramework(target)
+        reports = framework.exploit_findings(findings)
+        report = framework.generate_report()
+
+        # Summarize for agent consumption
+        summary_parts = [
+            f"Exploitation complete for {report['total_findings_exploited']} finding(s).",
+            f"Total payloads: {report['execution_summary']['total_payloads_executed']}",
+            f"Successful: {report['execution_summary']['total_successful']}",
+            f"Overall success rate: {report['execution_summary']['overall_success_rate']:.1%}",
+            "",
+        ]
+
+        for finding_report in reports:
+            summary_parts.append(
+                f"  [{finding_report.finding_id}] "
+                f"{finding_report.successful_attempts}/{finding_report.total_attempts} "
+                f"payloads succeeded (rate: {finding_report.success_rate:.1%})"
+            )
+
+        return "\n".join(summary_parts)
+    except Exception as e:
+        return f"ERROR: Exploitation failed: {e}"
 
 
 # ── Breach & dark web monitoring handlers ────────────────────────────────

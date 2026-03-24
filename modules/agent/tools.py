@@ -1104,6 +1104,44 @@ TOOLS = [
             "required": ["scan_id"],
         },
     },
+    {
+        "name": "run_exploitation",
+        "description": (
+            "Run automated exploitation against discovered findings to generate "
+            "proof-of-concept evidence. Supports SQLi, XSS, IDOR, SSRF, CSRF, "
+            "XXE, path traversal, RCE, auth bypass, command injection, race conditions, "
+            "and API vulnerabilities (BOLA, mass assignment). "
+            "Payloads are validated by a safety guard before execution. "
+            "Returns exploitation report with success rates and collected evidence."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "type": {"type": "string"},
+                            "parameter": {"type": "string"},
+                        },
+                        "required": ["type"],
+                    },
+                    "description": (
+                        "List of vulnerability findings to exploit. "
+                        "Each must have 'type' (e.g., 'SQL Injection', 'XSS', 'auth bypass'). "
+                        "Optional: 'id', 'parameter'."
+                    ),
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target URL to exploit (defaults to scan target)",
+                },
+            },
+            "required": ["findings"],
+        },
+    },
 ]
 
 
