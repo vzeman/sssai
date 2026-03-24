@@ -314,6 +314,7 @@ class TestQualityGateEvaluation:
         result = _evaluate_gates(scan, None, gates)
         assert result["passed"] is True
         assert result["critical_count"] == 0
+        assert result["high_count"] == 0
 
     def test_required_compliance_gate_pass(self):
         """Required compliance frameworks must be met."""
@@ -374,7 +375,6 @@ class TestQualityGateEvaluation:
         }
 
         result = _evaluate_gates(scan, report, gates)
-        assert "3" in result["summary"]  # "3/3 checks passed"
         assert result["summary"] == "3/3 checks passed"
 
     def test_gate_checks_include_threshold_and_actual(self):
