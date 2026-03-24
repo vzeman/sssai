@@ -16,7 +16,7 @@ curl <session_flags> https://target.com/api/profile -v
 nuclei -u https://target.com -H 'Cookie: session=abc' -t /nuclei-templates/
 
 # Use in sqlmap
-sqlmap -u "https://target.com/api/user?id=1" --cookie="session=abc" --level=3
+sqlmap -u "https://target.com/api/user?id=1" --cookie="session=abc" --level=3 --technique=BEU --risk=1
 
 # Use in ffuf (discover authenticated endpoints)
 ffuf -u https://target.com/FUZZ -w /wordlists/api.txt -H 'Cookie: session=abc'

@@ -17,7 +17,7 @@ Use `wapiti -u {target} -o /output/wapiti/ -f json -m xss` for automated testing
 - Comment injection: `--`, `#`, `/**/`
 - UNION-based: `' UNION SELECT 1,2,3--`
 - Time-based blind: `' AND SLEEP(5)--`
-- `sqlmap -u '{target}' --forms --batch --crawl=2 --output-dir=/output/sqlmap/`
+- `sqlmap -u '{target}' --forms --batch --crawl=2 --technique=BEU --risk=1 --output-dir=/output/sqlmap/`
 
 ### CSRF (Cross-Site Request Forgery)
 - Check for CSRF tokens on state-changing forms

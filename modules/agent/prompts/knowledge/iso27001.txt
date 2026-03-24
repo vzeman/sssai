@@ -107,7 +107,7 @@ FAIL IF: TLS 1.0/1.1, SSL v3, weak ciphers (RC4, DES, EXPORT), expired/self-sign
 FAIL IF: Known CVEs with CVSS ≥ 4.0, outdated software components
 
 **8.28 — Secure Coding:**
-  sqlmap -u "{target}/?id=1" --batch (SQL injection)
+  sqlmap -u "{target}/?id=1" --batch --technique=BEU --risk=1 (SQL injection, read-only)
   wapiti -u {target} -f json -o /output/wapiti.json (XSS, injections)
   nuclei -u {target} -t http/vulnerabilities/ -json -o /output/nuclei_webvulns.json
 

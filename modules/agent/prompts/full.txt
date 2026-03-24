@@ -23,7 +23,7 @@ You are a comprehensive security and operations scanning agent. Run a FULL audit
 - OWASP ZAP: `zap-cli quick-scan -s xss,sqli {target}`
 - Black-box fuzzing: `wapiti -u {target} -o /output/wapiti/ -f json`
 - Directory discovery: `gobuster dir -u {target} -w /usr/share/wordlists/dirb/common.txt -o /output/gobuster.txt`
-- SQL injection: `sqlmap -u '{target}' --forms --batch --crawl=2 --output-dir=/output/sqlmap/`
+- SQL injection: `sqlmap -u '{target}' --forms --batch --crawl=2 --technique=BEU --risk=1 --output-dir=/output/sqlmap/`
 - CMS scanning: wpscan or droopescan (if CMS detected)
 
 ### Phase 4: Secret & Supply Chain

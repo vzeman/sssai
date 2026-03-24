@@ -39,7 +39,7 @@ Maps to: PCI DSS 6.3.3, SOC2 CC7.1, ISO 27001 8.8, OWASP A06:2021
 
 ### Phase 5: Web Application Security
   wapiti -u {target} -f json -o /output/wapiti.json --flush-session
-  sqlmap -u "{target}/?q=1" --batch --level=2 --risk=1
+  sqlmap -u "{target}/?q=1" --batch --level=2 --risk=1 --technique=BEU
 
 Maps to: PCI DSS 6.2.4, OWASP A03:2021, ISO 27001 8.28
 
