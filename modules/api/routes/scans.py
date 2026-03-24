@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -15,6 +16,8 @@ from modules.infra.checkpoint import load_checkpoint, build_resume_context, dele
 from modules.infra.elasticsearch import search as es_search
 
 import redis as _redis
+
+logger = logging.getLogger(__name__)
 
 _REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379")
 _STUCK_TIMEOUT = int(os.environ.get("STUCK_SCAN_TIMEOUT_SECONDS", "600"))
@@ -190,8 +193,8 @@ def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session
                     failed_steps.append(act)
             if failed_steps:
                 retry_context["failed_steps"] = failed_steps[:20]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to parse activity log for scan %s during retry: %s", scan_id, e)
 
     # Create a new scan for the retry
     new_scan = Scan(
