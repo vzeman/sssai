@@ -253,3 +253,38 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str):
 def clear_auth_cookies(response: Response):
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token", path="/api/auth")
+
+
+# ─── Webhook API key helpers ────────────────────────────────────────
+
+def generate_api_key() -> tuple[str, str, str]:
+    """Generate a webhook API key. Returns (plain_key, key_prefix, key_hash)."""
+    raw = secrets.token_urlsafe(32)
+    plain_key = f"whk_{raw}"
+    key_prefix = plain_key[:12]
+    key_hash = pwd_context.hash(plain_key)
+    return plain_key, key_prefix, key_hash
+
+
+def get_webhook_user(request: Request, db: "Session") -> tuple:
+    """Authenticate a request using X-API-Key header. Returns (User, WebhookConfig)."""
+    from modules.api.models import User, WebhookConfig
+
+    api_key = request.headers.get("X-API-Key", "")
+    if not api_key or not api_key.startswith("whk_"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid API key")
+
+    prefix = api_key[:12]
+    candidates = db.query(WebhookConfig).filter(
+        WebhookConfig.key_prefix == prefix,
+        WebhookConfig.is_active == True,
+    ).all()
+
+    for wh in candidates:
+        if pwd_context.verify(api_key, wh.key_hash):
+            user = db.query(User).filter(User.id == wh.user_id).first()
+            if not user or not user.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+            return user, wh
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")

@@ -1,9 +1,70 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
-# ─── Auth ──────────────────────────────────────────────────────────────
+_SUPPORTED_AUTH_TYPES = frozenset(
+    {"form_login", "bearer_token", "basic_auth", "oauth2", "cookie", "api_key"}
+)
+
+
+# ─── Auth (scan credentials) ──────────────────────────────────────────
+class AuthConfig(BaseModel):
+    """Configuration for authenticated scanning.
+
+    Nested inside ScanCreate.config under the ``auth`` key::
+
+        {
+            "auth": {
+                "type": "form_login",
+                "login_url": "https://target.com/login",
+                "username_field": "email",
+                "password_field": "password",
+                "credentials": {"email": "user@example.com", "password": "secret"},
+                "success_indicator": "dashboard"
+            }
+        }
+    """
+
+    type: str
+    # form_login
+    login_url: str | None = None
+    username_field: str | None = None
+    password_field: str | None = None
+    credentials: dict | None = None
+    success_indicator: str | None = None
+    extra_fields: dict | None = None
+    csrf_field: str | None = None
+    # bearer_token
+    token: str | None = None
+    expires_at: float | None = None
+    # basic_auth (shares credentials)
+    # oauth2
+    token_url: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    scope: str | None = None
+    grant_type: str = "client_credentials"
+    # cookie
+    cookies: dict | None = None
+    cookie_string: str | None = None
+    # api_key
+    key: str | None = None
+    header_name: str = "X-API-Key"
+    query_param: str | None = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_auth_type(cls, v: str) -> str:
+        if v not in _SUPPORTED_AUTH_TYPES:
+            raise ValueError(
+                f"Unsupported auth type '{v}'. "
+                f"Must be one of: {sorted(_SUPPORTED_AUTH_TYPES)}"
+            )
+        return v
+
+
+# ─── Platform Auth (JWT) ──────────────────────────────────────────────
 class UserCreate(BaseModel):
     email: str
     password: str
@@ -34,6 +95,15 @@ class ScanCreate(BaseModel):
     scan_type: str = "security"
     config: dict | None = None
 
+    @field_validator("config")
+    @classmethod
+    def validate_auth_config(cls, v: dict | None) -> dict | None:
+        """If config contains an 'auth' key, validate it as AuthConfig."""
+        if v and "auth" in v:
+            # Raises ValidationError with descriptive message if invalid
+            AuthConfig(**v["auth"])
+        return v
+
 
 class ScanResponse(BaseModel):
     id: str
@@ -58,6 +128,41 @@ class MonitorCreate(BaseModel):
     check_type: str = "http"
     interval_seconds: int = 300
     expected_status: int = 200
+    
+    @field_validator('target')
+    @classmethod
+    def validate_target(cls, v):
+        """Validate that target is a valid URL or domain."""
+        v = v.strip()
+        if not v:
+            raise ValueError('Target cannot be empty')
+        
+        # Allow URLs, domains, IPs
+        if not (v.startswith('http://') or v.startswith('https://')):
+            # If no scheme, add https:// for validation
+            test_url = f'https://{v}'
+        else:
+            test_url = v
+        
+        try:
+            from urllib.parse import urlparse
+            result = urlparse(test_url)
+            if not result.netloc:
+                raise ValueError('Invalid target URL or domain')
+        except Exception as e:
+            raise ValueError(f'Invalid target: {str(e)}')
+        
+        return v
+    
+    @field_validator('interval_seconds')
+    @classmethod
+    def validate_interval(cls, v):
+        """Ensure interval is at least 10 seconds."""
+        if v < 10:
+            raise ValueError('Interval must be at least 10 seconds')
+        if v > 3600:
+            raise ValueError('Interval must be at most 1 hour')
+        return v
 
 
 class MonitorUpdate(BaseModel):
@@ -103,7 +208,6 @@ class ScheduledScanCreate(BaseModel):
     cron_expression: str = "daily"  # "hourly", "daily", "weekly", "12h", "30m", etc.
     config: dict | None = None
     max_runs: int | None = None
-    timezone: str | None = "UTC"
 
 
 class ScheduledScanUpdate(BaseModel):
@@ -111,7 +215,6 @@ class ScheduledScanUpdate(BaseModel):
     cron_expression: str | None = None
     config: dict | None = None
     max_runs: int | None = None
-    timezone: str | None = None
 
 
 class ScheduledScanResponse(BaseModel):
@@ -124,7 +227,6 @@ class ScheduledScanResponse(BaseModel):
     last_run_at: datetime | None = None
     run_count: int = 0
     max_runs: int | None = None
-    timezone: str | None = "UTC"
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -189,16 +291,52 @@ class CampaignResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ─── Verification ─────────────────────────────────────────────────────
-class VerificationCreate(BaseModel):
-    config: dict | None = None
-    finding_ids: list[str] | None = None  # optional subset of findings to verify
-
-
 # ─── Reports ──────────────────────────────────────────────────────────
 class ReportRequest(BaseModel):
     format: str = "json"  # json, html, pdf
 
+
+# ─── Asset Inventory ──────────────────────────────────────────────────
+class AssetInventoryResponse(BaseModel):
+    id: str
+    scan_id: str | None = None
+    target: str
+    technology_name: str
+    technology_version: str | None = None
+    cpe_entries: list | None = None
+    first_seen: datetime
+    last_seen: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CveAlertResponse(BaseModel):
+    id: str
+    asset_id: str
+    cve_id: str
+    technology_name: str
+    technology_version: str | None = None
+    cvss_score: float | None = None
+    cvss_severity: str | None = None
+    description: str | None = None
+    exploit_available: bool = False
+    affected_endpoints: list | None = None
+    notification_sent: bool = False
+    auto_rescan_triggered: bool = False
+    rescan_id: str | None = None
+    published_date: datetime | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Verification ────────────────────────────────────────────────────
+class VerificationCreate(BaseModel):
+    finding_id: str
+    scan_id: str
+    target: str
+    goal: str = "Validate and document this vulnerability with a proof of concept"
+    
 
 # ─── Tools ────────────────────────────────────────────────────────────
 class ToolInfo(BaseModel):
@@ -207,3 +345,7 @@ class ToolInfo(BaseModel):
     description: str
     examples: list[str] = []
     output_formats: list[str] = []
+
+
+# Alias for backward compatibility
+AssetResponse = AssetInventoryResponse
