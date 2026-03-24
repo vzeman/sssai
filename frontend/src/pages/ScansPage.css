@@ -21,6 +21,35 @@
   background: #00b8e6;
 }
 
+.scans-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-export {
+  display: inline-block;
+  background: transparent;
+  color: #00d4ff;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1px solid #00d4ff;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-export:hover {
+  background: rgba(0, 212, 255, 0.1);
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .empty-state {
   text-align: center;
   padding: 60px 24px;

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import DetailModal from '../components/DetailModal'
+import { LoadingSkeleton } from '../components/LoadingSkeleton'
+import { Pagination } from '../components/Pagination'
 import './ScansPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -10,6 +12,9 @@ function ScansPage({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedScan, setSelectedScan] = useState(null)
+  const [exporting, setExporting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     fetchScans()
@@ -46,6 +51,29 @@ function ScansPage({ token }) {
     return map[status] || ''
   }
 
+  async function handleExportCSV() {
+    setExporting(true)
+    try {
+      const resp = await fetch(`${API_BASE}/api/export/scans?format=csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error('Export failed')
+      const blob = await resp.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'scans_export.csv'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   function getRiskLabel(score) {
     if (score == null) return { text: 'N/A', cls: '' }
     if (score >= 8) return { text: `${score} Critical`, cls: 'risk-critical' }
@@ -54,8 +82,15 @@ function ScansPage({ token }) {
     return { text: `${score} Low`, cls: 'risk-low' }
   }
 
+  const paginatedScans = scans.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading scans...</div></div>
+    return (
+      <div className="page-container">
+        <div className="page-header"><h1>Scans</h1></div>
+        <LoadingSkeleton rows={8} columns={6} />
+      </div>
+    )
   }
 
   return (
@@ -65,7 +100,18 @@ function ScansPage({ token }) {
           <h1>Scans</h1>
           <p>All security scans and their results</p>
         </div>
-        <Link to="/scans/new" className="btn-new-scan">+ New Scan</Link>
+        <div className="scans-header-actions">
+          {scans.length > 0 && (
+            <button
+              className="btn-export"
+              onClick={handleExportCSV}
+              disabled={exporting}
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          )}
+          <Link to="/scans/new" className="btn-new-scan">+ New Scan</Link>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -89,10 +135,11 @@ function ScansPage({ token }) {
               </tr>
             </thead>
             <tbody>
-              {scans.map((scan, idx) => {
+              {paginatedScans.map((scan, idx) => {
                 const risk = getRiskLabel(scan.risk_score)
                 // Find the previous completed scan for the same target
-                const previousScan = scans.slice(idx + 1).find(
+                const globalIdx = (currentPage - 1) * pageSize + idx
+                const previousScan = scans.slice(globalIdx + 1).find(
                   s => s.status === 'completed' && (s.target || s.target_url) === (scan.target || scan.target_url)
                 )
                 return (
@@ -126,6 +173,13 @@ function ScansPage({ token }) {
               })}
             </tbody>
           </table>
+          <Pagination
+            totalItems={scans.length}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

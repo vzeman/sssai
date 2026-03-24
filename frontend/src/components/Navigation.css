@@ -1,7 +1,7 @@
 .sidebar-nav {
   width: 250px;
-  background: #1a1d27;
-  border-right: 1px solid #2a2d3a;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -14,7 +14,7 @@
 
 .nav-header {
   padding: 20px;
-  border-bottom: 1px solid #2a2d3a;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .nav-brand {
@@ -41,19 +41,19 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  color: #aaa;
+  color: var(--nav-link-color);
   text-decoration: none;
   transition: all 0.2s;
   cursor: pointer;
 }
 
 .nav-link:hover {
-  background: #252c3a;
+  background: var(--nav-link-hover-bg);
   color: #fff;
 }
 
 .nav-link.active {
-  background: #3a4050;
+  background: var(--nav-active-bg);
   color: #00d4ff;
   border-left: 3px solid #00d4ff;
   padding-left: 13px;
@@ -91,7 +91,27 @@
 
 .nav-footer {
   padding: 16px;
-  border-top: 1px solid #2a2d3a;
+  border-top: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.theme-toggle-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #3a3d4a;
+  color: #aaa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.theme-toggle-btn:hover {
+  border-color: #c084fc;
+  color: #c084fc;
 }
 
 .logout-btn {
@@ -120,7 +140,7 @@
     justify-content: space-between;
     position: relative;
     border-right: none;
-    border-bottom: 1px solid #2a2d3a;
+    border-bottom: 1px solid var(--sidebar-border);
   }
 
   .nav-header {
@@ -147,9 +167,16 @@
   .nav-footer {
     padding: 12px 16px;
     border-top: none;
+    flex-direction: row;
   }
 
   .logout-btn {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .theme-toggle-btn {
     width: auto;
     padding: 6px 10px;
     font-size: 11px;
