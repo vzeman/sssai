@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../components/ToastContext'
+import { useScanUpdates } from '../hooks/useWebSocket'
 import FindingDetailModal from '../components/FindingDetailModal'
 import './ScanDetailsPage.css'
 
@@ -23,6 +24,21 @@ function ScanDetailsPage({ token }) {
     fetchScanDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanId])
+
+  // WebSocket: auto-update when this scan's status changes
+  const handleScanUpdate = useCallback((msg) => {
+    if (msg.scan_id === scanId) {
+      fetchScanDetails()
+      if (msg.status === 'completed') {
+        showToast('Scan completed', 'success')
+      } else if (msg.status === 'failed') {
+        showToast('Scan failed', 'error')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanId])
+
+  const { wsStatus } = useScanUpdates(token, handleScanUpdate)
 
   async function fetchScanDetails() {
     try {
@@ -118,7 +134,12 @@ function ScanDetailsPage({ token }) {
       <div className="scan-metadata">
         <div className="metadata-item">
           <span className="label">Status</span>
-          <span className={`badge ${scan.status}`}>{scan.status}</span>
+          <span className={`badge ${scan.status}`}>
+            {scan.status}
+            {(scan.status === 'running' || scan.status === 'queued') && wsStatus === 'connected' && (
+              <span className="live-indicator" title="Receiving live updates"> (live)</span>
+            )}
+          </span>
         </div>
         <div className="metadata-item">
           <span className="label">Started</span>
