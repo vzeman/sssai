@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -1118,3 +1118,75 @@ def uptime_page():
         with open(path) as f:
             return HTMLResponse(f.read())
     return HTMLResponse("<h1>Uptime page not found</h1>", status_code=404)
+
+
+# ─── WebSocket endpoint for real-time scan updates ─────────────────────
+from jose import jwt as _ws_jwt
+from modules.api.auth import SECRET_KEY, ALGORITHM, is_token_blacklisted
+from modules.api.websocket import ws_manager
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time scan status updates.
+
+    Clients authenticate by sending a JSON message with their JWT token
+    immediately after connecting: {"type": "auth", "token": "<jwt>"}
+    """
+    await websocket.accept()
+    user_id = None
+
+    try:
+        # Wait for auth message (5-second timeout handled client-side)
+        auth_msg = await websocket.receive_json()
+        if auth_msg.get("type") != "auth" or not auth_msg.get("token"):
+            await websocket.send_json({"type": "error", "message": "Authentication required"})
+            await websocket.close(code=4001)
+            return
+
+        # Validate JWT token
+        try:
+            payload = _ws_jwt.decode(auth_msg["token"], SECRET_KEY, algorithms=[ALGORITHM])
+            token_user_id = payload.get("sub")
+            token_type = payload.get("type", "access")
+            if token_type != "access" or not token_user_id:
+                raise ValueError("Invalid token")
+            if is_token_blacklisted(auth_msg["token"]):
+                raise ValueError("Token revoked")
+        except Exception:
+            await websocket.send_json({"type": "error", "message": "Invalid token"})
+            await websocket.close(code=4001)
+            return
+
+        user_id = token_user_id
+        # Use the websocket manager but track with a simpler approach
+        # since ws_manager uses set() which needs hashable objects
+        if user_id not in ws_manager.active_connections:
+            ws_manager.active_connections[user_id] = set()
+        ws_manager.active_connections[user_id].add(websocket)
+
+        await websocket.send_json({"type": "connected", "message": "Authenticated"})
+        logger.info(f"WebSocket connected for user {user_id}")
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type", "")
+
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong"})
+            elif msg_type == "subscribe_scan":
+                scan_id = data.get("scan_id")
+                if scan_id:
+                    await websocket.send_json({
+                        "type": "subscribed",
+                        "scan_id": scan_id,
+                    })
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for user {user_id}")
+    except Exception as e:
+        logger.warning(f"WebSocket error for user {user_id}: {e}")
+    finally:
+        if user_id:
+            ws_manager.disconnect(websocket, user_id)

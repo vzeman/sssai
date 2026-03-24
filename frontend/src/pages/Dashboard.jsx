@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { LoadingSkeleton } from '../components/LoadingSkeleton'
 import { Pagination } from '../components/Pagination'
+import { useToast } from '../components/ToastContext'
+import { useScanUpdates } from '../hooks/useWebSocket'
 import './Dashboard.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -16,6 +18,7 @@ function Dashboard({ token }) {
   const [secondsAgo, setSecondsAgo] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const { showToast } = useToast()
 
   const fetchData = useCallback(async function () {
     try {
@@ -58,6 +61,19 @@ function Dashboard({ token }) {
     return () => clearInterval(interval)
   }, [fetchData])
 
+  // WebSocket: auto-refresh on scan status changes
+  const handleScanUpdate = useCallback((msg) => {
+    fetchData()
+    const status = msg.status || ''
+    if (status === 'completed') {
+      showToast(`Scan completed: ${msg.scan_id?.slice(0, 8) || 'unknown'}`, 'success')
+    } else if (status === 'failed') {
+      showToast(`Scan failed: ${msg.scan_id?.slice(0, 8) || 'unknown'}`, 'error')
+    }
+  }, [fetchData, showToast])
+
+  const { wsStatus } = useScanUpdates(token, handleScanUpdate)
+
   // Update "seconds ago" counter every second
   useEffect(() => {
     if (!lastUpdated) return
@@ -93,6 +109,10 @@ function Dashboard({ token }) {
           <p>Security overview and recent activity</p>
         </div>
         <div className="header-actions">
+          <span className={`ws-status ws-${wsStatus}`} title={`Live updates: ${wsStatus}`}>
+            <span className="ws-dot" />
+            {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting' : 'Offline'}
+          </span>
           {lastUpdated && (
             <span className="last-updated">
               Last updated: {formatTimeAgo(secondsAgo)}
