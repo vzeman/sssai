@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import DetailModal from '../components/DetailModal'
+import { LoadingSkeleton } from '../components/LoadingSkeleton'
+import { Pagination } from '../components/Pagination'
 import './ScansPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -11,6 +13,8 @@ function ScansPage({ token }) {
   const [error, setError] = useState('')
   const [selectedScan, setSelectedScan] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   useEffect(() => {
     fetchScans()
@@ -78,8 +82,15 @@ function ScansPage({ token }) {
     return { text: `${score} Low`, cls: 'risk-low' }
   }
 
+  const paginatedScans = scans.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading scans...</div></div>
+    return (
+      <div className="page-container">
+        <div className="page-header"><h1>Scans</h1></div>
+        <LoadingSkeleton rows={8} columns={6} />
+      </div>
+    )
   }
 
   return (
@@ -124,8 +135,13 @@ function ScansPage({ token }) {
               </tr>
             </thead>
             <tbody>
-              {scans.map(scan => {
+              {paginatedScans.map((scan, idx) => {
                 const risk = getRiskLabel(scan.risk_score)
+                // Find the previous completed scan for the same target
+                const globalIdx = (currentPage - 1) * pageSize + idx
+                const previousScan = scans.slice(globalIdx + 1).find(
+                  s => s.status === 'completed' && (s.target || s.target_url) === (scan.target || scan.target_url)
+                )
                 return (
                   <tr key={scan.id} onClick={() => setSelectedScan(scan)} style={{cursor: 'pointer'}}>
                     <td className="scan-target">{scan.target_url || scan.target || 'Unknown'}</td>
@@ -141,14 +157,29 @@ function ScansPage({ token }) {
                     <td className="scan-date">
                       {scan.created_at ? new Date(scan.created_at).toLocaleDateString() : '-'}
                     </td>
-                    <td>
+                    <td className="scan-actions" onClick={e => e.stopPropagation()}>
                       <Link to={`/scans/${scan.id}`} className="view-link">View</Link>
+                      {previousScan && scan.status === 'completed' && (
+                        <Link
+                          to={`/scans/${scan.id}/compare/${previousScan.id}`}
+                          className="compare-link"
+                        >
+                          Compare
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          <Pagination
+            totalItems={scans.length}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { LoadingSkeleton } from '../components/LoadingSkeleton'
+import { Pagination } from '../components/Pagination'
 import './Dashboard.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -12,6 +14,8 @@ function Dashboard({ token }) {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [secondsAgo, setSecondsAgo] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const fetchData = useCallback(async function () {
     try {
@@ -20,7 +24,7 @@ function Dashboard({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data.slice(0, 5))
+      setScans(data)
 
       let critical = 0, high = 0, medium = 0
       data.forEach(scan => {
@@ -70,8 +74,15 @@ function Dashboard({ token }) {
     return `${mins}m ${seconds % 60}s ago`
   }
 
+  const paginatedScans = scans.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   if (loading && !lastUpdated) {
-    return <div className="page-container"><div className="loading">Loading dashboard...</div></div>
+    return (
+      <div className="page-container">
+        <div className="page-header"><h1>Dashboard</h1></div>
+        <LoadingSkeleton rows={5} columns={4} />
+      </div>
+    )
   }
 
   return (
@@ -139,7 +150,7 @@ function Dashboard({ token }) {
               <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
             </div>
           ) : (
-            scans.map(scan => (
+            paginatedScans.map(scan => (
               <div key={scan.id} className="scan-item">
                 <div className="scan-title">{scan.target_url || 'Unknown'}</div>
                 <div className="scan-details">
@@ -150,6 +161,15 @@ function Dashboard({ token }) {
             ))
           )}
         </div>
+        {scans.length > 0 && (
+          <Pagination
+            totalItems={scans.length}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </div>
     </div>
   )

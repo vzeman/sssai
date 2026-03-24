@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import FindingDetailModal from '../components/FindingDetailModal'
+import { LoadingSkeleton } from '../components/LoadingSkeleton'
+import { Pagination } from '../components/Pagination'
 import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -13,6 +15,9 @@ function FindingsPage({ token }) {
   const [selectedFinding, setSelectedFinding] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [exporting, setExporting] = useState(false)
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const [filters, setFilters] = useState({
     severity: 'all',
@@ -70,6 +75,7 @@ function FindingsPage({ token }) {
   function handleFilterChange(e) {
     const { name, value } = e.target
     setFilters(prev => ({ ...prev, [name]: value }))
+    setCurrentPage(1)
   }
 
   async function handleExportCSV() {
@@ -98,8 +104,18 @@ function FindingsPage({ token }) {
     }
   }
 
+  const paginatedFindings = filteredFindings.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading findings...</div></div>
+    return (
+      <div className="page-container">
+        <div className="page-header"><h1>Findings</h1></div>
+        <LoadingSkeleton rows={8} columns={6} />
+      </div>
+    )
   }
 
   return (
@@ -221,7 +237,7 @@ function FindingsPage({ token }) {
               </tr>
             </thead>
             <tbody>
-              {filteredFindings.map((finding, idx) => (
+              {paginatedFindings.map((finding, idx) => (
                 <tr key={idx} className="finding-row" onClick={() => setSelectedFinding(finding)} style={{cursor: 'pointer'}}>
                   <td className="title-cell">
                     <span className="finding-title">{finding.title || 'Unknown'}</span>
@@ -254,6 +270,13 @@ function FindingsPage({ token }) {
               ))}
             </tbody>
           </table>
+          <Pagination
+            totalItems={filteredFindings.length}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
