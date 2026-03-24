@@ -22,3 +22,5 @@ Tracks every autonomous development iteration. Each row = one loop cycle.
 | 2026-03-24 | fix/api-input-validation-93 | #93 | PR #94 merged | Harden API validation: audit Pydantic schema, cron parsing, monitors bounds |
 | 2026-03-24 | fix/correlation-engine-type-matching | test fix | PR #95 merged | Fix correlation engine type matching + 9 dedup test mock paths |
 | 2026-03-24 | feat/ecommerce-ucp-acp-96 | #96 | PR #97 | UCP/ACP commerce protocol scanning for e-commerce sites |
+| 2026-03-24 | fix/exploitation-engine-tests | test fix | PR #98 merged | Fix 4 exploitation engine validation logic bugs |
+| 2026-03-24 | feat/ecommerce-wizard-template | #96 | PR #99 | Add ecommerce scan template to wizard |
