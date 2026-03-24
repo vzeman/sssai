@@ -103,7 +103,7 @@ RUN pip3 install --no-cache-dir \
 
 # ─── Playwright (browser-based DOM XSS testing, SPA crawling) ────
 RUN pip3 install --no-cache-dir playwright \
-    && python3 -m playwright install --with-deps chromium 2>/dev/null || true
+    && python3 -m playwright install --with-deps chromium || true
 
 # ─── Python security tools (best-effort) ──────────────────────────────
 RUN pip3 install --no-cache-dir \

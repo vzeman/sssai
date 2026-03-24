@@ -1,5 +1,6 @@
 """Tests for browser-based security testing module (issue #64)."""
 
+import asyncio
 import json
 import os
 import sys
@@ -87,6 +88,37 @@ class TestBrowserModule(unittest.TestCase):
 
         # Reset for other tests
         browser._playwright_available = None
+
+
+class TestScriptSanitization(unittest.TestCase):
+    """Test that dangerous script patterns are rejected before execution."""
+
+    def test_rejects_os_import(self):
+        from modules.agent.browser import run_browser_test
+        result = run_browser_test(
+            "https://example.com", "import os\nos.system('rm -rf /')")
+        self.assertIn("rejected", result.lower())
+
+    def test_rejects_subprocess(self):
+        from modules.agent.browser import run_browser_test
+        result = run_browser_test(
+            "https://example.com", "import subprocess\nsubprocess.run(['ls'])")
+        self.assertIn("rejected", result.lower())
+
+    def test_rejects_open(self):
+        from modules.agent.browser import run_browser_test
+        result = run_browser_test(
+            "https://example.com", "f = open('/etc/passwd')")
+        self.assertIn("rejected", result.lower())
+
+    def test_allows_playwright_calls(self):
+        """Valid Playwright scripts should not be rejected by sanitization."""
+        from modules.agent.browser import run_browser_test
+        # This will fall back to curl since playwright isn't installed locally,
+        # but it should NOT be rejected by sanitization
+        result = run_browser_test(
+            "https://example.com", "await page.goto(url)\ncontent = await page.content()")
+        self.assertNotIn("rejected", result.lower())
 
 
 class TestBrowserToolHandlers(unittest.TestCase):

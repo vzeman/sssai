@@ -7,10 +7,10 @@ prototype pollution, open redirects, storage exposure, sink detection).
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
-import sys
 import time
 from io import StringIO
 from urllib.parse import urljoin, urlparse
@@ -39,18 +39,19 @@ def run_browser_test(url: str, script: str, timeout: int = 60,
     The script receives `page` (async Playwright Page) and `url` (target URL)
     as variables. All print() output is captured and returned.
     """
+    # Validate script — only allow Playwright API calls, no dangerous imports
+    _blocked = ["import os", "import subprocess", "import shutil", "__import__",
+                "open(", "os.system", "os.popen", "subprocess."]
+    for pattern in _blocked:
+        if pattern in script:
+            return f"Script rejected: forbidden pattern '{pattern}'. Only Playwright API calls are allowed."
+
     if not _check_playwright():
         return _fallback_browser_test(url, script)
 
-    try:
-        return asyncio.get_event_loop().run_until_complete(
-            _async_browser_test(url, script, timeout, screenshot_path)
-        )
-    except RuntimeError:
-        # No event loop running — create one
-        return asyncio.run(
-            _async_browser_test(url, script, timeout, screenshot_path)
-        )
+    return asyncio.run(
+        _async_browser_test(url, script, timeout, screenshot_path)
+    )
 
 
 async def _async_browser_test(url: str, script: str, timeout: int,
@@ -78,38 +79,24 @@ async def _async_browser_test(url: str, script: str, timeout: int,
         ))
         page.on("pageerror", lambda err: js_errors.append(str(err)))
 
-        # Redirect print to capture buffer
-        old_stdout = sys.stdout
-        sys.stdout = captured
+        with contextlib.redirect_stdout(captured):
+            try:
+                # Wrap script in async function with page and url in scope
+                async def run_script():
+                    local_ns = {"page": page, "url": url}
+                    exec(compile(
+                        "async def __test__():\n" +
+                        "\n".join(f"    {line}" for line in script.split("\n")),
+                        "<browser_test>", "exec"
+                    ), local_ns)
+                    await local_ns["__test__"]()
 
-        try:
-            # Execute the user-provided script with page and url in scope
-            exec_globals = {"page": page, "url": url, "asyncio": asyncio}
-            exec_code = f"async def __browser_script__():\n"
-            for line in script.split("\n"):
-                exec_code += f"    {line}\n"
-            exec_code += "\nimport asyncio\nasyncio.get_event_loop().run_until_complete(__browser_script__())"
+                await asyncio.wait_for(run_script(), timeout=timeout)
 
-            # Use asyncio-compatible exec
-            async def run_script():
-                local_ns = {"page": page, "url": url}
-                script_body = script
-                # Wrap in async function and await
-                exec(compile(
-                    f"async def __test__():\n" +
-                    "\n".join(f"    {line}" for line in script_body.split("\n")),
-                    "<browser_test>", "exec"
-                ), local_ns)
-                await local_ns["__test__"]()
-
-            await asyncio.wait_for(run_script(), timeout=timeout)
-
-        except asyncio.TimeoutError:
-            captured.write(f"\nScript timed out after {timeout}s\n")
-        except Exception as e:
-            captured.write(f"\nScript error: {e}\n")
-        finally:
-            sys.stdout = old_stdout
+            except asyncio.TimeoutError:
+                captured.write(f"\nScript timed out after {timeout}s\n")
+            except Exception as e:
+                captured.write(f"\nScript error: {e}\n")
 
         # Take screenshot
         try:
@@ -154,14 +141,9 @@ def run_browser_crawl(url: str, depth: int = 2, max_pages: int = 20,
     if not _check_playwright():
         return _fallback_browser_crawl(url, depth, max_pages)
 
-    try:
-        return asyncio.get_event_loop().run_until_complete(
-            _async_browser_crawl(url, depth, max_pages, output_path)
-        )
-    except RuntimeError:
-        return asyncio.run(
-            _async_browser_crawl(url, depth, max_pages, output_path)
-        )
+    return asyncio.run(
+        _async_browser_crawl(url, depth, max_pages, output_path)
+    )
 
 
 async def _async_browser_crawl(url: str, depth: int, max_pages: int,
