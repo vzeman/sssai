@@ -2439,6 +2439,156 @@ def _run_attack_chain_analysis(
         return []
 
 
+# ── Confidence scoring ────────────────────────────────────────────────────
+
+def _apply_confidence_scores(report: dict):
+    """Assign confidence scores (0.0-1.0) to findings based on evidence quality.
+
+    Scoring heuristic:
+    - Base confidence: 0.5 (tool-reported finding)
+    - +0.15 if evidence field is non-empty
+    - +0.15 if affected_url(s) present
+    - +0.1  if CVE ID(s) attached
+    - +0.1  if CVSS score is populated
+    Values are clamped to [0.1, 1.0].
+    """
+    findings = report.get("findings", [])
+    for finding in findings:
+        # Skip if agent already provided a confidence score
+        if finding.get("confidence") is not None:
+            try:
+                finding["confidence"] = round(max(0.0, min(1.0, float(finding["confidence"]))), 2)
+            except (ValueError, TypeError):
+                pass
+            else:
+                continue
+
+        score = 0.5  # base: tool reported it
+
+        if finding.get("evidence") and str(finding["evidence"]).strip():
+            score += 0.15
+        if finding.get("affected_url") or finding.get("affected_urls"):
+            score += 0.15
+        if finding.get("cve_id") or finding.get("cve_ids"):
+            score += 0.1
+        if finding.get("cvss_score") is not None:
+            score += 0.1
+
+        finding["confidence"] = round(min(score, 1.0), 2)
+
+
+# ── Scan history learning ────────────────────────────────────────────────
+
+def _load_scan_history(target: str) -> str | None:
+    """Fetch summaries of the last 3 completed scans for this target from Elasticsearch.
+
+    Returns a formatted string suitable for injection into the system prompt,
+    or None if no history is available.
+    """
+    try:
+        from modules.infra.elasticsearch import search
+
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"target": target}},
+                ],
+            },
+        }
+        result = search(
+            "scanner-scan-findings",
+            query,
+            size=200,
+            sort=[{"timestamp": {"order": "desc"}}],
+        )
+
+        hits = result.get("hits", {}).get("hits", [])
+        if not hits:
+            return None
+
+        # Group findings by scan_id, keep at most 3 scans
+        scans: dict[str, list[dict]] = {}
+        for hit in hits:
+            src = hit.get("_source", {})
+            sid = src.get("scan_id", "unknown")
+            if sid not in scans:
+                if len(scans) >= 3:
+                    break
+                scans[sid] = []
+            scans[sid].append(src)
+
+        if not scans:
+            return None
+
+        lines = ["## Previous Scan History for This Target"]
+        lines.append(
+            "Use this history to prioritize retesting areas that had issues before "
+            "and to check whether previously-found vulnerabilities have been fixed.\n"
+        )
+        for sid, findings in scans.items():
+            ts = findings[0].get("timestamp", "unknown")[:19]
+            severities = Counter(f.get("severity", "info") for f in findings)
+            categories = Counter(f.get("category", "unknown") for f in findings)
+            top_categories = ", ".join(
+                f"{cat} ({cnt})" for cat, cnt in categories.most_common(5)
+            )
+            sev_summary = ", ".join(
+                f"{sev}: {cnt}" for sev, cnt in sorted(severities.items())
+            )
+            titles = [f.get("title", "untitled") for f in findings[:5]]
+
+            lines.append(f"### Scan {sid[:8]} ({ts})")
+            lines.append(f"- Findings: {len(findings)} ({sev_summary})")
+            lines.append(f"- Categories: {top_categories}")
+            lines.append(f"- Top findings: {'; '.join(titles)}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    except Exception as exc:
+        log.debug("Failed to load scan history for %s: %s", target, exc)
+        return None
+
+
+# ── Phase duration tracking ──────────────────────────────────────────────
+
+def _record_phase(scan_context: dict, phase_name: str):
+    """Record a phase transition timestamp in scan_context['_phase_timings'].
+
+    Each phase entry stores its start time. When a new phase starts, the
+    previous phase's duration is computed automatically.
+    """
+    timings = scan_context.setdefault("_phase_timings", {})
+    now = time.time()
+
+    # Close the previous phase
+    current = scan_context.get("_current_phase")
+    if current and current in timings:
+        timings[current]["end"] = now
+        timings[current]["duration_seconds"] = round(now - timings[current]["start"], 1)
+
+    # Open the new phase
+    timings[phase_name] = {"start": now}
+    scan_context["_current_phase"] = phase_name
+
+
+def _finalise_phase_timings(scan_context: dict) -> dict[str, float]:
+    """Return a clean {phase_name: duration_seconds} dict for the report."""
+    now = time.time()
+    timings = scan_context.get("_phase_timings", {})
+
+    # Close any still-open phase
+    current = scan_context.get("_current_phase")
+    if current and current in timings and "end" not in timings[current]:
+        timings[current]["end"] = now
+        timings[current]["duration_seconds"] = round(now - timings[current]["start"], 1)
+
+    return {
+        phase: round(info.get("duration_seconds", 0), 1)
+        for phase, info in timings.items()
+    }
+
+
 # ── Planning step ────────────────────────────────────────────────────────
 
 def _generate_plan(client, target: str, scan_type: str, config: dict) -> str:
@@ -2644,6 +2794,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             log.error("Scan %s: auth setup exception: %s", scan_id, exc)
 
     # ── Planning step ──
+    _record_phase(scan_context, "planning")
     _log_activity(scan_id, {
         "type": "phase",
         "phase": "planning",
@@ -2662,6 +2813,12 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             f"Follow this plan, adapting as you discover new information:\n\n{plan}\n\n"
             f"After each major step, assess whether the plan needs adjustment."
         )
+
+    # ── Scan history context ──
+    scan_history = _load_scan_history(target)
+    if scan_history:
+        system_prompt += f"\n\n{scan_history}"
+        log.info("Scan %s: loaded scan history for %s", scan_id, target)
 
     # Add summarization awareness
     system_prompt += (
@@ -2762,6 +2919,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     reflector_attempts = 0
     max_reflector_attempts = 3
 
+    _record_phase(scan_context, "scanning")
     _log_activity(scan_id, {
         "type": "phase",
         "phase": "scanning",
@@ -2847,6 +3005,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                         "total_tool_calls": loop_detector.total_calls,
                         "scan_id": scan_id, "target": target, "scan_type": scan_type,
                         "stopped_by_user": True,
+                        "phase_timings": _finalise_phase_timings(scan_context),
                         **token_tracker.summary(),
                     },
                 }
@@ -2950,6 +3109,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                         result = f"{result}\n\n{loop_warning}"
 
                     if result == "__REPORT__":
+                        _record_phase(scan_context, "reporting")
                         report = block.input
                         report["scan_metadata"] = {
                             **report.get("scan_metadata", {}),
@@ -2959,6 +3119,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             "scan_id": scan_id,
                             "target": target,
                             "scan_type": scan_type,
+                            "phase_timings": _finalise_phase_timings(scan_context),
                             **token_tracker.summary(),
                         }
                         if plan:
@@ -3030,6 +3191,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                         "scan_id": scan_id,
                         "target": target,
                         "scan_type": scan_type,
+                        "phase_timings": _finalise_phase_timings(scan_context),
                         **token_tracker.summary(),
                     },
                 }
@@ -3050,6 +3212,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "target": target,
                 "scan_type": scan_type,
                 "warning": "max iterations reached",
+                "phase_timings": _finalise_phase_timings(scan_context),
                 **token_tracker.summary(),
             },
         }
@@ -3060,6 +3223,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Phase 3.5: Attack Chain Analysis (post-processing fallback) ──
     # If the agent didn't produce attack_chains itself, generate them now.
     if not report.get("attack_chains"):
+        _record_phase(scan_context, "attack_chain_analysis")
         _log_activity(scan_id, {
             "type": "phase",
             "phase": "attack_chain_analysis",
@@ -3088,6 +3252,9 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             scan_id, len(report["attack_chains"]),
         )
 
+    # ── Post-processing phase ──
+    _record_phase(scan_context, "post_processing")
+
     # ── CVSS scoring pass ──
     try:
         _run_cvss_scoring_pass(report, client, token_tracker)
@@ -3101,6 +3268,13 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         log.info("Scan %s: auto-triage applied to %d findings", scan_id, len(report.get("findings", [])))
     except Exception as exc:
         log.warning("Auto-triage failed for scan %s: %s", scan_id, exc)
+
+    # ── Confidence scoring ──
+    try:
+        _apply_confidence_scores(report)
+        log.info("Scan %s: confidence scores applied to %d findings", scan_id, len(report.get("findings", [])))
+    except Exception as exc:
+        log.warning("Confidence scoring failed for scan %s: %s", scan_id, exc)
 
     # ── Recommend scan interval ──
     try:
@@ -3158,6 +3332,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "first_seen_scan_id": f.get("first_seen_scan_id"),
                 "first_seen_date": f.get("first_seen_date"),
                 "last_seen_scan_id": f.get("last_seen_scan_id"),
+                "confidence": f.get("confidence"),
             })
         if es_findings:
             bulk_index("scanner-scan-findings", es_findings)
