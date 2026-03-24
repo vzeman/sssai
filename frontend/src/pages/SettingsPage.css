@@ -1,0 +1,363 @@
+/* ─── Settings Tabs ─────────────────────────────────────────────────── */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #2a2d3a;
+  padding-bottom: 0;
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #888;
+  font-size: 13px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-tab:hover {
+  color: #e8eaed;
+}
+
+.settings-tab-active {
+  color: #6c9eff;
+  border-bottom-color: #6c9eff;
+}
+
+/* ─── Settings Card ────────────────────────────────────────────────── */
+.settings-content {
+  max-width: 800px;
+}
+
+.settings-card {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.settings-card-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e8eaed;
+}
+
+.settings-card-header .settings-card-title {
+  margin-bottom: 0;
+}
+
+/* ─── Profile Field Grid ──────────────────────────────────────────── */
+.settings-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .settings-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-field label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  font-weight: 600;
+}
+
+.settings-field span {
+  font-size: 14px;
+  color: #e8eaed;
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────── */
+.settings-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #2a3040;
+  color: #8ab4f8;
+}
+
+.settings-badge-green {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #1a3a2a;
+  color: #44dd88;
+}
+
+.settings-badge-dim {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #2a2a2a;
+  color: #888;
+}
+
+.settings-badge-red {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #3a1a1a;
+  color: #ff6666;
+}
+
+/* ─── Forms ───────────────────────────────────────────────────────── */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 400px;
+}
+
+.settings-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-form-field label {
+  font-size: 12px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.settings-form-field input,
+.settings-select {
+  background: #111420;
+  border: 1px solid #2a2d3a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e8eaed;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.settings-form-field input:focus,
+.settings-select:focus {
+  border-color: #6c9eff;
+}
+
+.settings-select {
+  cursor: pointer;
+  max-width: 300px;
+}
+
+.settings-select option {
+  background: #111420;
+  color: #e8eaed;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────── */
+.settings-btn {
+  background: #6c9eff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: fit-content;
+}
+
+.settings-btn:hover:not(:disabled) {
+  background: #5a8ae6;
+}
+
+.settings-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-btn-sm {
+  background: #2a3040;
+  color: #8ab4f8;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.settings-btn-sm:hover {
+  background: #3a4050;
+}
+
+.settings-btn-danger {
+  background: #3a1a1a;
+  color: #ff6666;
+}
+
+.settings-btn-danger:hover {
+  background: #4a2020;
+}
+
+/* ─── Messages ────────────────────────────────────────────────────── */
+.settings-message {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.settings-message-error {
+  background: #3a1a1a;
+  color: #ff6666;
+  border: 1px solid #4a2020;
+}
+
+.settings-message-success {
+  background: #1a3a2a;
+  color: #44dd88;
+  border: 1px solid #2a4a3a;
+}
+
+.settings-muted {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ─── Tables ──────────────────────────────────────────────────────── */
+.settings-table-wrap {
+  overflow-x: auto;
+}
+
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.settings-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  font-weight: 600;
+  border-bottom: 1px solid #2a2d3a;
+}
+
+.settings-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #e8eaed;
+  border-bottom: 1px solid #1e2030;
+}
+
+.settings-table tr:last-child td {
+  border-bottom: none;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ─── Code / Key display ──────────────────────────────────────────── */
+.settings-code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  color: #8ab4f8;
+}
+
+.settings-created-key {
+  background: #1a3a2a;
+  border: 1px solid #2a4a3a;
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.settings-created-key-label {
+  color: #44dd88;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.settings-key-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #111420;
+  border: 1px solid #2a2d3a;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.settings-key-display code {
+  flex: 1;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12px;
+  color: #e8eaed;
+  word-break: break-all;
+}
+
+/* ─── Inline form (API key creation) ──────────────────────────────── */
+.settings-inline-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.settings-inline-input {
+  background: #111420;
+  border: 1px solid #2a2d3a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e8eaed;
+  font-size: 13px;
+  outline: none;
+  flex: 1;
+  max-width: 300px;
+  transition: border-color 0.2s;
+}
+
+.settings-inline-input:focus {
+  border-color: #6c9eff;
+}
+
+@media (max-width: 600px) {
+  .settings-inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-inline-input {
+    max-width: none;
+  }
+}

@@ -1,0 +1,265 @@
+.page-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.page-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #888;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+}
+
+.error-message {
+  background: #2a1a1a;
+  border: 1px solid #4a2a2a;
+  border-radius: 8px;
+  color: #ff6666;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  border-color: #3a4050;
+  background: #252c3a;
+}
+
+.stat-card.critical {
+  border-left: 4px solid #ff4444;
+}
+
+.stat-card.high {
+  border-left: 4px solid #ff8844;
+}
+
+.stat-card.medium {
+  border-left: 4px solid #ffaa44;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.recent-scans {
+  margin-top: 24px;
+}
+
+.recent-scans h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.scans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scan-item {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.scan-item:hover {
+  border-color: #3a4050;
+  background: #252c3a;
+}
+
+.scan-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.scan-details {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #888;
+}
+
+.status {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #2a3d50;
+  color: #4a9eff;
+  text-transform: capitalize;
+}
+
+.status.completed {
+  background: #2a4a2a;
+  color: #4aff4a;
+}
+
+.status.failed {
+  background: #4a2a2a;
+  color: #ff4a4a;
+}
+
+.timestamp {
+  color: #666;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 14px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.last-updated {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #1a1d27;
+  border: 1px solid #3a3d4a;
+  border-radius: 6px;
+  color: #aaa;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.refresh-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+  background: #1a2a3a;
+}
+
+.dashboard-new-scan {
+  display: inline-block;
+  background: #00d4ff;
+  color: #1a1d27;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.dashboard-new-scan:hover {
+  background: #00b8e6;
+}
+
+.empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.empty-state-icon {
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.empty-state-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.empty-state-text {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #888;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+.empty-state-cta {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #2a3d50;
+  color: #4a9eff;
+  border: 1px solid #3a5070;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.empty-state-cta:hover {
+  background: #3a4d60;
+  border-color: #4a6080;
+  color: #6ab4ff;
+}

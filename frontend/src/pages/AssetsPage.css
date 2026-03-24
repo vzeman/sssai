@@ -1,0 +1,133 @@
+.assets-summary {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 16px;
+}
+
+.assets-table {
+  overflow-x: auto;
+}
+
+.assets-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.assets-table th {
+  background: #111420;
+  border-bottom: 1px solid #2a2d3a;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.assets-table td {
+  border-bottom: 1px solid #2a2d3a;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #e8eaed;
+}
+
+.asset-row:hover {
+  background: #252c3a;
+}
+
+.asset-row.asset-new {
+  background: rgba(68, 255, 68, 0.06);
+  border-left: 3px solid #44ff44;
+}
+
+.asset-row.asset-removed {
+  background: rgba(255, 68, 68, 0.06);
+  border-left: 3px solid #ff4444;
+}
+
+.hostname-cell {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mono-cell {
+  font-family: monospace;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.date-cell {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* Asset Diff Modal */
+.asset-diff-modal {
+  max-width: 650px;
+}
+
+.diff-section {
+  margin-bottom: 20px;
+}
+
+.diff-label {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diff-label.diff-new {
+  color: #44ff44;
+}
+
+.diff-label.diff-changed {
+  color: #ffaa44;
+}
+
+.diff-label.diff-removed {
+  color: #ff4444;
+}
+
+.diff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diff-item {
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.diff-item-new {
+  background: rgba(68, 255, 68, 0.08);
+  color: #44ff44;
+  border-left: 3px solid #44ff44;
+}
+
+.diff-item-changed {
+  background: rgba(255, 170, 68, 0.08);
+  color: #ffaa44;
+  border-left: 3px solid #ffaa44;
+}
+
+.diff-item-removed {
+  background: rgba(255, 68, 68, 0.08);
+  color: #ff4444;
+  border-left: 3px solid #ff4444;
+}

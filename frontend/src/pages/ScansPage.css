@@ -1,0 +1,139 @@
+.scans-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.btn-new-scan {
+  display: inline-block;
+  background: #00d4ff;
+  color: #1a1d27;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-new-scan:hover {
+  background: #00b8e6;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: #888;
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.scans-table-wrapper {
+  overflow-x: auto;
+}
+
+.scans-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.scans-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: #888;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2a2d3a;
+}
+
+.scans-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #2a2d3a;
+  color: #ccc;
+}
+
+.scans-table tr:hover td {
+  background: #1e2230;
+}
+
+.scan-target {
+  color: #fff;
+  font-weight: 500;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-date {
+  white-space: nowrap;
+  color: #888;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-completed {
+  background: #1a3a2a;
+  color: #44cc88;
+}
+
+.status-running {
+  background: #1a2a3a;
+  color: #44aaff;
+}
+
+.status-pending {
+  background: #2a2a1a;
+  color: #ccaa44;
+}
+
+.status-failed {
+  background: #2a1a1a;
+  color: #ff6666;
+}
+
+.risk-badge {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.risk-critical {
+  color: #ff4444;
+}
+
+.risk-high {
+  color: #ff8844;
+}
+
+.risk-medium {
+  color: #ffcc44;
+}
+
+.risk-low {
+  color: #44cc88;
+}
+
+.view-link {
+  color: #00d4ff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.view-link:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,303 @@
+/* Compliance Page Styles */
+
+.compliance-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  padding: 20px;
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.control-group label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-group select {
+  background: #12141c;
+  border: 1px solid #2a2d3a;
+  color: #e8eaed;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.control-group select:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.control-hint {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.generate-btn {
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Score Section */
+
+.compliance-results {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.score-section {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.score-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.score-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #fff;
+}
+
+.framework-version {
+  font-size: 12px;
+  color: #666;
+  background: #252830;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.score-display {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.score-circle {
+  text-align: center;
+}
+
+.score-value {
+  font-size: 48px;
+  font-weight: 800;
+}
+
+.score-good { color: #44ff44; }
+.score-warning { color: #ffaa44; }
+.score-bad { color: #ff4444; }
+
+.score-bar-container {
+  width: 100%;
+  height: 12px;
+  background: #252830;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.score-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.6s ease;
+}
+
+.bar-good { background: #44ff44; }
+.bar-warning { background: #ffaa44; }
+.bar-bad { background: #ff4444; }
+
+.score-summary {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.pass-count {
+  color: #44ff44;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.partial-count {
+  color: #ffaa44;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fail-count {
+  color: #ff4444;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.download-btn {
+  margin-top: 4px;
+}
+
+/* Controls Table */
+
+.controls-list {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.controls-list h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: #fff;
+}
+
+.controls-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.controls-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2a2d3a;
+}
+
+.controls-table td {
+  padding: 12px;
+  font-size: 13px;
+  border-bottom: 1px solid #1e2130;
+}
+
+.control-row.status-fail {
+  background: rgba(255, 68, 68, 0.04);
+}
+
+.control-row.status-partial {
+  background: rgba(255, 170, 68, 0.04);
+}
+
+.control-name {
+  color: #e8eaed;
+}
+
+.control-id {
+  display: inline-block;
+  font-weight: 700;
+  color: #aaa;
+  margin-right: 8px;
+  min-width: 36px;
+}
+
+.compliance-status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.compliance-status-badge.pass {
+  background: #2a4a2a;
+  color: #44ff44;
+}
+
+.compliance-status-badge.fail {
+  background: #4a2a2a;
+  color: #ff4444;
+}
+
+.compliance-status-badge.partial {
+  background: #4a3a2a;
+  color: #ffaa44;
+}
+
+.findings-count .has-findings {
+  color: #ffaa44;
+  font-weight: 600;
+}
+
+.findings-count .no-findings {
+  color: #555;
+}
+
+/* Frameworks Overview Grid */
+
+.compliance-overview {
+  margin-top: 12px;
+}
+
+.compliance-overview h2 {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: #fff;
+}
+
+.frameworks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.framework-card {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.framework-card:hover {
+  border-color: #4a9eff;
+  background: #1e2230;
+}
+
+.framework-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #fff;
+}
+
+.fw-version {
+  font-size: 11px;
+  color: #666;
+  background: #252830;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.fw-description {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #888;
+  line-height: 1.5;
+}
