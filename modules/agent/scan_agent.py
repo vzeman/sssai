@@ -2450,7 +2450,7 @@ def _apply_confidence_scores(report: dict):
     - +0.15 if affected_url(s) present
     - +0.1  if CVE ID(s) attached
     - +0.1  if CVSS score is populated
-    Values are clamped to [0.1, 1.0].
+    Values are clamped to [0.0, 1.0].
     """
     findings = report.get("findings", [])
     for finding in findings:
@@ -2502,7 +2502,7 @@ def _load_scan_history(target: str) -> str | None:
         result = search(
             "scanner-scan-findings",
             query,
-            size=200,
+            size=60,
             sort=[{"timestamp": {"order": "desc"}}],
         )
 
