@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ConfirmDialog from '../components/ConfirmDialog'
 import DetailModal from '../components/DetailModal'
 import './StubPage.css'
 
@@ -304,30 +305,13 @@ function SchedulesPage({ token }) {
                       >
                         Edit
                       </button>
-                      {confirmingDelete === sched.id ? (
-                        <>
-                          <button
-                            onClick={() => handleDelete(sched.id)}
-                            style={{ ...actionBtnStyle, borderColor: '#5a2a2a', color: '#ff6b6b' }}
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => setConfirmingDelete(null)}
-                            style={actionBtnStyle}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmingDelete(sched.id)}
-                          style={{ ...actionBtnStyle, borderColor: '#5a2a2a', color: '#ff6b6b' }}
-                          title="Delete schedule"
-                        >
-                          Delete
-                        </button>
-                      )}
+                      <button
+                        onClick={() => setConfirmingDelete(sched.id)}
+                        style={{ ...actionBtnStyle, borderColor: '#5a2a2a', color: '#ff6b6b' }}
+                        title="Delete schedule"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -344,6 +328,16 @@ function SchedulesPage({ token }) {
           onClose={() => setSelectedSchedule(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmingDelete !== null}
+        title="Delete Schedule?"
+        description="This will permanently delete the scheduled scan. This action cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        onConfirm={() => handleDelete(confirmingDelete)}
+        onCancel={() => setConfirmingDelete(null)}
+      />
     </div>
   )
 }
