@@ -10,6 +10,7 @@ function ScansPage({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedScan, setSelectedScan] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetchScans()
@@ -46,6 +47,29 @@ function ScansPage({ token }) {
     return map[status] || ''
   }
 
+  async function handleExportCSV() {
+    setExporting(true)
+    try {
+      const resp = await fetch(`${API_BASE}/api/export/scans?format=csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error('Export failed')
+      const blob = await resp.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'scans_export.csv'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   function getRiskLabel(score) {
     if (score == null) return { text: 'N/A', cls: '' }
     if (score >= 8) return { text: `${score} Critical`, cls: 'risk-critical' }
@@ -65,7 +89,18 @@ function ScansPage({ token }) {
           <h1>Scans</h1>
           <p>All security scans and their results</p>
         </div>
-        <Link to="/scans/new" className="btn-new-scan">+ New Scan</Link>
+        <div className="scans-header-actions">
+          {scans.length > 0 && (
+            <button
+              className="btn-export"
+              onClick={handleExportCSV}
+              disabled={exporting}
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          )}
+          <Link to="/scans/new" className="btn-new-scan">+ New Scan</Link>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
