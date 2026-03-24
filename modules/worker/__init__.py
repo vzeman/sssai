@@ -214,6 +214,15 @@ def main():
                         store_technologies_from_report(scan_id, user_id, target, report, _DB_URL)
                 except Exception as inv_err:
                     log.warning("Asset inventory update failed for scan %s: %s", scan_id, inv_err)
+
+                # Update security posture score after scan completes
+                try:
+                    posture_user_id = _get_scan_user_id(scan_id)
+                    if posture_user_id:
+                        from modules.agent.posture_score import run_posture_update
+                        run_posture_update(scan_id, posture_user_id, target, raw_findings)
+                except Exception as posture_err:
+                    log.warning("Posture score update failed for scan %s: %s", scan_id, posture_err)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")
