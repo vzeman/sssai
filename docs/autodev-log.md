@@ -14,3 +14,9 @@ Tracks every autonomous development iteration. Each row = one loop cycle.
 | 2026-03-24 | feat/vulnerability-correlation-52 | #52 | PR #83 | Vulnerability correlation engine with attack chain detection |
 | 2026-03-24 | fix/non-destructive-testing-policy | safety | PR #84 | Non-destructive testing policy across all 15 agent prompts |
 | 2026-03-24 | feat/full-dashboard-frontend-85 | #85 | PR #86 | Full multi-page dashboard with 16+ pages and routing |
+| 2026-03-24 | — | PRs #78-81,87-89 | merged | Merged 7 PRs: DOM XSS, webhooks tests, GraphQL tests, triage tests, posture tests, CLAUDE.md, ES fix |
+| 2026-03-24 | fix/wire-posture-score-6 | #6 | PR #90 | Wire posture score calculation into scan completion + register API route |
+| 2026-03-24 | fix/wire-webhooks-and-triage-7-9 | #7, #9 | PR #91 | Wire webhook router, auto-triage, and scheduling recommendations into pipeline |
+| 2026-03-24 | — | PRs #86,90,91 | merged | Merged dashboard, posture score wiring, webhooks/triage wiring |
+| 2026-03-24 | fix/frontend-lint-warnings | lint | PR #92 | Fix all 15 react-hooks/exhaustive-deps warnings across 11 pages |
+| 2026-03-24 | fix/api-input-validation-93 | #93 | PR #94 | Harden API validation: audit Pydantic schema, cron parsing, monitors bounds |

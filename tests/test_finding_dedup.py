@@ -218,7 +218,7 @@ class TestStampAllNew:
 class TestDeduplicateFindings:
     """Test main deduplication workflow."""
 
-    @patch("modules.agent.finding_dedup.es_search")
+    @patch("modules.infra.elasticsearch.search")
     def test_no_previous_findings(self, mock_es_search):
         """When no previous findings exist, all should be marked 'new'."""
         mock_es_search.return_value = {"hits": {"hits": []}}
@@ -232,7 +232,7 @@ class TestDeduplicateFindings:
         assert enriched[0]["finding_status"] == "new"
         assert resolved == []
 
-    @patch("modules.agent.finding_dedup.es_search")
+    @patch("modules.infra.elasticsearch.search")
     def test_existing_finding_still_present(self, mock_es_search):
         """When a previous finding is present in current scan, mark as 'existing'."""
         mock_es_search.return_value = {
@@ -263,7 +263,7 @@ class TestDeduplicateFindings:
         assert enriched[0]["first_seen_scan_id"] == "scan-0"
         assert resolved == []
 
-    @patch("modules.agent.finding_dedup.es_search")
+    @patch("modules.infra.elasticsearch.search")
     def test_finding_regression(self, mock_es_search):
         """When a resolved finding reappears, mark as 'regressed'."""
         mock_es_search.return_value = {
@@ -293,7 +293,7 @@ class TestDeduplicateFindings:
         assert enriched[0]["finding_status"] == "regressed"
         assert resolved == []
 
-    @patch("modules.agent.finding_dedup.es_search")
+    @patch("modules.infra.elasticsearch.search")
     def test_finding_resolution_detection(self, mock_es_search):
         """When a previous finding is not in current scan, mark its ID as resolved."""
         mock_es_search.return_value = {
@@ -332,7 +332,7 @@ class TestDeduplicateFindings:
         assert "prev-doc-1" in resolved
         assert "prev-doc-2" not in resolved
 
-    @patch("modules.agent.finding_dedup.es_search")
+    @patch("modules.infra.elasticsearch.search")
     def test_es_failure_graceful_fallback(self, mock_es_search):
         """When ES search fails, fallback to marking all as 'new'."""
         mock_es_search.side_effect = Exception("ES connection failed")
@@ -350,7 +350,7 @@ class TestDeduplicateFindings:
 class TestMarkResolvedInEs:
     """Test marking findings as resolved in Elasticsearch."""
 
-    @patch("modules.agent.finding_dedup.get_client")
+    @patch("modules.infra.elasticsearch.get_client")
     def test_update_resolved_documents(self, mock_get_client):
         """Should update documents with resolved status."""
         mock_es = MagicMock()
@@ -362,13 +362,13 @@ class TestMarkResolvedInEs:
         assert updated == 2
         assert mock_es.update.call_count == 2
 
-    @patch("modules.agent.finding_dedup.get_client")
+    @patch("modules.infra.elasticsearch.get_client")
     def test_empty_resolved_list(self, mock_get_client):
         """Empty resolved list should return 0."""
         updated = mark_resolved_in_es([], "scan-1", "2024-01-01T00:00:00Z")
         assert updated == 0
 
-    @patch("modules.agent.finding_dedup.get_client")
+    @patch("modules.infra.elasticsearch.get_client")
     def test_update_partial_failure(self, mock_get_client):
         """Should return count of successfully updated docs."""
         mock_es = MagicMock()
@@ -378,7 +378,7 @@ class TestMarkResolvedInEs:
         updated = mark_resolved_in_es(["doc-1", "doc-2", "doc-3"], "scan-1", "2024-01-01T00:00:00Z")
         assert updated == 2  # 2 successes, 1 failure
 
-    @patch("modules.agent.finding_dedup.get_client")
+    @patch("modules.infra.elasticsearch.get_client")
     def test_es_client_failure(self, mock_get_client):
         """ES client initialization failure should return 0."""
         mock_get_client.side_effect = Exception("ES connection failed")

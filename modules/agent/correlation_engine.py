@@ -559,20 +559,21 @@ class ConfidenceScorer:
     @staticmethod
     def _are_related_types(type1: str, type2: str) -> bool:
         """Check if vulnerability types are related."""
-        type1_lower = type1.lower()
-        type2_lower = type2.lower()
-        
-        # Define type relationships
+        # Normalize: lowercase and replace separators with spaces for matching
+        type1_norm = type1.lower().replace("_", " ").replace("-", " ")
+        type2_norm = type2.lower().replace("_", " ").replace("-", " ")
+
+        # Define type relationship groups
         relationships = {
-            "injection": ["sqli", "nosqli", "command_injection", "template_injection"],
-            "access_control": ["idor", "privilege_escalation", "auth_bypass"],
-            "data": ["data_exposure", "info_disclosure", "information_disclosure"],
+            "injection": ["injection", "sqli", "nosqli"],
+            "access_control": ["idor", "privilege escalation", "auth bypass", "access control", "authorization"],
+            "data": ["data exposure", "info disclosure", "information disclosure", "data leak", "sensitive data"],
         }
-        
-        for group, types in relationships.items():
-            if any(t in type1_lower for t in types) and any(t in type2_lower for t in types):
+
+        for group, keywords in relationships.items():
+            if any(k in type1_norm for k in keywords) and any(k in type2_norm for k in keywords):
                 return True
-        
+
         return False
     
     @staticmethod
