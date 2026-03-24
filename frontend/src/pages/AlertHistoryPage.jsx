@@ -7,33 +7,31 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function AlertHistoryPage({ token }) {
   const [alerts, setAlerts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [selectedAlert, setSelectedAlert] = useState(null)
 
   useEffect(() => {
-    fetchAlerts()
-  }, [filter])
-
-  async function fetchAlerts() {
-    try {
-      let url = `${API_BASE}/api/notifications`
-      if (filter !== 'all') {
-        url += `?status=${filter}`
+    let cancelled = false
+    async function load() {
+      try {
+        let url = `${API_BASE}/api/notifications`
+        if (filter !== 'all') {
+          url += `?status=${filter}`
+        }
+        const resp = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (resp.ok && !cancelled) {
+          const data = await resp.json()
+          setAlerts(Array.isArray(data) ? data : [])
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Failed to fetch alerts:', err)
       }
-      const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (resp.ok) {
-        const data = await resp.json()
-        setAlerts(Array.isArray(data) ? data : [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch alerts:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    load()
+    return () => { cancelled = true }
+  }, [filter, token])
 
   return (
     <div className="page-container">

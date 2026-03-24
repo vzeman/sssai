@@ -6,29 +6,25 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function QueuePage({ token }) {
   const [queue, setQueue] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchQueue()
-    const interval = setInterval(fetchQueue, 5000) // Poll every 5 seconds
-    return () => clearInterval(interval)
-  }, [])
-
-  async function fetchQueue() {
-    try {
-      const resp = await fetch(`${API_BASE}/api/scans?status=queued,running`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (resp.ok) {
-        const data = await resp.json()
-        setQueue(data)
+    let cancelled = false
+    async function poll() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/scans?status=queued,running`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (resp.ok && !cancelled) {
+          setQueue(await resp.json())
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Failed to fetch queue:', err)
       }
-    } catch (err) {
-      console.error('Failed to fetch queue:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    poll()
+    const interval = setInterval(poll, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [token])
 
   return (
     <div className="page-container">

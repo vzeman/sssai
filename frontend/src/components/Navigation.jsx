@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import './Navigation.css'
 
-function Navigation({ token, onLogout }) {
+function Navigation({ onLogout }) {
   const location = useLocation()
 
   const navItems = [

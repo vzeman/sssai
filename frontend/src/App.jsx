@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { SecurityAdvisorChat } from './components/SecurityAdvisorChat'
 import { ToastProvider } from './components/ToastContext'
 import Toast from './components/Toast'
@@ -94,7 +94,7 @@ function LoginForm({ onLogin }) {
 function AppLayout({ token, onLogout }) {
   return (
     <div className="app-layout">
-      <Navigation token={token} onLogout={onLogout} />
+      <Navigation onLogout={onLogout} />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<Dashboard token={token} />} />

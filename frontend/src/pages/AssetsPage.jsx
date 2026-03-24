@@ -155,11 +155,6 @@ function AssetsPage({ token }) {
     setFilters(prev => ({ ...prev, [name]: value }))
   }
 
-  function getUniqueTargets() {
-    const targets = new Set(assets.map(a => a.target).filter(Boolean))
-    return [...targets]
-  }
-
   if (loading) {
     return <div className="page-container"><div className="loading">Loading assets...</div></div>
   }

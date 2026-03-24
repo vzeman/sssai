@@ -5,27 +5,24 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function WebhooksPage({ token }) {
   const [webhooks, setWebhooks] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchWebhooks()
-  }, [])
-
-  async function fetchWebhooks() {
-    try {
-      const resp = await fetch(`${API_BASE}/api/webhooks`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (resp.ok) {
-        const data = await resp.json()
-        setWebhooks(data)
+    let cancelled = false
+    async function load() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/webhooks`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (resp.ok && !cancelled) {
+          setWebhooks(await resp.json())
+        }
+      } catch (err) {
+        if (!cancelled) console.error('Failed to fetch webhooks:', err)
       }
-    } catch (err) {
-      console.error('Failed to fetch webhooks:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    load()
+    return () => { cancelled = true }
+  }, [token])
 
   return (
     <div className="page-container">
@@ -36,7 +33,7 @@ function WebhooksPage({ token }) {
 
       <div className="stub-content">
         <div className="feature-card">
-          <h2>🔗 Webhook Management</h2>
+          <h2>Webhook Management</h2>
           <p>Create and manage webhook endpoints:</p>
           <ul>
             <li>Receive scan completion notifications</li>
@@ -47,7 +44,7 @@ function WebhooksPage({ token }) {
         </div>
 
         <div className="feature-card">
-          <h2>🔐 Integration Providers</h2>
+          <h2>Integration Providers</h2>
           <p>Pre-built integrations with popular tools:</p>
           <ul>
             <li>Slack notifications</li>
@@ -58,7 +55,7 @@ function WebhooksPage({ token }) {
         </div>
 
         <div className="feature-card">
-          <h2>📊 Webhook Logs</h2>
+          <h2>Webhook Logs</h2>
           <p>Monitor webhook delivery and retry history</p>
         </div>
       </div>

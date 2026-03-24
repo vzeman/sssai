@@ -145,18 +145,6 @@ function FindingsPage({ token }) {
     setFilters(prev => ({ ...prev, [name]: value }))
   }
 
-  function handleUpdateStatus(finding, newStatus) {
-    setFindings(prev =>
-      prev.map(f =>
-        f === finding ? { ...f, status: newStatus } : f
-      )
-    )
-    setSelectedFinding(null)
-
-    const label = newStatus === 'resolved' ? 'resolved' : 'marked as false positive'
-    setSuccessMessage(`"${finding.title || 'Finding'}" has been ${label}.`)
-  }
-
   if (loading) {
     return <div className="page-container"><div className="loading">Loading findings...</div></div>
   }
