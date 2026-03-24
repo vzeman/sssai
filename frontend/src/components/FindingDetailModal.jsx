@@ -1,7 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import './FindingDetailModal.css'
 
 export default function FindingDetailModal({ finding, onClose }) {
+  const modalRef = useRef(null)
+  useFocusTrap(modalRef, !!finding)
+
   useEffect(() => {
     function handleEsc(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handleEsc)
@@ -20,8 +24,8 @@ export default function FindingDetailModal({ finding, onClose }) {
   const color = severityColors[finding.severity] || '#888'
 
   return (
-    <div className="fdm-overlay" onClick={onClose}>
-      <div className="fdm-modal" onClick={e => e.stopPropagation()}>
+    <div className="fdm-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="fdm-modal" onClick={e => e.stopPropagation()} ref={modalRef} aria-label={finding.title || 'Finding Details'}>
         {/* Header with severity stripe */}
         <div className="fdm-header" style={{ borderTopColor: color }}>
           <div className="fdm-header-top">
@@ -31,7 +35,7 @@ export default function FindingDetailModal({ finding, onClose }) {
             {finding.cvss_score && (
               <span className="fdm-cvss">CVSS {finding.cvss_score}</span>
             )}
-            <button className="fdm-close" onClick={onClose}>&times;</button>
+            <button className="fdm-close" onClick={onClose} aria-label="Close dialog">&times;</button>
           </div>
           <h2 className="fdm-title">{finding.title || 'Finding Details'}</h2>
           <div className="fdm-meta-row">
@@ -72,7 +76,7 @@ export default function FindingDetailModal({ finding, onClose }) {
           {finding.remediation && (
             <section className="fdm-section fdm-remediation">
               <h3 className="fdm-section-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                 </svg>
                 How to Fix
@@ -166,7 +170,7 @@ export default function FindingDetailModal({ finding, onClose }) {
 
         {/* Footer */}
         <div className="fdm-footer">
-          <button className="fdm-btn fdm-btn-close" onClick={onClose}>Close</button>
+          <button className="fdm-btn fdm-btn-close" onClick={onClose} aria-label="Close dialog">Close</button>
         </div>
       </div>
     </div>

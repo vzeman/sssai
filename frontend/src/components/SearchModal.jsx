@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import './SearchModal.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -11,6 +12,8 @@ export function SearchModal({ open, onClose, token }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
+  const searchModalRef = useRef(null)
+  useFocusTrap(searchModalRef, open)
   const navigate = useNavigate()
 
   // Focus input when modal opens
@@ -111,10 +114,10 @@ export function SearchModal({ open, onClose, token }) {
   let globalIdx = 0
 
   return (
-    <div className="search-modal-overlay" onClick={handleOverlayClick}>
-      <div className="search-modal" onKeyDown={handleKeyDown}>
+    <div className="search-modal-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true">
+      <div className="search-modal" onKeyDown={handleKeyDown} ref={searchModalRef} aria-label="Global search">
         <div className="search-modal-input-wrapper">
-          <svg className="search-modal-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="search-modal-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -125,11 +128,12 @@ export function SearchModal({ open, onClose, token }) {
             placeholder="Search findings, scans, activity..."
             value={query}
             onChange={handleInputChange}
+            aria-label="Search findings, scans, and activity"
           />
           <span className="search-modal-kbd">ESC</span>
         </div>
 
-        <div className="search-modal-body">
+        <div className="search-modal-body" aria-live="polite">
           {loading && (
             <div className="search-modal-loading">Searching...</div>
           )}
@@ -155,7 +159,7 @@ export function SearchModal({ open, onClose, token }) {
           {!loading && findings.length > 0 && (
             <div className="search-modal-section">
               <div className="search-modal-section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
                 Findings
@@ -170,7 +174,7 @@ export function SearchModal({ open, onClose, token }) {
                     onClick={() => navigateToResult({ type: 'finding', data: f })}
                   >
                     <div className="search-modal-result-icon finding">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                       </svg>
                     </div>
@@ -194,7 +198,7 @@ export function SearchModal({ open, onClose, token }) {
           {!loading && activities.length > 0 && (
             <div className="search-modal-section">
               <div className="search-modal-section-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                 </svg>
                 Scans / Activity
@@ -209,7 +213,7 @@ export function SearchModal({ open, onClose, token }) {
                     onClick={() => navigateToResult({ type: 'scan', data: a })}
                   >
                     <div className="search-modal-result-icon scan">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                       </svg>
                     </div>

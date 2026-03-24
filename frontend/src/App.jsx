@@ -66,7 +66,7 @@ function LoginForm({ onLogin }) {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <span className="login-icon">🛡️</span>
+          <span className="login-icon" role="img" aria-label="Security shield">🛡️</span>
           <h1>SSSAI Security Advisor</h1>
           <p>Sign in to access your AI security dashboard</p>
         </div>
@@ -87,7 +87,7 @@ function LoginForm({ onLogin }) {
             required
             className="login-input"
           />
-          {error && <div className="login-error">{error}</div>}
+          {error && <div className="login-error" role="alert" aria-live="assertive">{error}</div>}
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
@@ -114,7 +114,7 @@ function AppLayout({ token, onLogout }) {
   return (
     <div className="app-layout">
       <Navigation onLogout={onLogout} />
-      <main className="app-main">
+      <main className="app-main" aria-label="Main content">
         <Breadcrumbs />
         <ErrorBoundary>
           <Routes>
