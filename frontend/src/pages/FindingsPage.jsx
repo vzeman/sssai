@@ -14,6 +14,7 @@ function FindingsPage({ token }) {
   const [error, setError] = useState('')
   const [selectedFinding, setSelectedFinding] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
@@ -77,6 +78,32 @@ function FindingsPage({ token }) {
     setCurrentPage(1)
   }
 
+  async function handleExportCSV() {
+    if (!findings.length) return
+    setExporting(true)
+    try {
+      const scanId = findings[0]?.scan_id
+      if (!scanId) return
+      const resp = await fetch(`${API_BASE}/api/export/findings?scan_id=${scanId}&format=csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error('Export failed')
+      const blob = await resp.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `findings_${scanId.substring(0, 8)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const paginatedFindings = filteredFindings.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
@@ -94,8 +121,19 @@ function FindingsPage({ token }) {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>Findings</h1>
-        <p>Security findings and vulnerabilities across all scans</p>
+        <div>
+          <h1>Findings</h1>
+          <p>Security findings and vulnerabilities across all scans</p>
+        </div>
+        {findings.length > 0 && (
+          <button
+            className="btn-export"
+            onClick={handleExportCSV}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}
