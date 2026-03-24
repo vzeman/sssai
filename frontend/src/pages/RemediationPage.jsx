@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/ToastContext'
 import './RemediationPage.css'
 
@@ -20,6 +21,7 @@ function RemediationPage({ token }) {
   const [activeTab, setActiveTab] = useState('severity')
   const [verifyingIds, setVerifyingIds] = useState(new Set())
   const [expandedIds, setExpandedIds] = useState(new Set())
+  const [confirmVerifyScanId, setConfirmVerifyScanId] = useState(null)
 
   useEffect(() => {
     fetchScansAndFindings()
@@ -196,7 +198,7 @@ function RemediationPage({ token }) {
             <div className="finding-card-actions">
               <button
                 className="btn btn-primary btn-sm"
-                onClick={() => triggerVerification(finding.scanId)}
+                onClick={() => setConfirmVerifyScanId(finding.scanId)}
                 disabled={verifyingIds.has(finding.scanId)}
               >
                 {verifyingIds.has(finding.scanId) ? 'Verifying...' : 'Trigger Verification Scan'}
@@ -314,6 +316,21 @@ function RemediationPage({ token }) {
           {renderTriageBucket('Backlog', triageBuckets.backlog, 'bucket-backlog')}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmVerifyScanId !== null}
+        title="Trigger Verification Scan?"
+        description="This will queue a verification scan for this finding. Verification scans are resource-intensive and may take several minutes."
+        confirmLabel="Trigger Scan"
+        confirmVariant="warning"
+        onConfirm={() => {
+          const scanId = confirmVerifyScanId
+          setConfirmVerifyScanId(null)
+          triggerVerification(scanId)
+        }}
+        onCancel={() => setConfirmVerifyScanId(null)}
+        isLoading={confirmVerifyScanId !== null && verifyingIds.has(confirmVerifyScanId)}
+      />
     </div>
   )
 }

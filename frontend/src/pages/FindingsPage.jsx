@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import ConfirmDialog from '../components/ConfirmDialog'
 import FindingDetailModal from '../components/FindingDetailModal'
 import { LoadingSkeleton } from '../components/LoadingSkeleton'
 import { Pagination } from '../components/Pagination'
@@ -37,20 +38,36 @@ function StatusDropdown({ finding, token, onStatusChange }) {
   const [showReason, setShowReason] = useState(false)
   const [pendingStatus, setPendingStatus] = useState('')
   const [reason, setReason] = useState('')
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const CONFIRM_DESCRIPTIONS = {
+    false_positive: 'This will mark the finding as a false positive. The finding will be excluded from future reports.',
+    accepted_risk: 'This will mark the finding as an accepted risk. Ensure this has been reviewed and approved.',
+  }
 
   async function handleChange(e) {
     const newStatus = e.target.value
     const currentStatus = finding.finding_status || 'new'
     if (newStatus === currentStatus) return
 
-    // For false_positive and accepted_risk, ask for a reason
+    // For false_positive and accepted_risk, confirm first
     if (newStatus === 'false_positive' || newStatus === 'accepted_risk') {
       setPendingStatus(newStatus)
-      setShowReason(true)
+      setShowConfirm(true)
       return
     }
 
     await submitStatusChange(newStatus, '')
+  }
+
+  function handleConfirmAccept() {
+    setShowConfirm(false)
+    setShowReason(true)
+  }
+
+  function handleConfirmCancel() {
+    setShowConfirm(false)
+    setPendingStatus('')
   }
 
   async function submitStatusChange(status, changeReason) {
@@ -123,6 +140,15 @@ function StatusDropdown({ finding, token, onStatusChange }) {
           </form>
         </div>
       )}
+      <ConfirmDialog
+        open={showConfirm}
+        title={`Mark as ${STATUS_MAP[pendingStatus]?.label || ''}?`}
+        description={CONFIRM_DESCRIPTIONS[pendingStatus] || ''}
+        confirmLabel="Continue"
+        confirmVariant="warning"
+        onConfirm={handleConfirmAccept}
+        onCancel={handleConfirmCancel}
+      />
     </div>
   )
 }
