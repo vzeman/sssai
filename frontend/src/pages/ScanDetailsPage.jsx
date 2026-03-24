@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useToast } from '../components/ToastContext'
 import { useScanUpdates } from '../hooks/useWebSocket'
 import FindingDetailModal from '../components/FindingDetailModal'
@@ -9,7 +9,6 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function ScanDetailsPage({ token }) {
   const { scanId } = useParams()
-  const navigate = useNavigate()
   const { showToast } = useToast()
   const [scan, setScan] = useState(null)
   const [findings, setFindings] = useState([])
@@ -116,7 +115,6 @@ function ScanDetailsPage({ token }) {
     <div className="page-container scan-details">
       <div className="page-header">
         <div className="header-title">
-          <button className="back-btn" onClick={() => navigate('/reports')}>← Back</button>
           <div>
             <h1>{scan.target_url || 'Scan Details'}</h1>
             <p>Target: {scan.target_url || 'Unknown'}</p>

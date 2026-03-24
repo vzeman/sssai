@@ -26,6 +26,7 @@ import ScansPage from './pages/ScansPage'
 import ScanComparisonPage from './pages/ScanComparisonPage'
 import ScanWizard from './components/ScanWizard'
 import Navigation from './components/Navigation'
+import Breadcrumbs from './components/Breadcrumbs'
 import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 
@@ -114,6 +115,7 @@ function AppLayout({ token, onLogout }) {
     <div className="app-layout">
       <Navigation onLogout={onLogout} />
       <main className="app-main">
+        <Breadcrumbs />
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Dashboard token={token} />} />
