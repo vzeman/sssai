@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { SecurityAdvisorChat } from './components/SecurityAdvisorChat'
+import { SearchModal } from './components/SearchModal'
 import { ToastProvider } from './components/ToastContext'
 import ThemeProvider from './contexts/ThemeContext'
 import Toast from './components/Toast'
@@ -94,6 +95,19 @@ function LoginForm({ onLogin }) {
 }
 
 function AppLayout({ token, onLogout }) {
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(prev => !prev)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <div className="app-layout">
       <Navigation onLogout={onLogout} />
@@ -122,6 +136,11 @@ function AppLayout({ token, onLogout }) {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <SearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        token={token}
+      />
     </div>
   )
 }

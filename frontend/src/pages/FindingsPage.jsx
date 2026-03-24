@@ -24,7 +24,18 @@ function FindingsPage({ token }) {
     cvssMin: 0,
     cvssMax: 10,
     status: 'all',
+    search: '',
+    category: 'all',
   })
+  const [savedFilters, setSavedFilters] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sssai_saved_filters') || '[]')
+    } catch {
+      return []
+    }
+  })
+  const [saveFilterName, setSaveFilterName] = useState('')
+  const [showSaveInput, setShowSaveInput] = useState(false)
 
   useEffect(() => {
     fetchFindings()
@@ -65,11 +76,46 @@ function FindingsPage({ token }) {
     let filtered = findings.filter(f => {
       if (filters.severity !== 'all' && f.severity !== filters.severity) return false
       if (filters.status !== 'all' && f.status !== filters.status) return false
+      if (filters.category !== 'all' && f.category !== filters.category) return false
       const cvss = parseFloat(f.cvss_score) || 0
       if (cvss < filters.cvssMin || cvss > filters.cvssMax) return false
+      if (filters.search) {
+        const term = filters.search.toLowerCase()
+        const title = (f.title || '').toLowerCase()
+        const desc = (f.description || '').toLowerCase()
+        if (!title.includes(term) && !desc.includes(term)) return false
+      }
       return true
     })
     setFilteredFindings(filtered)
+  }
+
+  const categories = [...new Set(findings.map(f => f.category).filter(Boolean))].sort()
+
+  function persistSavedFilters(updated) {
+    setSavedFilters(updated)
+    localStorage.setItem('sssai_saved_filters', JSON.stringify(updated))
+  }
+
+  function handleSaveFilter() {
+    const name = saveFilterName.trim()
+    if (!name) return
+    const preset = { name, filters: { ...filters } }
+    const updated = [...savedFilters.filter(f => f.name !== name), preset]
+    persistSavedFilters(updated)
+    setSaveFilterName('')
+    setShowSaveInput(false)
+    setSuccessMessage(`Filter "${name}" saved`)
+  }
+
+  function handleLoadFilter(preset) {
+    setFilters(preset.filters)
+    setCurrentPage(1)
+  }
+
+  function handleDeleteFilter(name) {
+    const updated = savedFilters.filter(f => f.name !== name)
+    persistSavedFilters(updated)
   }
 
   function handleFilterChange(e) {
@@ -143,6 +189,17 @@ function FindingsPage({ token }) {
       )}
 
       <div className="filters-section">
+        <div className="filter-group filter-group-wide">
+          <label>Search</label>
+          <input
+            type="text"
+            name="search"
+            value={filters.search}
+            onChange={handleFilterChange}
+            placeholder="Search by title or description..."
+          />
+        </div>
+
         <div className="filter-group">
           <label>Severity</label>
           <select name="severity" value={filters.severity} onChange={handleFilterChange}>
@@ -151,6 +208,16 @@ function FindingsPage({ token }) {
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Category</label>
+          <select name="category" value={filters.category} onChange={handleFilterChange}>
+            <option value="all">All Categories</option>
+            {categories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
           </select>
         </div>
 
@@ -190,6 +257,56 @@ function FindingsPage({ token }) {
             <option value="false-positive">False Positive</option>
           </select>
         </div>
+      </div>
+
+      <div className="saved-filters-section">
+        <div className="saved-filters-actions">
+          {!showSaveInput ? (
+            <button className="btn-save-filter" onClick={() => setShowSaveInput(true)}>
+              Save Current Filter
+            </button>
+          ) : (
+            <form className="save-filter-form" onSubmit={(e) => { e.preventDefault(); handleSaveFilter(); }}>
+              <input
+                type="text"
+                value={saveFilterName}
+                onChange={(e) => setSaveFilterName(e.target.value)}
+                placeholder="Filter preset name..."
+                className="save-filter-input"
+                autoFocus
+              />
+              <button type="submit" className="btn-save-confirm" disabled={!saveFilterName.trim()}>
+                Save
+              </button>
+              <button type="button" className="btn-save-cancel" onClick={() => { setShowSaveInput(false); setSaveFilterName(''); }}>
+                Cancel
+              </button>
+            </form>
+          )}
+        </div>
+        {savedFilters.length > 0 && (
+          <div className="saved-filters-list">
+            <span className="saved-filters-label">Saved:</span>
+            {savedFilters.map(preset => (
+              <div key={preset.name} className="saved-filter-chip">
+                <button
+                  className="saved-filter-chip-name"
+                  onClick={() => handleLoadFilter(preset)}
+                  title={`Load filter: ${preset.name}`}
+                >
+                  {preset.name}
+                </button>
+                <button
+                  className="saved-filter-chip-delete"
+                  onClick={() => handleDeleteFilter(preset.name)}
+                  title={`Delete filter: ${preset.name}`}
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="findings-summary">
