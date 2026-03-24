@@ -158,6 +158,7 @@ INDICES = {
                 "category": {"type": "keyword"},
                 "remediation": {"type": "text"},
                 "cvss_score": {"type": "float"},
+                "cvss_vector": {"type": "keyword"},
                 "cve_id": {"type": "keyword"},
                 "tool": {"type": "keyword"},
                 "evidence": {"type": "text"},

@@ -200,7 +200,7 @@
     <!-- Executive Summary -->
     <div class="section">
         <h2>Executive Summary</h2>
-        <p>{{ report.get('summary', 'No summary available.') }}</p>
+        {{ report.get('summary', 'No summary available.') | markdown_to_html }}
     </div>
 
     <!-- Technologies Detected -->
@@ -230,7 +230,7 @@
             <div style="font-size:13px;color:#666;margin-bottom:6px">Category: {{ finding.category }}</div>
             {% endif %}
 
-            <p>{{ finding.description }}</p>
+            {{ finding.description | markdown_to_html }}
 
             {% if finding.get('cve_ids') %}
             <div style="margin:8px 0">
