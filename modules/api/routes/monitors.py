@@ -52,7 +52,7 @@ def list_monitors(user: User = Depends(get_current_user), db: Session = Depends(
 
 @router.get("/enriched")
 def list_monitors_enriched(
-    hours: int = Query(24, le=720),
+    hours: int = Query(24, ge=1, le=720),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -184,7 +184,7 @@ def delete_monitor(monitor_id: str, user: User = Depends(get_current_user), db: 
 def get_checks(
     monitor_id: str,
     limit: int = Query(100, le=500),
-    hours: int = Query(24, le=720),
+    hours: int = Query(24, ge=1, le=720),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -207,7 +207,7 @@ def get_checks(
 @router.get("/{monitor_id}/stats")
 def get_stats(
     monitor_id: str,
-    hours: int = Query(24, le=720),
+    hours: int = Query(24, ge=1, le=720),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

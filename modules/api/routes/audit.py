@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
@@ -291,12 +292,16 @@ async def get_iso27001_report(
         raise HTTPException(status_code=500, detail="Failed to generate report")
 
 
+class ManualAuditEntry(BaseModel):
+    action: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_\-]+$")
+    resource_type: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_\-]+$")
+    resource_id: str = Field(..., min_length=1, max_length=255)
+    notes: str | None = Field(None, max_length=5000)
+
+
 @router.post("/manual-entry")
 async def create_manual_audit_entry(
-    action: str,
-    resource_type: str,
-    resource_id: str,
-    notes: Optional[str] = None,
+    entry: ManualAuditEntry,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -306,10 +311,10 @@ async def create_manual_audit_entry(
     try:
         log_id = await AuditLogger.log_action(
             user_id=current_user.id,
-            action=action,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            after_state={"notes": notes} if notes else None,
+            action=entry.action,
+            resource_type=entry.resource_type,
+            resource_id=entry.resource_id,
+            after_state={"notes": entry.notes} if entry.notes else None,
             db=db,
         )
 

@@ -13,6 +13,11 @@ from modules.api.auth import get_current_user
 router = APIRouter()
 
 
+import re
+
+_INTERVAL_RE = re.compile(r"^(\d{1,4})([hmd])$")
+
+
 def calc_first_run(cron_expression: str) -> datetime:
     """Calculate when the first run should happen."""
     now = datetime.utcnow()
@@ -25,12 +30,17 @@ def calc_first_run(cron_expression: str) -> datetime:
         return now + timedelta(weeks=1)
     elif expr == "monthly":
         return now + timedelta(days=30)
-    elif expr.endswith("h"):
-        return now + timedelta(hours=int(expr[:-1]))
-    elif expr.endswith("m"):
-        return now + timedelta(minutes=int(expr[:-1]))
-    elif expr.endswith("d"):
-        return now + timedelta(days=int(expr[:-1]))
+    else:
+        m = _INTERVAL_RE.match(expr)
+        if m:
+            val = min(int(m.group(1)), 9999)
+            unit = m.group(2)
+            if unit == "h":
+                return now + timedelta(hours=val)
+            elif unit == "m":
+                return now + timedelta(minutes=val)
+            elif unit == "d":
+                return now + timedelta(days=val)
     return now + timedelta(days=1)
 
 
