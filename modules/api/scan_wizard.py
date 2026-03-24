@@ -254,6 +254,25 @@ class ScanTemplates:
                 "detailed_reporting": True,
             }
         ),
+        "ecommerce": ScanTemplateConfig(
+            name="E-Commerce Scan (20 min)",
+            description="Validates UCP/ACP commerce protocols, payment security, PCI-DSS checks, and checkout flow testing.",
+            duration_estimate="20 minutes",
+            enabled_modules=["ssl", "http", "commerce_protocol", "api_testing", "web_vulns", "seo", "performance"],
+            depth="deep",
+            timeout_minutes=20,
+            parallelization=3,
+            config={
+                "scan_type": "ecommerce",
+                "check_ssl": True,
+                "commerce_protocol_validation": True,
+                "payment_security": True,
+                "checkout_flow_testing": True,
+                "pci_dss_checks": True,
+                "seo_audit": True,
+                "performance_check": True,
+            }
+        ),
         "full": ScanTemplateConfig(
             name="Full Audit (60+ min)",
             description="Complete security audit with all modules. Most comprehensive analysis.",
