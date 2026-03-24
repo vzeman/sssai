@@ -19,4 +19,6 @@ Tracks every autonomous development iteration. Each row = one loop cycle.
 | 2026-03-24 | fix/wire-webhooks-and-triage-7-9 | #7, #9 | PR #91 | Wire webhook router, auto-triage, and scheduling recommendations into pipeline |
 | 2026-03-24 | — | PRs #86,90,91 | merged | Merged dashboard, posture score wiring, webhooks/triage wiring |
 | 2026-03-24 | fix/frontend-lint-warnings | lint | PR #92 | Fix all 15 react-hooks/exhaustive-deps warnings across 11 pages |
-| 2026-03-24 | fix/api-input-validation-93 | #93 | PR #94 | Harden API validation: audit Pydantic schema, cron parsing, monitors bounds |
+| 2026-03-24 | fix/api-input-validation-93 | #93 | PR #94 merged | Harden API validation: audit Pydantic schema, cron parsing, monitors bounds |
+| 2026-03-24 | fix/correlation-engine-type-matching | test fix | PR #95 merged | Fix correlation engine type matching + 9 dedup test mock paths |
+| 2026-03-24 | feat/ecommerce-ucp-acp-96 | #96 | PR #97 | UCP/ACP commerce protocol scanning for e-commerce sites |
