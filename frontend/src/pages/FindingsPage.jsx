@@ -1,85 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import DetailModal from '../components/DetailModal'
+import FindingDetailModal from '../components/FindingDetailModal'
 import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
-
-function FindingDetailsModal({ finding, onClose, onUpdateStatus }) {
-  if (!finding) return null
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{finding.title || 'Finding Details'}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
-        </div>
-
-        <div className="modal-body">
-          <div className="detail-section">
-            <h3>CVSS Score</h3>
-            <div className="cvss-display">
-              <div className={`cvss-score severity-${finding.severity}`}>
-                {finding.cvss_score || 'N/A'}
-              </div>
-              <div className="cvss-vector">{finding.cvss_vector || 'N/A'}</div>
-            </div>
-          </div>
-
-          <div className="detail-section">
-            <h3>Severity</h3>
-            <span className={`severity-badge ${finding.severity}`}>
-              {finding.severity || 'Unknown'}
-            </span>
-          </div>
-
-          <div className="detail-section">
-            <h3>Description</h3>
-            <p>{finding.description || 'No description available'}</p>
-          </div>
-
-          <div className="detail-section">
-            <h3>Remediation</h3>
-            <p>{finding.remediation || 'No remediation steps available'}</p>
-          </div>
-
-          {finding.history && finding.history.length > 0 && (
-            <div className="detail-section">
-              <h3>History</h3>
-              <div className="history-list">
-                {finding.history.map((entry, idx) => (
-                  <div key={idx} className="history-item">
-                    <span className="history-date">
-                      {new Date(entry.timestamp).toLocaleDateString()}
-                    </span>
-                    <span className="history-status">{entry.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
-          <button
-            className="btn btn-success"
-            onClick={() => onUpdateStatus(finding, 'resolved')}
-          >
-            Mark as Resolved
-          </button>
-          <button
-            className="btn btn-warning"
-            onClick={() => onUpdateStatus(finding, 'false-positive')}
-          >
-            Mark as False Positive
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function FindingsPage({ token }) {
   const [findings, setFindings] = useState([])
@@ -294,9 +218,8 @@ function FindingsPage({ token }) {
       )}
 
       {selectedFinding && (
-        <DetailModal
-          title={selectedFinding.title}
-          data={selectedFinding}
+        <FindingDetailModal
+          finding={selectedFinding}
           onClose={() => setSelectedFinding(null)}
         />
       )}

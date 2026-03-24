@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../components/ToastContext'
+import FindingDetailModal from '../components/FindingDetailModal'
 import './ScanDetailsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -16,6 +17,7 @@ function ScanDetailsPage({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sorting, setSorting] = useState({ field: 'severity', order: 'asc' })
+  const [selectedFinding, setSelectedFinding] = useState(null)
 
   useEffect(() => {
     fetchScanDetails()
@@ -181,7 +183,7 @@ function ScanDetailsPage({ token }) {
                   <tr><td colSpan="4" className="empty-row">No findings in this scan</td></tr>
                 ) : (
                   sortedFindings.map((f, idx) => (
-                    <tr key={idx}>
+                    <tr key={idx} onClick={() => setSelectedFinding(f)} style={{ cursor: 'pointer' }}>
                       <td>{f.title || 'Unknown'}</td>
                       <td>
                         <span className={`severity-badge ${f.severity}`}>
@@ -260,6 +262,13 @@ function ScanDetailsPage({ token }) {
           </div>
         )}
       </div>
+
+      {selectedFinding && (
+        <FindingDetailModal
+          finding={selectedFinding}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
     </div>
   )
 }
