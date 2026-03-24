@@ -27,24 +27,25 @@ function Navigation({ onLogout }) {
   ]
 
   return (
-    <nav className="sidebar-nav">
+    <nav className="sidebar-nav" aria-label="Main navigation">
       <div className="nav-header">
-        <div className="nav-brand">🛡️ SSSAI</div>
+        <div className="nav-brand"><span aria-hidden="true">🛡️</span> SSSAI</div>
         <div className="nav-subtitle">Security Scanner</div>
       </div>
 
       <div className="nav-new-scan">
-        <Link to="/scans/new" className="new-scan-btn">+ New Scan</Link>
+        <Link to="/scans/new" className="new-scan-btn" aria-label="Create new scan">+ New Scan</Link>
       </div>
 
-      <ul className="nav-menu">
+      <ul className="nav-menu" role="list">
         {navItems.map((item) => (
           <li key={item.label}>
             <Link
               to={item.path}
               className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+              {...(location.pathname === item.path ? { 'aria-current': 'page' } : {})}
             >
-              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-icon" aria-hidden="true">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
             </Link>
           </li>
@@ -52,10 +53,10 @@ function Navigation({ onLogout }) {
       </ul>
 
       <div className="nav-footer">
-        <button onClick={toggleTheme} className="theme-toggle-btn" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+        <button onClick={toggleTheme} className="theme-toggle-btn" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
           {theme === 'dark' ? '\u2600\uFE0F Light Mode' : '\uD83C\uDF19 Dark Mode'}
         </button>
-        <button onClick={onLogout} className="logout-btn">
+        <button onClick={onLogout} className="logout-btn" aria-label="Sign out">
           Sign Out
         </button>
       </div>

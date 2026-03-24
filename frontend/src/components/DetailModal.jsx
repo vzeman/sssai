@@ -1,7 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import './DetailModal.css'
 
 export default function DetailModal({ title, data, onClose }) {
+  const modalRef = useRef(null)
+  useFocusTrap(modalRef, !!data)
+
   useEffect(() => {
     function handleEsc(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handleEsc)
@@ -34,11 +38,11 @@ export default function DetailModal({ title, data, onClose }) {
   const entries = typeof data === 'object' && !Array.isArray(data) ? Object.entries(data) : []
 
   return (
-    <div className="detail-overlay" onClick={onClose}>
-      <div className="detail-modal" onClick={e => e.stopPropagation()}>
+    <div className="detail-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="detail-modal" onClick={e => e.stopPropagation()} ref={modalRef} aria-labelledby="detail-modal-title">
         <div className="detail-header">
-          <h2>{title || 'Details'}</h2>
-          <button className="detail-close" onClick={onClose}>&times;</button>
+          <h2 id="detail-modal-title">{title || 'Details'}</h2>
+          <button className="detail-close" onClick={onClose} aria-label="Close dialog">&times;</button>
         </div>
         <div className="detail-body">
           {entries.length > 0 ? (

@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import './ConfirmDialog.css'
 
 export default function ConfirmDialog({
@@ -21,12 +22,15 @@ export default function ConfirmDialog({
     return () => document.removeEventListener('keydown', handleEsc)
   }, [open, onCancel])
 
+  const dialogRef = useRef(null)
+  useFocusTrap(dialogRef, open)
+
   if (!open) return null
 
   return (
-    <div className="confirm-dialog-overlay" onClick={onCancel}>
-      <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-        <h3 className="confirm-dialog-title">{title}</h3>
+    <div className="confirm-dialog-overlay" onClick={onCancel} role="dialog" aria-modal="true">
+      <div className="confirm-dialog" onClick={e => e.stopPropagation()} ref={dialogRef} aria-labelledby="confirm-dialog-title">
+        <h3 className="confirm-dialog-title" id="confirm-dialog-title">{title}</h3>
         <p className="confirm-dialog-description">{description}</p>
         <div className="confirm-dialog-footer">
           <button

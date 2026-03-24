@@ -14,13 +14,14 @@ function Toast() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="toast-container">
+    <div className="toast-container" aria-live="polite" aria-relevant="additions removals">
       {toasts.map(toast => (
         <div
           key={toast.id}
           className={`toast toast-${toast.type}${toast.removing ? ' removing' : ''}`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
         >
-          <span className="toast-icon">{ICONS[toast.type] || ICONS.info}</span>
+          <span className="toast-icon" aria-hidden="true">{ICONS[toast.type] || ICONS.info}</span>
           <span className="toast-message">{toast.message}</span>
           <button
             className="toast-dismiss"
