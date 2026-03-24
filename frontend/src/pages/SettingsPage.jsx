@@ -149,6 +149,7 @@ function NotificationsSection({ token }) {
   const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -182,7 +183,11 @@ function NotificationsSection({ token }) {
   }
 
   async function deleteChannel(id) {
-    if (!confirm('Delete this notification channel?')) return
+    if (confirmingDelete !== id) {
+      setConfirmingDelete(id)
+      return
+    }
+    setConfirmingDelete(null)
     try {
       const resp = await fetch(`${API_BASE}/api/notifications/${id}`, {
         method: 'DELETE',
@@ -245,12 +250,29 @@ function NotificationsSection({ token }) {
                     >
                       {ch.is_active ? 'Disable' : 'Enable'}
                     </button>
-                    <button
-                      className="settings-btn-sm settings-btn-danger"
-                      onClick={() => deleteChannel(ch.id)}
-                    >
-                      Delete
-                    </button>
+                    {confirmingDelete === ch.id ? (
+                      <>
+                        <button
+                          className="settings-btn-sm settings-btn-danger"
+                          onClick={() => deleteChannel(ch.id)}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          className="settings-btn-sm"
+                          onClick={() => setConfirmingDelete(null)}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="settings-btn-sm settings-btn-danger"
+                        onClick={() => deleteChannel(ch.id)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -271,6 +293,7 @@ function ApiKeysSection({ token }) {
   const [createdKey, setCreatedKey] = useState(null)
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [confirmingRevoke, setConfirmingRevoke] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -325,7 +348,11 @@ function ApiKeysSection({ token }) {
   }
 
   async function revokeKey(id) {
-    if (!confirm('Revoke this API key? This cannot be undone.')) return
+    if (confirmingRevoke !== id) {
+      setConfirmingRevoke(id)
+      return
+    }
+    setConfirmingRevoke(null)
     try {
       const resp = await fetch(`${API_BASE}/api/webhooks/${id}`, {
         method: 'DELETE',
@@ -412,12 +439,29 @@ function ApiKeysSection({ token }) {
                   <td className="settings-muted">{formatDate(wh.created_at)}</td>
                   <td className="settings-muted">{formatDate(wh.last_used_at)}</td>
                   <td>
-                    <button
-                      className="settings-btn-sm settings-btn-danger"
-                      onClick={() => revokeKey(wh.id)}
-                    >
-                      Revoke
-                    </button>
+                    {confirmingRevoke === wh.id ? (
+                      <>
+                        <button
+                          className="settings-btn-sm settings-btn-danger"
+                          onClick={() => revokeKey(wh.id)}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          className="settings-btn-sm"
+                          onClick={() => setConfirmingRevoke(null)}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="settings-btn-sm settings-btn-danger"
+                        onClick={() => revokeKey(wh.id)}
+                      >
+                        Revoke
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
