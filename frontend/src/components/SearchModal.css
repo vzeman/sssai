@@ -1,0 +1,249 @@
+.search-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 9000;
+  padding-top: 15vh;
+  backdrop-filter: blur(4px);
+}
+
+.search-modal {
+  background: #1a1d27;
+  border: 1px solid #2a2d3a;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: searchModalIn 0.15s ease-out;
+}
+
+@keyframes searchModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.search-modal-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #2a2d3a;
+}
+
+.search-modal-icon {
+  flex-shrink: 0;
+  color: #666;
+}
+
+.search-modal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e8eaed;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.search-modal-input::placeholder {
+  color: #555;
+}
+
+.search-modal-kbd {
+  font-size: 11px;
+  color: #555;
+  background: #111420;
+  border: 1px solid #2a2d3a;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+}
+
+.search-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.search-modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: #666;
+  font-size: 14px;
+}
+
+.search-modal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px;
+  color: #555;
+  font-size: 14px;
+  text-align: center;
+}
+
+.search-modal-empty-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #444;
+}
+
+.search-modal-section {
+  padding: 4px 0;
+}
+
+.search-modal-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-modal-section-count {
+  color: #444;
+  font-weight: 400;
+}
+
+.search-modal-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background 0.1s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.search-modal-result:hover,
+.search-modal-result.active {
+  background: #252c3a;
+}
+
+.search-modal-result-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.search-modal-result-icon.finding {
+  background: #3a2a2a;
+  color: #ff6644;
+}
+
+.search-modal-result-icon.scan {
+  background: #2a3a4a;
+  color: #4a9eff;
+}
+
+.search-modal-result-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-modal-result-title {
+  font-size: 14px;
+  color: #e8eaed;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-modal-result-meta {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-modal-result-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.search-modal-result-badge.critical {
+  background: #4a2a2a;
+  color: #ff4444;
+}
+
+.search-modal-result-badge.high {
+  background: #4a3a2a;
+  color: #ff8844;
+}
+
+.search-modal-result-badge.medium {
+  background: #4a4a2a;
+  color: #ffaa44;
+}
+
+.search-modal-result-badge.low {
+  background: #2a4a2a;
+  color: #44ff44;
+}
+
+.search-modal-result-badge.info {
+  background: #2a2a4a;
+  color: #8888ff;
+}
+
+.search-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid #2a2d3a;
+  font-size: 11px;
+  color: #555;
+}
+
+.search-modal-footer-keys {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-modal-footer-key {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-modal-footer-key kbd {
+  background: #111420;
+  border: 1px solid #2a2d3a;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: monospace;
+  font-size: 11px;
+}
