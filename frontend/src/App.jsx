@@ -26,6 +26,7 @@ import ScansPage from './pages/ScansPage'
 import ScanComparisonPage from './pages/ScanComparisonPage'
 import ScanWizard from './components/ScanWizard'
 import Navigation from './components/Navigation'
+import ErrorBoundary from './components/ErrorBoundary'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -113,29 +114,31 @@ function AppLayout({ token, onLogout }) {
     <div className="app-layout">
       <Navigation onLogout={onLogout} />
       <main className="app-main">
-        <Routes>
-          <Route path="/" element={<Dashboard token={token} />} />
-          <Route path="/scans" element={<ScansPage token={token} />} />
-          <Route path="/scans/new" element={<ScanWizard token={token} />} />
-          <Route path="/scans/:scanId" element={<ScanDetailsPage token={token} />} />
-          <Route path="/scans/:scanId/compare/:baselineId" element={<ScanComparisonPage token={token} />} />
-          <Route path="/findings" element={<FindingsPage token={token} />} />
-          <Route path="/reports" element={<ReportsPage token={token} />} />
-          <Route path="/compliance" element={<CompliancePage token={token} />} />
-          <Route path="/remediation" element={<RemediationPage token={token} />} />
-          <Route path="/schedules" element={<SchedulesPage token={token} />} />
-          <Route path="/webhooks" element={<WebhooksPage token={token} />} />
-          <Route path="/campaigns" element={<CampaignsPage token={token} />} />
-          <Route path="/queue" element={<QueuePage token={token} />} />
-          <Route path="/alerts" element={<AlertHistoryPage token={token} />} />
-          <Route path="/assets" element={<AssetsPage token={token} />} />
-          <Route path="/inventory" element={<InventoryPage token={token} />} />
-          <Route path="/posture" element={<PosturePage token={token} />} />
-          <Route path="/audit-logs" element={<AuditLogsPage token={token} />} />
-          <Route path="/settings" element={<SettingsPage token={token} />} />
-          <Route path="/advisor" element={<SecurityAdvisorChat token={token} />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Dashboard token={token} />} />
+            <Route path="/scans" element={<ScansPage token={token} />} />
+            <Route path="/scans/new" element={<ScanWizard token={token} />} />
+            <Route path="/scans/:scanId" element={<ScanDetailsPage token={token} />} />
+            <Route path="/scans/:scanId/compare/:baselineId" element={<ScanComparisonPage token={token} />} />
+            <Route path="/findings" element={<FindingsPage token={token} />} />
+            <Route path="/reports" element={<ReportsPage token={token} />} />
+            <Route path="/compliance" element={<CompliancePage token={token} />} />
+            <Route path="/remediation" element={<RemediationPage token={token} />} />
+            <Route path="/schedules" element={<SchedulesPage token={token} />} />
+            <Route path="/webhooks" element={<WebhooksPage token={token} />} />
+            <Route path="/campaigns" element={<CampaignsPage token={token} />} />
+            <Route path="/queue" element={<QueuePage token={token} />} />
+            <Route path="/alerts" element={<AlertHistoryPage token={token} />} />
+            <Route path="/assets" element={<AssetsPage token={token} />} />
+            <Route path="/inventory" element={<InventoryPage token={token} />} />
+            <Route path="/posture" element={<PosturePage token={token} />} />
+            <Route path="/audit-logs" element={<AuditLogsPage token={token} />} />
+            <Route path="/settings" element={<SettingsPage token={token} />} />
+            <Route path="/advisor" element={<SecurityAdvisorChat token={token} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <SearchModal
         open={searchOpen}
