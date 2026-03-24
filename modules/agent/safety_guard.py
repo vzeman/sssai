@@ -7,6 +7,8 @@ Prevents accidental damage to targets during automated exploitation.
 
 import logging
 import re
+from urllib.parse import unquote
+
 from modules.agent.exploitation_engine import ExploitType
 
 log = logging.getLogger(__name__)
@@ -70,7 +72,7 @@ class SafetyGuard:
     def __init__(self):
         self._sql_patterns = [re.compile(p, re.IGNORECASE) for p in _SQL_DESTRUCTIVE]
         self._os_patterns = [re.compile(p, re.IGNORECASE) for p in _OS_DESTRUCTIVE]
-        self._dos_patterns = [re.compile(p) for p in _DOS_PATTERNS]
+        self._dos_patterns = [re.compile(p, re.IGNORECASE) for p in _DOS_PATTERNS]
         self._net_patterns = [re.compile(p, re.IGNORECASE) for p in _NETWORK_DESTRUCTIVE]
 
     def validate_payload(
@@ -84,6 +86,21 @@ class SafetyGuard:
         if not payload:
             return True, ""
 
+        # Decode URL-encoded and hex-encoded payloads to prevent bypass
+        decoded = unquote(payload)
+        # Also handle double-encoding
+        decoded = unquote(decoded)
+        # Check both original and decoded forms
+        check_payloads = {payload, decoded}
+
+        for p in check_payloads:
+            result = self._check_patterns(p)
+            if result is not None:
+                return result
+        return True, ""
+
+    def _check_patterns(self, payload: str) -> tuple[bool, str] | None:
+        """Check a single payload string against all patterns. Returns (False, reason) if blocked, None if clean."""
         # Check SQL destructive patterns
         for pattern in self._sql_patterns:
             if pattern.search(payload):
@@ -104,4 +121,16 @@ class SafetyGuard:
             if pattern.search(payload):
                 return False, f"Destructive network pattern detected: {pattern.pattern}"
 
-        return True, ""
+        return None
+
+
+# Module-level singleton — avoids re-compiling 25 regexes on every call
+_guard_instance: SafetyGuard | None = None
+
+
+def get_safety_guard() -> SafetyGuard:
+    """Return the module-level SafetyGuard singleton."""
+    global _guard_instance
+    if _guard_instance is None:
+        _guard_instance = SafetyGuard()
+    return _guard_instance
