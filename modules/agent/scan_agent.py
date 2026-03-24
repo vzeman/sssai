@@ -2366,6 +2366,7 @@ def _run_reflector(client, text_output: str, system_prompt: str, tools: list,
 _ATTACK_CHAIN_PATTERNS = [
     ("open redirect", "xss"),
     ("open redirect", "session"),
+    ("open redirect", "cookie"),
     ("xss", "csrf"),
     ("xss", "admin"),
     ("information disclosure", "credentials"),
