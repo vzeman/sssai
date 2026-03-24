@@ -107,3 +107,110 @@ Changes to these paths require additional test coverage, must be reviewed by a h
 - **Commit messages**: Conventional Commits — `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
 - All PRs must pass CI checks before merge
 - Classify every PR by risk tier (Tier 1/2/3) in the PR description
+
+## Autonomous Development Mode (AutoDev)
+
+When running in autonomous loop mode (`/loop 15m /implement`), follow this continuous development cycle. Inspired by Karpathy's autoresearch — but adapted for security software engineering.
+
+### Philosophy
+
+- Work independently. The human may be away — keep working until manually stopped.
+- Prefer small, focused changes over large rewrites.
+- Simplicity wins: if deleting code achieves the same result, that is a victory.
+- Never break what already works. The build is your ground truth metric.
+- Every loop iteration should leave the codebase better than it found it.
+
+### The Loop (every iteration)
+
+```
+SURVEY → PLAN → IMPLEMENT → TEST → REVIEW → DECIDE → LOOP
+```
+
+### 1. Survey Phase (~30s)
+
+Check for work in priority order:
+
+1. `gh issue list --state open --sort priority` — open issues are highest priority
+2. `gh pr list --state open` — check if any PRs need fixes from review comments
+3. `grep -r "TODO\|FIXME\|HACK" modules/ frontend/src/ --include="*.py" --include="*.jsx" --include="*.js"` — code debt
+4. Review recent `git log --oneline -20` for incomplete or broken work
+5. If nothing above yields work, self-generate improvements (see below)
+
+### 2. Plan Phase (~1m)
+
+- Pick ONE task per iteration — do not bundle unrelated changes
+- Read all relevant files before writing any code
+- Create a branch from `main`: `<type>/<short-description>` (e.g., `fix/schedule-field-names`)
+- For issues: reference the issue number in commits and PR
+
+### 3. Implement Phase
+
+- Make minimal, focused changes that address exactly one concern
+- Follow all Code Style Rules from this file
+- Respect the Dependency Rule — never cross architectural boundaries
+- One logical change per commit with a Conventional Commit message
+
+### 4. Test Phase (~1m)
+
+Quality gates that MUST pass before any commit:
+
+```bash
+# Frontend must compile
+cd frontend && npm run build
+
+# Backend Docker images must build
+docker compose build api worker
+
+# If Python tests exist in tests/
+python -m pytest tests/ -x --tb=short 2>/dev/null || true
+```
+
+If any gate fails: fix it (max 2 attempts), then discard the branch and log the failure.
+
+### 5. Review Phase (~30s)
+
+Self-review the diff before committing:
+
+- No secrets, credentials, or .env values in the diff
+- No new security vulnerabilities (SQL injection, XSS, command injection)
+- Changes match the project's code style
+- No unnecessary complexity added
+- No unrelated changes smuggled in
+
+### 6. Decide Phase
+
+- **Tests pass** → commit, push, create PR with issue reference, assign for review
+- **Tests fail after 2 fix attempts** → `git checkout main`, log failure, move to next task
+- **Never** force-push, amend published commits, or merge directly to main
+
+### Self-Generated Improvements
+
+When no issues or TODOs remain, generate work in this priority order:
+
+1. **Security hardening** — input validation gaps, missing auth checks, OWASP compliance
+2. **Error handling** — API routes without proper error responses, unhandled edge cases
+3. **Frontend UX** — missing loading states, error messages, empty states, broken layouts
+4. **Test coverage** — unit tests for critical paths (agent, auth, models, infra)
+5. **Performance** — slow queries, unnecessary re-renders, missing indexes
+6. **Observability** — logging gaps, missing metrics, health check improvements
+7. **Documentation** — API docs, inline comments for complex logic only
+8. **Dependency updates** — patch versions only, never major bumps
+
+For each self-generated improvement: create a GitHub issue first, then implement it. This keeps the work tracked and reviewable.
+
+### Results Tracking
+
+After each loop iteration, append to `docs/autodev-log.md`:
+
+```
+| Date | Branch | Issue/Task | Status | Description |
+|------|--------|------------|--------|-------------|
+```
+
+### Safeguards
+
+- **Critical paths** (`auth.py`, `models.py`, `scan_agent.py`, `docker-compose.yml`, `.env`) — create the PR but flag it `needs-human-review`. Do not self-merge.
+- **Max 1 PR per iteration** — quality over quantity.
+- **Stuck detection** — if the same task fails 3 iterations in a row, skip it, label the issue `blocked`, and move on.
+- **No destructive operations** — never `git reset --hard`, `rm -rf`, `DROP TABLE`, or `docker system prune` autonomously.
+- **Rate limiting** — respect GitHub API limits. If rate-limited, wait until next iteration.
