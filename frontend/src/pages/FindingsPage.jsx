@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import FindingDetailModal from '../components/FindingDetailModal'
 import { LoadingSkeleton } from '../components/LoadingSkeleton'
 import { Pagination } from '../components/Pagination'
+import { useToast } from '../components/ToastContext'
 import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -31,6 +32,7 @@ function StatusBadge({ status }) {
 }
 
 function StatusDropdown({ finding, token, onStatusChange }) {
+  const { showToast } = useToast()
   const [changing, setChanging] = useState(false)
   const [showReason, setShowReason] = useState(false)
   const [pendingStatus, setPendingStatus] = useState('')
@@ -69,7 +71,7 @@ function StatusDropdown({ finding, token, onStatusChange }) {
       }
       onStatusChange(finding.id, status)
     } catch (err) {
-      alert(err.message)
+      showToast(err.message, 'error')
     } finally {
       setChanging(false)
       setReason('')

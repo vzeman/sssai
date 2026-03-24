@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import DetailModal from '../components/DetailModal'
 import './StubPage.css'
+import './AlertHistoryPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -40,46 +41,22 @@ function AlertHistoryPage({ token }) {
         <p>View all security alerts and notifications</p>
       </div>
 
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px' }}>
+      <div className="alert-filter-bar">
         <button
           onClick={() => setFilter('all')}
-          style={{
-            padding: '6px 12px',
-            border: '1px solid #3a3d4a',
-            background: filter === 'all' ? '#2a3d50' : 'transparent',
-            color: filter === 'all' ? '#4a9eff' : '#aaa',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-          }}
+          className={`alert-filter-btn${filter === 'all' ? ' active' : ''}`}
         >
           All
         </button>
         <button
           onClick={() => setFilter('unread')}
-          style={{
-            padding: '6px 12px',
-            border: '1px solid #3a3d4a',
-            background: filter === 'unread' ? '#2a3d50' : 'transparent',
-            color: filter === 'unread' ? '#4a9eff' : '#aaa',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-          }}
+          className={`alert-filter-btn${filter === 'unread' ? ' active' : ''}`}
         >
           Unread
         </button>
         <button
           onClick={() => setFilter('critical')}
-          style={{
-            padding: '6px 12px',
-            border: '1px solid #3a3d4a',
-            background: filter === 'critical' ? '#4a2a2a' : 'transparent',
-            color: filter === 'critical' ? '#ff4444' : '#aaa',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-          }}
+          className={`alert-filter-btn${filter === 'critical' ? ' active-critical' : ''}`}
         >
           Critical
         </button>
@@ -100,43 +77,25 @@ function AlertHistoryPage({ token }) {
           <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div className="alert-list">
           {alerts.map((alert) => (
             <div
               key={alert.id}
               onClick={() => setSelectedAlert(alert)}
-              style={{
-                background: '#1a1d27',
-                border: '1px solid #2a2d3a',
-                borderRadius: '8px',
-                padding: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                cursor: 'pointer',
-              }}
+              className="alert-card"
             >
               <div>
-                <h3 style={{ margin: '0 0 4px', color: '#fff', fontSize: '14px' }}>
+                <h3 className="alert-card-title">
                   {alert.title || 'Alert'}
                 </h3>
-                <p style={{ margin: 0, color: '#888', fontSize: '12px' }}>
+                <p className="alert-card-message">
                   {alert.message || 'No description'}
                 </p>
-                <p style={{ margin: '4px 0 0', color: '#666', fontSize: '11px' }}>
+                <p className="alert-card-time">
                   {new Date(alert.created_at).toLocaleString()}
                 </p>
               </div>
-              <span
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  background: '#4a2a2a',
-                  color: '#ff4444',
-                }}
-              >
+              <span className="alert-severity-badge">
                 {alert.severity || 'info'}
               </span>
             </div>

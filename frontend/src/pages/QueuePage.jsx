@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './StubPage.css'
+import './QueuePage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -59,33 +60,26 @@ function QueuePage({ token }) {
           <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
         </div>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="queue-table">
           <thead>
-            <tr style={{ background: '#111420', borderBottom: '1px solid #2a2d3a' }}>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>Target</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>Status</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>Position</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>ETA</th>
+            <tr>
+              <th>Target</th>
+              <th>Status</th>
+              <th>Position</th>
+              <th>ETA</th>
             </tr>
           </thead>
           <tbody>
             {queue.map((scan, idx) => (
-              <tr key={scan.id} style={{ borderBottom: '1px solid #2a2d3a' }}>
-                <td style={{ padding: '12px 16px', color: '#e8eaed' }}>{scan.target_url || 'N/A'}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    background: scan.status === 'running' ? '#2a3a4a' : '#3a3a2a',
-                    color: scan.status === 'running' ? '#4a9eff' : '#ffaa44'
-                  }}>
+              <tr key={scan.id}>
+                <td>{scan.target_url || 'N/A'}</td>
+                <td>
+                  <span className={`queue-status-badge ${scan.status}`}>
                     {scan.status}
                   </span>
                 </td>
-                <td style={{ padding: '12px 16px', color: '#888' }}>{idx + 1}</td>
-                <td style={{ padding: '12px 16px', color: '#888' }}>~5 min</td>
+                <td className="muted">{idx + 1}</td>
+                <td className="muted">~5 min</td>
               </tr>
             ))}
           </tbody>
