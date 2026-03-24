@@ -1,0 +1,128 @@
+## Commerce Protocol Testing Methodology (UCP & ACP)
+
+This module covers security and compliance validation for the Universal Commerce Protocol (UCP)
+by Google/Shopify and the Agentic Commerce Protocol (ACP) by OpenAI/Stripe — two open standards
+(Jan-Feb 2026) for AI-powered agentic commerce.
+
+### Phase 1: UCP Discovery & Validation
+
+#### 1.1 Manifest Discovery
+- Fetch `https://{target}/.well-known/ucp` via curl:
+  `curl -sS -D /output/ucp-headers.txt https://{target}/.well-known/ucp -o /output/ucp-manifest.json`
+- Validate HTTP response: must return 200 with `Content-Type: application/json`
+- Check CORS headers: `Access-Control-Allow-Origin` must be present (typically `*` for agent access)
+- Check `Cache-Control` headers are present (platforms cache per HTTP directives)
+- Run OPTIONS preflight: `curl -sS -X OPTIONS -H "Origin: https://agent.example" -D- https://{target}/.well-known/ucp`
+
+#### 1.2 Manifest Structure Validation
+- Parse JSON and validate required top-level keys: `ucp.version`, `ucp.services`, `ucp.capabilities`
+- Validate `ucp.version` is in `YYYY-MM-DD` format (current: `2026-01-11`)
+- For each service in `ucp.services`:
+  - Must have `version` (YYYY-MM-DD format)
+  - Must have `spec` URL (HTTPS, reachable)
+  - Must have at least one transport binding (`rest`, `mcp`, `a2a`, or `embedded`)
+  - For REST binding: validate `rest.schema` (OpenAPI JSON URL) and `rest.endpoint` (HTTPS, no trailing slash)
+  - For MCP binding: validate `mcp.schema` (OpenRPC JSON URL) and `mcp.endpoint`
+- For each capability in `ucp.capabilities`:
+  - Validate required fields: `name`, `version`, `spec`, `schema`
+  - Validate `name` follows reverse-domain format: `{reverse-domain}.{service}.{capability}`
+  - Validate namespace authority: `dev.ucp.*` specs must originate from `https://ucp.dev/...`
+  - Validate `schema` URL is reachable and returns valid JSON Schema
+
+#### 1.3 Payment Handler Validation
+- Check `payment.handlers` array exists
+- For each handler: validate `id`, `name`, `version`, `instrument_schemas`
+- Validate tokenization configuration is present and well-formed
+- Verify tokenization URLs use HTTPS
+
+#### 1.4 Signing Keys Validation
+- Check `signing_keys` array exists
+- Validate each key is valid JWK format (required: `kid`, `kty`, `crv`, `use`, `alg`)
+- Verify key algorithm is supported (ES256 with P-256 curve recommended)
+- Check that key ID (`kid`) is unique within the manifest
+
+#### 1.5 Endpoint Accessibility Testing
+- For each REST endpoint declared: send OPTIONS request, verify CORS preflight response
+- Send GET to endpoint base URL, verify HTTPS and valid response
+- If schema URLs are declared, fetch and validate they return valid OpenAPI/OpenRPC JSON
+- Test that endpoints do not expose sensitive error details in 4xx/5xx responses
+
+#### 1.6 UCP Security Assessment
+- Verify ALL URLs use HTTPS (no HTTP) — CRITICAL if violated
+- Check that signing keys use adequate algorithm strength (ES256 minimum)
+- Verify payment handler tokenization URLs are HTTPS
+- Check for overly permissive CORS (is wildcard `*` appropriate?)
+- Validate Content-Security-Policy does not block agent requests
+- Check rate limiting on UCP endpoints (should be agent-friendly but not unlimited)
+- Verify no sensitive data (API keys, tokens) in the manifest
+
+### Phase 2: ACP Discovery & Validation
+
+#### 2.1 ACP Endpoint Discovery
+- ACP does not use a .well-known manifest — discovery is typically via Stripe integration
+- Check for common ACP checkout endpoint patterns:
+  `curl -sS -o /dev/null -w "%{http_code}" https://{target}/checkouts`
+  `curl -sS -o /dev/null -w "%{http_code}" https://{target}/api/checkouts`
+  `curl -sS -o /dev/null -w "%{http_code}" https://{target}/acp/checkouts`
+  `curl -sS -o /dev/null -w "%{http_code}" https://{target}/v1/checkouts`
+- Look for ACP-related headers in existing API responses
+- Check if site uses Stripe (look for `stripe.js`, `pk_live_*`, `pk_test_*` patterns in page source)
+- Check robots.txt and sitemap for checkout API paths
+
+#### 2.2 ACP Endpoint Validation (if discovered)
+ACP has 5 core endpoints — test each for correct behavior:
+- `POST /checkouts` — Create checkout session (should return 401 without auth)
+- `GET /checkouts/:id` — Retrieve checkout state
+- `PUT /checkouts/:id` — Update checkout (items, address, fulfillment)
+- `POST /checkouts/:id/complete` — Process payment (SharedPaymentToken)
+- `POST /checkouts/:id/cancel` — Cancel checkout
+- Also: `POST /delegate_payment` endpoint
+
+Status flow: `not_ready_for_payment` → `ready_for_payment` → `completed` / `canceled`
+
+Test error response format: must include `type`, `code`, `message` fields.
+Verify `Content-Type: application/json` is required.
+Currency must be ISO code (lowercase), amounts in smallest unit (cents).
+Country codes must be ISO 3166-1 alpha-2 format.
+
+#### 2.3 ACP Security Assessment
+- Verify `Authorization: Bearer` is required on all endpoints (should return 401 without it)
+- Check for information leakage in error responses (no stack traces, internal paths)
+- Validate rate limiting exists on checkout creation
+- Check CORS configuration for checkout endpoints
+- Verify no sensitive data in URL parameters (all in request body)
+- Verify HTTPS is enforced on all endpoints — CRITICAL if violated
+- Check that payment provider tokens (SharedPaymentToken / SPT) are not logged or exposed
+
+### Phase 3: Cross-Protocol Analysis
+
+- If both UCP and ACP are implemented, check for consistency in:
+  - Payment method coverage
+  - Product catalog accessibility
+  - Fulfillment option parity
+- Report which protocols are supported and their maturity level
+- Provide readiness score for each protocol (0-100)
+
+### Phase 4: E-Commerce Platform Detection
+
+Check for platform indicators that affect protocol support:
+- Shopify: check for `Shopify` in headers, `cdn.shopify.com` in sources
+- WooCommerce: check for `wp-content/plugins/woocommerce` patterns
+- Magento: check for `Mage.Cookies`, `/static/version` patterns
+- PrestaShop: check for `prestashop` patterns in cookies/headers
+- BigCommerce: check for `bigcommerce.com` in DNS or headers
+- Each platform has different UCP/ACP integration paths — note in findings
+
+### Severity Guidelines
+- Missing `/.well-known/ucp` entirely: INFO (not implemented yet — recommendation)
+- Malformed manifest JSON: HIGH (broken implementation)
+- Missing HTTPS on endpoints: CRITICAL (security violation, CWE-319)
+- Missing CORS headers on UCP manifest: MEDIUM (agents cannot discover)
+- Invalid signing keys: HIGH (webhook verification broken, CWE-327)
+- Missing payment handlers: MEDIUM (incomplete implementation)
+- Expired or invalid schema URLs: MEDIUM (agents cannot negotiate capabilities)
+- Missing authentication on ACP endpoints: CRITICAL (CWE-306)
+- Information leakage in error responses: MEDIUM (CWE-209)
+- Sensitive data in manifest: HIGH (CWE-200)
+- Weak signing algorithm: MEDIUM (CWE-326)
+- Missing rate limiting on checkout endpoints: MEDIUM (CWE-770)

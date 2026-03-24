@@ -32,6 +32,13 @@ _FOCUS_HINTS = {
         "Load the breach_monitoring knowledge module. "
         "Produce a detailed Breach Exposure Summary in your report."
     ),
+    "ecommerce": (
+        "This is an e-commerce/e-shop scan. Prioritize commerce protocol validation "
+        "(UCP at /.well-known/ucp, ACP checkout endpoints), payment security, "
+        "SSL/TLS, PCI-DSS relevant checks, and checkout flow security. "
+        "Load commerce_protocol_testing knowledge module. "
+        "Also test SEO, performance, and accessibility as they impact conversion."
+    ),
 }
 
 

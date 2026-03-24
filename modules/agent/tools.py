@@ -39,6 +39,7 @@ TOOLS = [
             "  Cloud: prowler\n"
             "  Breach Monitoring: holehe, breach-parse\n"
             "  Utility: curl, wget, jq, python3, node\n"
+            "  Commerce Protocol: curl and http_request for UCP manifest (/.well-known/ucp) and ACP endpoint validation\n"
             "  Browser: use browser_test and browser_crawl tools for Playwright-based client-side testing\n"
             "Save output files to /output/ for later reference."
         ),
@@ -694,7 +695,7 @@ TOOLS = [
                 "knowledge_needed": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing', 'browser_testing', 'dom_xss')",
+                    "description": "Knowledge modules to load (e.g., 'chatbot_testing', 'api_testing', 'owasp_testing', 'ssl_tls', 'auth_testing', 'form_testing', 'recon_advanced', 'performance', 'seo', 'compliance', 'cloud', 'graphql_testing', 'grpc_testing', 'browser_testing', 'dom_xss', 'commerce_protocol_testing')",
                 },
             },
             "required": ["reason", "plan_steps"],
@@ -717,7 +718,7 @@ TOOLS = [
                         "chatbot_testing", "api_testing", "owasp_testing", "ssl_tls",
                         "recon_advanced", "performance", "seo", "compliance", "cloud",
                         "form_testing", "auth_testing", "graphql_testing", "grpc_testing",
-                        "browser_testing", "dom_xss",
+                        "browser_testing", "dom_xss", "commerce_protocol_testing",
                     ],
                 },
             },
