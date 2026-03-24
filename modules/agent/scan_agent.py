@@ -3094,6 +3094,26 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     except Exception as exc:
         log.warning("CVSS scoring pass failed: %s", exc)
 
+    # ── Auto-triage findings ──
+    try:
+        from modules.agent.triage import apply_triage
+        apply_triage(report)
+        log.info("Scan %s: auto-triage applied to %d findings", scan_id, len(report.get("findings", [])))
+    except Exception as exc:
+        log.warning("Auto-triage failed for scan %s: %s", scan_id, exc)
+
+    # ── Recommend scan interval ──
+    try:
+        from modules.agent.scheduling import recommend_scan_interval
+        interval_rec = recommend_scan_interval(
+            target=report.get("target", ""),
+            current_report=report,
+        )
+        report["recommended_scan_interval"] = interval_rec
+        log.info("Scan %s: recommended interval = %s", scan_id, interval_rec.get("recommended_scan_interval"))
+    except Exception as exc:
+        log.warning("Scan interval recommendation failed for scan %s: %s", scan_id, exc)
+
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
 
