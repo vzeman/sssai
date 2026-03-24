@@ -71,7 +71,7 @@ INSPECT: View source for suspicious external scripts, obfuscated code.
 - 6.5.6  Bespoke and custom software security addressed
 
 TEST COMMANDS:
-  sqlmap -u "{target}/search?q=1" --batch --level=3 (check for SQLi)
+  sqlmap -u "{target}/search?q=1" --batch --level=3 --technique=BEU --risk=1 (check for SQLi, read-only)
   nuclei -u {target} -t vulnerabilities/ -t cves/ -json -o /output/nuclei_vulns.json
   nuclei -u {target} -t http/technologies/ -json -o /output/nuclei_tech.json
   wapiti -u {target} -f json -o /output/wapiti.json --flush-session

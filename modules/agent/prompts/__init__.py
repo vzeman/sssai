@@ -13,7 +13,7 @@ _DIR = os.path.dirname(__file__)
 _FOCUS_HINTS = {
     "adaptive": "Run a fully adaptive scan. Discover everything and test what you find.",
     "security": "Focus primarily on security vulnerabilities, but still do full discovery.",
-    "pentest": "Focus on exploitable vulnerabilities and attack chains. Be aggressive in testing.",
+    "pentest": "Focus on exploitable vulnerabilities and attack chains. Be thorough in testing but strictly non-destructive — prove vulnerabilities with read-only techniques only.",
     "chatbot": "The user believes there is a chatbot on this target. Prioritize chatbot discovery and testing.",
     "api_security": "The user wants API security testing prioritized. Discover and test all API endpoints.",
     "seo": "Focus primarily on SEO, performance, and accessibility after discovery.",

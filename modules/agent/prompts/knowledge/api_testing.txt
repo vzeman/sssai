@@ -17,7 +17,7 @@
 - Check if unauthenticated requests can access authenticated endpoints
 
 ### Input Validation
-- SQL injection on parameters: `sqlmap -u '{target}/api/users?id=1' --batch --output-dir=/output/sqlmap/`
+- SQL injection on parameters: `sqlmap -u '{target}/api/users?id=1' --batch --technique=BEU --risk=1 --output-dir=/output/sqlmap/`
 - NoSQL injection, command injection
 - `wapiti -u {target} -o /output/wapiti/ -f json`
 

@@ -15,7 +15,7 @@
 - Weak ciphers and deprecated protocols
 
 ### A03: Injection
-- SQL Injection: `sqlmap -u "{target}" --batch --level 3 --risk 2 --output-dir=/output/sqlmap`
+- SQL Injection: `sqlmap -u "{target}" --batch --level 3 --risk 1 --technique=BEU --output-dir=/output/sqlmap`
 - XSS payloads on forms and parameters
 - Command injection: backticks, semicolons, pipes in inputs
 - `wapiti -u {target} -o /output/wapiti/ -f json -m sql,xss,exec,xxe`
