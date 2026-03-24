@@ -126,6 +126,10 @@ When running in autonomous loop mode (`/loop 15m /implement`), follow this conti
 SURVEY → PLAN → IMPLEMENT → TEST → REVIEW → DECIDE → LOOP
 ```
 
+### 0. Stay healthy
+
+Autocompact your context with `/compact` command
+
 ### 1. Survey Phase (~30s)
 
 Check for work in priority order:
@@ -139,6 +143,7 @@ Check for work in priority order:
 ### 2. Plan Phase (~1m)
 
 - Pick ONE task per iteration — do not bundle unrelated changes
+- The goal is to finish all open PRs first, than implement next issues
 - Read all relevant files before writing any code
 - Create a branch from `main`: `<type>/<short-description>` (e.g., `fix/schedule-field-names`)
 - For issues: reference the issue number in commits and PR
