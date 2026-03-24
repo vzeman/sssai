@@ -34,11 +34,11 @@ security-scanner/
 │   ├── notifications/        # Multi-channel alert dispatcher (Slack, Discord, email, webhook)
 │   ├── reports/              # HTML/PDF/JSON report generation (Jinja2 + WeasyPrint)
 │   ├── tools/                # Tool registry — metadata for 80+ scanning tools
-│   ├── sandbox/              # NemoClaw/OpenClaw/OpenShell sandboxed execution
+│   ├── sandbox/              # (deprecated — execution handled by Claude Code internally)
 │   └── config.py             # Central AI model selection and pricing
 ├── frontend/                 # React 19 + Vite SPA (in development)
 ├── docker/                   # Dockerfiles per service (api, worker, scheduler, monitor, heartbeat)
-├── config/                   # NemoClaw/OpenClaw/OpenShell configuration YAML
+├── config/                   # Application configuration files
 ├── scripts/                  # Utility scripts
 ├── templates/                # (reserved)
 ├── output/                   # Scan output files (mounted volume)
@@ -133,7 +133,6 @@ The Monitor service polls active monitors at their configured intervals (default
 | **NVD + Exploit-DB** | CVE/exploit lookup (HTML scraping) | `exploit_search` agent tool |
 | **SMTP** | Email notifications | `modules/notifications/dispatcher.py` |
 | **Slack/Discord webhooks** | Alert notifications | `modules/notifications/dispatcher.py` |
-| **OpenClaw/NemoClaw** | Optional sandboxed agent execution | `modules/sandbox/` |
 
 ## Infrastructure Abstraction
 

@@ -32,7 +32,7 @@ class NotificationDispatcher:
     def __init__(self, channels: list[dict]):
         """
         channels: list of dicts with keys:
-            - type: "email" | "slack" | "discord" | "webhook" | "openclaw"
+            - type: "email" | "slack" | "discord" | "webhook"
             - config: channel-specific configuration
             - min_severity: minimum severity to trigger (default: "info")
         """
@@ -197,31 +197,6 @@ class NotificationDispatcher:
         smtp.send_message(msg)
         smtp.quit()
         log.info("Email notification sent: %s -> %s", notification.title, config["to_email"])
-
-    async def _send_openclaw(self, config: dict, notification: Notification):
-        """Send notification via OpenClaw gateway API for multi-channel distribution."""
-        gateway_url = config.get("gateway_url", "http://localhost:3080")
-        channel = config.get("channel", "default")
-
-        payload = {
-            "channel": channel,
-            "message": {
-                "text": f"**{notification.title}**\n\n{notification.message}",
-                "metadata": {
-                    "severity": notification.severity,
-                    "scan_id": notification.scan_id,
-                    "target": notification.target,
-                    "risk_score": notification.risk_score,
-                    "findings_count": notification.findings_count,
-                    "report_url": notification.report_url,
-                },
-            },
-        }
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(f"{gateway_url}/api/v1/messages", json=payload)
-            resp.raise_for_status()
-            log.info("OpenClaw notification sent: %s -> %s", notification.title, channel)
 
 
 def build_scan_notification(scan_id: str, target: str, report: dict) -> Notification:

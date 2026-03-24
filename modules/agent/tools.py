@@ -387,6 +387,19 @@ TOOLS = [
                         },
                     },
                 },
+                "passed_checks": {
+                    "type": "array",
+                    "description": "Tests that passed without issues — documents what was tested and found secure.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "test_name": {"type": "string", "description": "Name of the test/check performed"},
+                            "description": {"type": "string", "description": "What was tested"},
+                            "result": {"type": "string", "enum": ["pass"], "description": "Always 'pass' for passed checks"},
+                        },
+                        "required": ["test_name", "description", "result"],
+                    },
+                },
                 "scan_metadata": {
                     "type": "object",
                     "properties": {
@@ -400,6 +413,24 @@ TOOLS = [
                 },
             },
             "required": ["summary", "risk_score", "findings"],
+        },
+    },
+    # ── Request logging ──────────────────────────────────────────────────────
+    {
+        "name": "log_request",
+        "description": "Log an HTTP request/response for the audit trail. All requests to the target domain should be logged.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string"},
+                "method": {"type": "string"},
+                "status_code": {"type": "integer"},
+                "request_headers": {"type": "object"},
+                "response_summary": {"type": "string", "description": "Brief summary of the response"},
+                "test_name": {"type": "string", "description": "Name of the test/check being performed"},
+                "result": {"type": "string", "enum": ["pass", "fail", "error", "info"]},
+            },
+            "required": ["url", "method", "test_name", "result"],
         },
     },
     # ── AI-first adaptive tools ──────────────────────────────────────────────

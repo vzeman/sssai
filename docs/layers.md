@@ -26,7 +26,7 @@ The codebase organizes into four implicit layers based on what each package depe
 │  infra/local_queue.py, infra/aws_queue.py,               │
 │  infra/local_storage.py, infra/aws_storage.py,           │
 │  infra/elasticsearch.py, infra/*_secrets.py,             │
-│  sandbox/nemoclaw.py, sandbox/openclaw.py                │
+│  sandbox/ (deprecated)                                   │
 └──────────────────────────────────────────────────────────┘
 ```
 

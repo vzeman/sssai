@@ -155,6 +155,19 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
             body = resp.text[:10000] if len(resp.text) > 10000 else resp.text
             output_parts.extend(["", "--- Body (first 10KB) ---", body])
 
+            # Auto-log HTTP request to the request audit trail
+            if scan_context is not None:
+                request_log = scan_context.setdefault("_request_log", [])
+                request_log.append({
+                    "url": url,
+                    "method": method,
+                    "status_code": resp.status_code,
+                    "response_summary": f"{resp.status_code} {resp.reason_phrase} ({len(resp.text)} bytes)",
+                    "test_name": "http_request",
+                    "result": "info",
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                })
+
             output = "\n".join(output_parts)
             if len(output) > MAX_OUTPUT_LEN:
                 return output[:MAX_OUTPUT_LEN] + "\n... [truncated]"
@@ -280,6 +293,26 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
 
     elif name == "update_attack_surface":
         return _handle_update_attack_surface(input, scan_context)
+
+    elif name == "log_request":
+        try:
+            if scan_context is None:
+                scan_context = {}
+            request_log = scan_context.setdefault("_request_log", [])
+            entry = {
+                "url": input.get("url", ""),
+                "method": input.get("method", "GET"),
+                "status_code": input.get("status_code"),
+                "request_headers": input.get("request_headers"),
+                "response_summary": input.get("response_summary", ""),
+                "test_name": input.get("test_name", ""),
+                "result": input.get("result", "info"),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+            request_log.append(entry)
+            return f"Request logged: {entry['method']} {entry['url']} [{entry['result']}]"
+        except Exception as e:
+            return f"ERROR: {e}"
 
     elif name == "report":
         return "__REPORT__"
@@ -1026,6 +1059,27 @@ def _post_agent_chat(scan_id: str, message: str, msg_type: str = "info"):
         pass
 
 
+def _post_to_advisor_chat(scan_id: str, target: str, message: str, msg_type: str = "info"):
+    """Post an agent message to the global advisor chat for cross-scan visibility."""
+    try:
+        import redis
+        r = redis.from_url(_REDIS_URL)
+        advisor_msg = json.dumps({
+            "role": "agent",
+            "message": message,
+            "type": msg_type,
+            "scan_id": scan_id,
+            "target": target,
+            "timestamp": time.strftime("%H:%M:%S"),
+            "ts": time.time(),
+        })
+        r.rpush("advisor:chat:history", advisor_msg)
+        r.ltrim("advisor:chat:history", -500, -1)
+        r.expire("advisor:chat:history", 86400 * 7)
+    except Exception:
+        pass
+
+
 # ── Loop detection ───────────────────────────────────────────────────────
 
 class LoopDetector:
@@ -1657,6 +1711,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             scan_context["_plan_history"] = resume["plan_history"]
     else:
         _post_agent_chat(scan_id, f"Starting {scan_type} scan of {target}. I'll keep you updated on progress.", "status")
+        _post_to_advisor_chat(scan_id, target, f"Starting {scan_type} scan of {target}.", "scan_start")
         messages = [{"role": "user", "content": f"Begin scanning {target} now."}]
 
     start_time = resume.get("original_start_time", time.time()) if resume else time.time()
@@ -2027,8 +2082,30 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     except Exception as exc:
         log.warning("Scan scheduling recommendation failed for scan %s: %s", scan_id, exc)
 
+    # ── Include request log in report ──
+    if scan_context.get("_request_log"):
+        report["request_log"] = scan_context["_request_log"]
+
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
+
+    # ── Post scan completion to advisor chat ──
+    findings_count = len(report.get("findings", []))
+    risk_score = report.get("risk_score", 0)
+    _post_to_advisor_chat(
+        scan_id, target,
+        f"Scan of {target} complete. Risk score: {risk_score}, {findings_count} findings.",
+        "scan_complete",
+    )
+
+    # ── Post critical findings to advisor chat ──
+    for finding in report.get("findings", []):
+        if finding.get("severity") == "critical":
+            _post_to_advisor_chat(
+                scan_id, target,
+                f"CRITICAL finding: {finding.get('title', 'Unknown')} on {target}",
+                "critical_finding",
+            )
 
     # ── Index findings to Elasticsearch ──
     try:

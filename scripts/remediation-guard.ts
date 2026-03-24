@@ -369,7 +369,7 @@ if (process.argv.includes('--self-test')) {
     'infra/ should be a critical path',
   );
   console.assert(
-    isCriticalPath('modules/sandbox/nemoclaw.py') === true,
+    isCriticalPath('modules/sandbox/__init__.py') === true,
     'sandbox/ should be a critical path',
   );
   console.assert(
@@ -403,9 +403,9 @@ if (process.argv.includes('--self-test')) {
     },
     {
       severity: 'warning',
-      file: 'modules/sandbox/nemoclaw.py',
-      line: 5,
-      message: 'Missing error handling in sandbox execution',
+      file: 'modules/sandbox/__init__.py',
+      line: 1,
+      message: 'Missing error handling in sandbox module',
     },
   ];
 

@@ -360,7 +360,7 @@ POST /api/notifications/
 }
 ```
 
-**Channel types:** `email`, `slack`, `discord`, `webhook`, `openclaw`
+**Channel types:** `email`, `slack`, `discord`, `webhook`
 
 ### Severity Routing
 

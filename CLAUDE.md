@@ -55,7 +55,7 @@ modules/
 ├── monitor/        # Uptime monitoring service
 ├── notifications/  # Alert dispatcher (Slack, Discord, email, webhooks)
 ├── reports/        # Report generation with templates
-├── sandbox/        # Sandboxed execution (NemoClaw, OpenClaw, OpenShell)
+├── sandbox/        # (deprecated — execution handled by Claude Code internally)
 ├── scheduler/      # Cron-based scheduled scan consumer
 ├── tools/          # Tool registry for scanning instruments
 └── worker/         # Redis queue consumer — runs the AI agent
@@ -71,7 +71,6 @@ docker/             # Dockerfiles: api, worker, scheduler, monitor, heartbeat
 - `modules/api/models.py` — Database schema (User, Scan, Monitor, etc.)
 - `modules/agent/scan_agent.py` — Core AI agent loop driving all scans
 - `modules/infra/` — Infrastructure adapters (queue, storage, secrets)
-- `modules/sandbox/` — Sandboxed code execution
 - `docker-compose.yml` — Service orchestration and environment variables
 - `.env` / `.env.example` — Secrets and configuration
 
@@ -83,7 +82,6 @@ Changes to these paths require additional test coverage, must be reviewed by a h
 - Never disable authentication middleware or weaken JWT validation.
 - Validate all external input at API route boundaries (use Pydantic schemas).
 - Use parameterized queries — never interpolate user input into SQL strings.
-- Sandbox configuration (`modules/sandbox/`) must enforce least-privilege execution.
 - Never expose internal service ports (Redis, Postgres, Elasticsearch) to the host beyond what `docker-compose.yml` already defines.
 
 ## Dependency Management

@@ -83,10 +83,7 @@ These are only needed when `RUNTIME=aws`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENCLAW_GATEWAY_URL` | `http://localhost:3080` | OpenClaw gateway URL |
-| `OPENCLAW_API_KEY` | — | OpenClaw API key |
-| `OPENSHELL_ENABLED` | `false` | Enable OpenShell sandboxed execution |
-| `NEMOCLAW_INFERENCE_PROVIDER` | `anthropic` | NemoClaw inference provider |
+| *(none currently)* | | |
 
 ---
 

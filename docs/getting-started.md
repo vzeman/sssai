@@ -228,7 +228,7 @@ curl -X POST http://localhost:8000/api/notifications/ \
   }'
 ```
 
-Supported channels: `slack`, `discord`, `email`, `webhook`, `openclaw`
+Supported channels: `slack`, `discord`, `email`, `webhook`
 
 ### Enable Two-Factor Authentication
 

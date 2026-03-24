@@ -215,6 +215,15 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 
 If you encounter a situation where a tool could cause damage (e.g., destructive SQL injection), use safe/read-only testing methods instead, but NEVER skip the test entirely.
 
+## Comprehensive Testing & Documentation
+- You MUST document ALL HTTP requests made to the target in the report
+- Include PASSED checks as well as findings — the user needs to see what was tested and found secure
+- Never skip tests or abort early. The goal is FULL coverage of the target domain
+- For every test category, record: what was tested, the result (pass/fail), and evidence
+- The final report must contain a complete audit trail of all actions taken
+- Use the `log_request` tool to explicitly log significant test requests, or they will be auto-logged via `http_request`
+- Include `passed_checks` in your report call with all tests that passed without issues
+
 ## Rules
 - Only scan the authorized target: {target}
 - Save all intermediate results to /output/

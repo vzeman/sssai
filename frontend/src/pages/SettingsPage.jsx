@@ -92,8 +92,8 @@ function PasswordSection({ token }) {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (err) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (fetchErr) {
+      setMessage({ type: 'error', text: fetchErr.message })
     } finally {
       setSubmitting(false)
     }
@@ -151,7 +151,7 @@ function NotificationsSection({ token }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    async function fetchChannels() {
+    async function load() {
       try {
         const resp = await fetch(`${API_BASE}/api/notifications`, {
           headers: authHeaders(token),
@@ -164,7 +164,7 @@ function NotificationsSection({ token }) {
         setLoading(false)
       }
     }
-    fetchChannels()
+    load()
   }, [token])
 
   async function toggleChannel(id, currentActive) {
@@ -200,7 +200,6 @@ function NotificationsSection({ token }) {
     slack: 'Slack',
     discord: 'Discord',
     webhook: 'Webhook',
-    openclaw: 'OpenClaw',
     jira: 'Jira',
     linear: 'Linear',
     github_issues: 'GitHub Issues',
@@ -274,20 +273,30 @@ function ApiKeysSection({ token }) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    fetchWebhooks()
-  }, [])
+    async function load() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/webhooks`, {
+          headers: authHeaders(token),
+        })
+        if (!resp.ok) throw new Error('Failed to fetch API keys')
+        setWebhooks(await resp.json())
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [token])
 
-  async function fetchWebhooks() {
+  async function refreshWebhooks() {
     try {
       const resp = await fetch(`${API_BASE}/api/webhooks`, {
         headers: authHeaders(token),
       })
-      if (!resp.ok) throw new Error('Failed to fetch API keys')
-      setWebhooks(await resp.json())
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+      if (resp.ok) setWebhooks(await resp.json())
+    } catch {
+      // silent refresh
     }
   }
 
@@ -307,7 +316,7 @@ function ApiKeysSection({ token }) {
       if (!resp.ok) throw new Error(data.detail || 'Failed to create key')
       setCreatedKey(data.api_key)
       setNewKeyName('')
-      fetchWebhooks()
+      refreshWebhooks()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -470,23 +479,22 @@ function SettingsPage({ token }) {
   const [activeTab, setActiveTab] = useState('profile')
 
   useEffect(() => {
-    fetchUser()
-  }, [])
-
-  async function fetchUser() {
-    try {
-      const resp = await fetch(`${API_BASE}/api/auth/me`, {
-        headers: authHeaders(token),
-      })
-      if (resp.ok) {
-        setUser(await resp.json())
+    async function fetchUser() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: authHeaders(token),
+        })
+        if (resp.ok) {
+          setUser(await resp.json())
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err)
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      console.error('Failed to fetch user:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    fetchUser()
+  }, [token])
 
   const tabs = [
     { id: 'profile', label: 'Profile' },

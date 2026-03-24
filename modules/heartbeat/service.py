@@ -57,6 +57,20 @@ HEARTBEAT_TOOLS = [
             "required": ["scan_id"],
         },
     },
+    {
+        "name": "post_scan_recommendation",
+        "description": "Post a recommendation to the global advisor chat suggesting a scan that needs attention.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target": {"type": "string", "description": "Target to scan"},
+                "scan_type": {"type": "string", "description": "Recommended scan type"},
+                "reason": {"type": "string", "description": "Why this scan is needed"},
+                "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+            },
+            "required": ["target", "scan_type", "reason", "priority"],
+        },
+    },
 ]
 
 
@@ -224,6 +238,90 @@ def _check_stuck_scans(engine, r: redis.Redis) -> dict:
         return {"name": "ScanHealth", "status": "unknown", "error": str(e)}
 
 
+def _check_scan_attention_needed(engine) -> dict:
+    """Review scans that may need AI attention: high-severity findings, coverage gaps, degrading posture."""
+    result = {
+        "name": "ScanAttention",
+        "status": "up",
+        "high_severity_scans": [],
+        "coverage_gaps": [],
+        "degrading_targets": [],
+    }
+    try:
+        with engine.connect() as conn:
+            # 1. Completed scans in the last 24h with critical/high findings needing follow-up
+            rows = conn.execute(text(
+                "SELECT s.id, s.target, s.scan_type, s.risk_score "
+                "FROM scans s "
+                "WHERE s.status = 'completed' "
+                "AND s.completed_at > NOW() - INTERVAL '24 hours' "
+                "AND s.risk_score >= 70 "
+                "ORDER BY s.risk_score DESC "
+                "LIMIT 10"
+            )).fetchall()
+            for row in rows:
+                result["high_severity_scans"].append({
+                    "scan_id": row[0],
+                    "target": row[1],
+                    "scan_type": row[2],
+                    "risk_score": row[3],
+                })
+
+            # 2. Coverage gaps — targets scanned with one type but missing other common types
+            coverage = conn.execute(text(
+                "SELECT DISTINCT target, array_agg(DISTINCT scan_type) AS types "
+                "FROM scans "
+                "WHERE status = 'completed' "
+                "AND created_at > NOW() - INTERVAL '30 days' "
+                "GROUP BY target"
+            )).fetchall()
+            recommended_types = {"security", "ssl", "api", "headers"}
+            for row in coverage:
+                target = row[0]
+                completed_types = set(row[1]) if row[1] else set()
+                missing = recommended_types - completed_types
+                if missing:
+                    result["coverage_gaps"].append({
+                        "target": target,
+                        "completed_types": list(completed_types),
+                        "missing_types": list(missing),
+                    })
+
+            # 3. Degrading posture — targets where risk scores are trending upward
+            trending = conn.execute(text(
+                "SELECT target, "
+                "  AVG(risk_score) FILTER (WHERE completed_at > NOW() - INTERVAL '7 days') AS recent_avg, "
+                "  AVG(risk_score) FILTER (WHERE completed_at BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '7 days') AS older_avg "
+                "FROM scans "
+                "WHERE status = 'completed' AND risk_score IS NOT NULL "
+                "GROUP BY target "
+                "HAVING COUNT(*) FILTER (WHERE completed_at > NOW() - INTERVAL '7 days') >= 1 "
+                "  AND COUNT(*) FILTER (WHERE completed_at BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '7 days') >= 1"
+            )).fetchall()
+            for row in trending:
+                target, recent_avg, older_avg = row[0], row[1], row[2]
+                if recent_avg is not None and older_avg is not None and recent_avg > older_avg + 10:
+                    result["degrading_targets"].append({
+                        "target": target,
+                        "recent_avg_risk": round(float(recent_avg), 1),
+                        "older_avg_risk": round(float(older_avg), 1),
+                        "delta": round(float(recent_avg - older_avg), 1),
+                    })
+
+        needs_attention = (
+            result["high_severity_scans"]
+            or result["coverage_gaps"]
+            or result["degrading_targets"]
+        )
+        result["status"] = "warning" if needs_attention else "up"
+
+    except Exception as e:
+        result["status"] = "unknown"
+        result["error"] = str(e)
+
+    return result
+
+
 def _generate_ai_summary(checks: list[dict]) -> str:
     """Use Claude to generate a concise heartbeat status summary."""
     try:
@@ -322,16 +420,24 @@ class HeartbeatService:
             _check_worker(self.r),
             _check_monitor(self.engine),
             _check_stuck_scans(self.engine, self.r),
+            _check_scan_attention_needed(self.engine),
         ]
 
         statuses = {c["name"]: c["status"] for c in checks}
         log.info("Health: %s", statuses)
 
-        # Check if any scans are stuck — if so, give AI tools to handle them
+        # Check if any scans are stuck or need attention — if so, give AI tools to handle them
         scan_health = next((c for c in checks if c["name"] == "ScanHealth"), {})
         stuck_scans = scan_health.get("stuck_scans", [])
 
-        if stuck_scans:
+        scan_attention = next((c for c in checks if c["name"] == "ScanAttention"), {})
+        needs_attention = (
+            scan_attention.get("high_severity_scans")
+            or scan_attention.get("coverage_gaps")
+            or scan_attention.get("degrading_targets")
+        )
+
+        if stuck_scans or needs_attention:
             summary = self._generate_ai_summary_with_tools(checks)
         else:
             summary = _generate_ai_summary(checks)
@@ -349,12 +455,17 @@ class HeartbeatService:
 
             system = (
                 "You are a platform health monitor for a security scanner. "
-                "Review the health checks and take action on any stuck scans.\n\n"
+                "Review the health checks and take action on any stuck scans or scan attention items.\n\n"
                 "Rules for stuck scans:\n"
                 "- If a scan has been silent for 10+ minutes and already_retried is false: retry it\n"
-                "- If a scan has been silent for 30+ minutes OR already_retried is true: fail it\n"
-                "- After taking actions, provide a brief 2-4 sentence status summary in plain text\n"
-                "- Include what actions you took on stuck scans in your summary"
+                "- If a scan has been silent for 30+ minutes OR already_retried is true: fail it\n\n"
+                "Rules for scan attention (ScanAttention check):\n"
+                "- For high_severity_scans: recommend a follow-up scan using post_scan_recommendation\n"
+                "- For coverage_gaps: recommend the missing scan types using post_scan_recommendation\n"
+                "- For degrading_targets: recommend a comprehensive security scan using post_scan_recommendation with high/critical priority\n"
+                "- Use post_scan_recommendation to post recommendations to the advisor chat\n\n"
+                "After taking actions, provide a brief 2-4 sentence status summary in plain text.\n"
+                "Include what actions you took on stuck scans and recommendations in your summary."
             )
 
             messages = [{"role": "user", "content": f"Module health checks:\n{checks_json}"}]
@@ -400,7 +511,42 @@ class HeartbeatService:
             scan_id = input_data["scan_id"]
             reason = input_data.get("reason", "Marked failed by heartbeat AI — no activity detected")
             return self._fail_scan(scan_id, reason)
+        elif name == "post_scan_recommendation":
+            return self._post_scan_recommendation(input_data)
         return f"Unknown tool: {name}"
+
+    def _post_scan_recommendation(self, input_data: dict) -> str:
+        """Post a scan recommendation to the global advisor chat."""
+        try:
+            target = input_data["target"]
+            scan_type = input_data["scan_type"]
+            reason = input_data["reason"]
+            priority = input_data["priority"]
+
+            msg = json.dumps({
+                "role": "system",
+                "message": (
+                    f"[Scan Recommendation] Target: {target} | Type: {scan_type} | "
+                    f"Priority: {priority}\n{reason}"
+                ),
+                "type": "recommendation",
+                "target": target,
+                "scan_type": scan_type,
+                "priority": priority,
+                "reason": reason,
+                "timestamp": time.strftime("%H:%M:%S"),
+                "ts": time.time(),
+            })
+            self.r.rpush("advisor:chat:history", msg)
+            self.r.ltrim("advisor:chat:history", -500, -1)
+            self.r.expire("advisor:chat:history", 86400 * 7)
+
+            log.info("Posted scan recommendation: %s %s (%s)", target, scan_type, priority)
+            return f"Recommendation posted to advisor chat: {scan_type} scan of {target} ({priority} priority)."
+
+        except Exception as e:
+            log.error("Failed to post scan recommendation: %s", e)
+            return f"Failed to post recommendation: {e}"
 
     def _retry_scan(self, scan_id: str) -> str:
         """Re-queue a stuck scan with checkpoint context if available."""

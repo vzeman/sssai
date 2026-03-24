@@ -133,7 +133,7 @@ class ScheduledScanResponse(BaseModel):
 # ─── Notification Channels ────────────────────────────────────────────
 class NotificationChannelCreate(BaseModel):
     name: str
-    channel_type: str  # email, slack, discord, webhook, openclaw
+    channel_type: str  # email, slack, discord, webhook
     config: dict  # channel-specific: {"webhook_url": "..."}, {"to_email": "..."}, etc.
     min_severity: str = "info"
 
