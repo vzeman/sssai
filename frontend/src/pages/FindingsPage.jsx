@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import DetailModal from '../components/DetailModal'
 import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -269,7 +270,7 @@ function FindingsPage({ token }) {
             </thead>
             <tbody>
               {filteredFindings.map((finding, idx) => (
-                <tr key={idx} className="finding-row">
+                <tr key={idx} className="finding-row" onClick={() => setSelectedFinding(finding)} style={{cursor: 'pointer'}}>
                   <td className="title-cell">
                     <span className="finding-title">{finding.title || 'Unknown'}</span>
                   </td>
@@ -304,11 +305,13 @@ function FindingsPage({ token }) {
         </div>
       )}
 
-      <FindingDetailsModal
-        finding={selectedFinding}
-        onClose={() => setSelectedFinding(null)}
-        onUpdateStatus={handleUpdateStatus}
-      />
+      {selectedFinding && (
+        <DetailModal
+          title={selectedFinding.title}
+          data={selectedFinding}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
     </div>
   )
 }

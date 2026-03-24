@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import DetailModal from '../components/DetailModal'
 import './ScansPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -8,6 +9,7 @@ function ScansPage({ token }) {
   const [scans, setScans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedScan, setSelectedScan] = useState(null)
 
   useEffect(() => {
     fetchScans()
@@ -89,7 +91,7 @@ function ScansPage({ token }) {
               {scans.map(scan => {
                 const risk = getRiskLabel(scan.risk_score)
                 return (
-                  <tr key={scan.id}>
+                  <tr key={scan.id} onClick={() => setSelectedScan(scan)} style={{cursor: 'pointer'}}>
                     <td className="scan-target">{scan.target_url || scan.target || 'Unknown'}</td>
                     <td>{scan.scan_type || scan.type || '-'}</td>
                     <td>
@@ -112,6 +114,14 @@ function ScansPage({ token }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {selectedScan && (
+        <DetailModal
+          title={selectedScan.target_url || selectedScan.target || 'Scan Details'}
+          data={selectedScan}
+          onClose={() => setSelectedScan(null)}
+        />
       )}
     </div>
   )

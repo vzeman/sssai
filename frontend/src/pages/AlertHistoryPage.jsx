@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import DetailModal from '../components/DetailModal'
 import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -8,6 +9,7 @@ function AlertHistoryPage({ token }) {
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [selectedAlert, setSelectedAlert] = useState(null)
 
   useEffect(() => {
     fetchAlerts()
@@ -104,6 +106,7 @@ function AlertHistoryPage({ token }) {
           {alerts.map((alert) => (
             <div
               key={alert.id}
+              onClick={() => setSelectedAlert(alert)}
               style={{
                 background: '#1a1d27',
                 border: '1px solid #2a2d3a',
@@ -112,6 +115,7 @@ function AlertHistoryPage({ token }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                cursor: 'pointer',
               }}
             >
               <div>
@@ -140,6 +144,14 @@ function AlertHistoryPage({ token }) {
             </div>
           ))}
         </div>
+      )}
+
+      {selectedAlert && (
+        <DetailModal
+          title={selectedAlert.title || 'Alert Details'}
+          data={selectedAlert}
+          onClose={() => setSelectedAlert(null)}
+        />
       )}
     </div>
   )
