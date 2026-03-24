@@ -1,0 +1,157 @@
+.sidebar-nav {
+  width: 250px;
+  background: #1a1d27;
+  border-right: 1px solid #2a2d3a;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.nav-header {
+  padding: 20px;
+  border-bottom: 1px solid #2a2d3a;
+}
+
+.nav-brand {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.nav-subtitle {
+  font-size: 12px;
+  color: #888;
+}
+
+.nav-menu {
+  flex: 1;
+  list-style: none;
+  padding: 8px 0;
+  margin: 0;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  color: #aaa;
+  text-decoration: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: #252c3a;
+  color: #fff;
+}
+
+.nav-link.active {
+  background: #3a4050;
+  color: #00d4ff;
+  border-left: 3px solid #00d4ff;
+  padding-left: 13px;
+}
+
+.nav-icon {
+  font-size: 18px;
+  width: 24px;
+}
+
+.nav-label {
+  font-size: 14px;
+}
+
+.nav-new-scan {
+  padding: 12px 16px 4px;
+}
+
+.new-scan-btn {
+  display: block;
+  text-align: center;
+  background: #00d4ff;
+  color: #1a1d27;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.new-scan-btn:hover {
+  background: #00b8e6;
+}
+
+.nav-footer {
+  padding: 16px;
+  border-top: 1px solid #2a2d3a;
+}
+
+.logout-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #3a3d4a;
+  color: #aaa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+@media (max-width: 768px) {
+  .sidebar-nav {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    border-right: none;
+    border-bottom: 1px solid #2a2d3a;
+  }
+
+  .nav-header {
+    padding: 12px 16px;
+    border-bottom: none;
+  }
+
+  .nav-menu {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  .nav-link {
+    padding: 6px 10px;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .nav-label {
+    font-size: 10px;
+  }
+
+  .nav-footer {
+    padding: 12px 16px;
+    border-top: none;
+  }
+
+  .logout-btn {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}

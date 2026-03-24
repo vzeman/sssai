@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import DetailModal from './DetailModal'
 import '../styles/AuditLogViewer.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -10,6 +11,7 @@ export default function AuditLogViewer({ token }) {
   const [error, setError] = useState('')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(25)
+  const [selectedLog, setSelectedLog] = useState(null)
 
   // Filters
   const [filters, setFilters] = useState({
@@ -162,14 +164,14 @@ export default function AuditLogViewer({ token }) {
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id} className={`log-row ${log.status}`}>
+                <tr key={log.id} className={`log-row ${log.status}`} onClick={() => setSelectedLog(log)} style={{ cursor: 'pointer' }}>
                   <td className="timestamp">
                     {new Date(log.created_at).toLocaleString()}
                   </td>
                   <td className="action">{log.action}</td>
                   <td className="resource">
                     <span className="resource-type">{log.resource_type}</span>
-                    <code className="resource-id">{log.resource_id.substring(0, 16)}...</code>
+                    <code className="resource-id">{log.resource_id?.substring(0, 16)}{log.resource_id?.length > 16 ? '...' : ''}</code>
                   </td>
                   <td>
                     <span className={`status-badge ${log.status}`}>
@@ -232,6 +234,24 @@ export default function AuditLogViewer({ token }) {
           <option value="100">100 per page</option>
         </select>
       </div>
+
+      {selectedLog && (
+        <DetailModal
+          title={`${selectedLog.action} — ${selectedLog.resource_type}`}
+          data={{
+            timestamp: new Date(selectedLog.created_at).toLocaleString(),
+            action: selectedLog.action,
+            resource_type: selectedLog.resource_type,
+            resource_id: selectedLog.resource_id,
+            status: selectedLog.status,
+            ip_address: selectedLog.ip_address,
+            ...(selectedLog.error_message && { error_message: selectedLog.error_message }),
+            ...(selectedLog.before_state && { before_state: selectedLog.before_state }),
+            ...(selectedLog.after_state && { after_state: selectedLog.after_state }),
+          }}
+          onClose={() => setSelectedLog(null)}
+        />
+      )}
     </div>
   )
 }
