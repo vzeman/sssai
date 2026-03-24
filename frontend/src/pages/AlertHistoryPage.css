@@ -1,0 +1,74 @@
+.alert-filter-bar {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.alert-filter-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--app-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.alert-filter-btn.active {
+  background: var(--card-hover-bg);
+  color: var(--app-accent);
+}
+
+.alert-filter-btn.active-critical {
+  background: var(--severity-critical-bg, #4a2a2a);
+  color: var(--severity-critical, #ff4444);
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.alert-card:hover {
+  border-color: var(--card-hover-border);
+  background: var(--card-hover-bg);
+}
+
+.alert-card-title {
+  margin: 0 0 4px;
+  color: var(--app-text);
+  font-size: 14px;
+}
+
+.alert-card-message {
+  margin: 0;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.alert-card-time {
+  margin: 4px 0 0;
+  color: var(--app-text-secondary);
+  font-size: 11px;
+}
+
+.alert-severity-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--severity-critical-bg, #4a2a2a);
+  color: var(--severity-critical, #ff4444);
+}

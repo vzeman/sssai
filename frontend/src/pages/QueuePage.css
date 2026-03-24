@@ -1,0 +1,45 @@
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.queue-table thead tr {
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.queue-table th {
+  padding: 12px 16px;
+  text-align: left;
+  color: var(--app-text-muted);
+}
+
+.queue-table tbody tr {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.queue-table td {
+  padding: 12px 16px;
+  color: var(--app-text);
+}
+
+.queue-table td.muted {
+  color: var(--app-text-muted);
+}
+
+.queue-status-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.queue-status-badge.running {
+  background: var(--card-hover-bg, #2a3a4a);
+  color: var(--app-accent, #4a9eff);
+}
+
+.queue-status-badge.queued {
+  background: var(--severity-medium-bg, #3a3a2a);
+  color: var(--severity-medium, #ffaa44);
+}
