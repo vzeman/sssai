@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { SecurityAdvisorChat } from './components/SecurityAdvisorChat'
 import { ToastProvider } from './components/ToastContext'
+import ThemeProvider from './contexts/ThemeContext'
 import Toast from './components/Toast'
 import Dashboard from './pages/Dashboard'
 import FindingsPage from './pages/FindingsPage'
@@ -193,19 +194,21 @@ function App() {
   }, [token])
 
   return (
-    <ToastProvider>
-      <Router>
-        {!token ? (
-          <Routes>
-            <Route path="/login" element={<LoginForm onLogin={handleLogin} />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        ) : (
-          <AppLayout token={token} onLogout={handleLogout} />
-        )}
-      </Router>
-      <Toast />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <Router>
+          {!token ? (
+            <Routes>
+              <Route path="/login" element={<LoginForm onLogin={handleLogin} />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          ) : (
+            <AppLayout token={token} onLogout={handleLogout} />
+          )}
+        </Router>
+        <Toast />
+      </ToastProvider>
+    </ThemeProvider>
   )
 }
 

@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useTheme } from '../contexts/useTheme'
 import './Navigation.css'
 
 function Navigation({ onLogout }) {
   const location = useLocation()
+  const { theme, toggleTheme } = useTheme()
 
   const navItems = [
     { label: 'Dashboard', path: '/', icon: '📊' },
@@ -50,6 +52,9 @@ function Navigation({ onLogout }) {
       </ul>
 
       <div className="nav-footer">
+        <button onClick={toggleTheme} className="theme-toggle-btn" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+          {theme === 'dark' ? '\u2600\uFE0F Light Mode' : '\uD83C\uDF19 Dark Mode'}
+        </button>
         <button onClick={onLogout} className="logout-btn">
           Sign Out
         </button>
