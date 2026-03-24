@@ -33,7 +33,19 @@ function ReportsPage({ token }) {
 
   async function generateExecutiveBrief() {
     try {
-      alert('Generating executive brief... This feature is coming soon!')
+      const completedScan = scans.find(s => s.status === 'completed') || scans[0]
+      if (!completedScan) {
+        alert('No scans available to generate a brief from.')
+        return
+      }
+      const scanId = completedScan.id
+      const resp = await fetch(`${API_BASE}/api/reports/${scanId}/executive-brief/html/token`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) throw new Error('Failed to generate executive brief token')
+      const data = await resp.json()
+      const reportToken = data.token
+      window.open(`${API_BASE}/api/reports/${scanId}/executive-brief/html?rt=${reportToken}`, '_blank')
     } catch (err) {
       alert(`Error: ${err.message}`)
     }

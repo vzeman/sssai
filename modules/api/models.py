@@ -118,6 +118,7 @@ class ScheduledScan(Base):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     run_count: Mapped[int] = mapped_column(Integer, default=0)
     max_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = unlimited
+    timezone: Mapped[str | None] = mapped_column(String, nullable=True, default="UTC")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="scheduled_scans")

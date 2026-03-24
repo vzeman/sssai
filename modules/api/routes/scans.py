@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
 from modules.api.models import Scan, User
-from modules.api.schemas import ScanCreate, ScanResponse
+from modules.api.schemas import ScanCreate, ScanResponse, VerificationCreate
 from modules.api.auth import get_current_user
 from modules.infra import get_queue, get_storage
 
@@ -221,6 +221,62 @@ def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session
         "status": "queued",
         "target": new_scan.target,
     }
+
+
+@router.post("/{scan_id}/verify", response_model=ScanResponse)
+def verify_scan(scan_id: str, body: VerificationCreate | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create a targeted verification re-scan from a completed scan.
+
+    Pulls the original scan's target and findings, then queues a new
+    'verification' scan that only tests those specific issues.
+    """
+    original = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    if original.status != "completed":
+        raise HTTPException(status_code=400, detail="Only completed scans can be verified")
+
+    storage = get_storage()
+    report = storage.get_json(f"scans/{scan_id}/report.json")
+    if not report:
+        raise HTTPException(status_code=404, detail="Original scan has no report")
+
+    findings = report.get("findings", [])
+    if not findings:
+        raise HTTPException(status_code=400, detail="Original scan has no findings to verify")
+
+    body = body or VerificationCreate()
+
+    # Optionally filter to a subset of findings
+    if body.finding_ids:
+        findings = [f for f in findings if f.get("id") in body.finding_ids]
+        if not findings:
+            raise HTTPException(status_code=400, detail="None of the specified finding_ids matched")
+
+    verification_config = {
+        **(body.config or {}),
+        "verification_of": scan_id,
+        "original_findings": findings,
+        "original_created_at": original.created_at.isoformat() if original.created_at else None,
+    }
+
+    scan = Scan(
+        user_id=user.id,
+        target=original.target,
+        scan_type="verification",
+        config=verification_config,
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    get_queue().send("scan-jobs", {
+        "scan_id": scan.id,
+        "target": scan.target,
+        "scan_type": scan.scan_type,
+        "config": scan.config or {},
+    })
+    return scan
 
 
 @router.post("/{scan_id}/stop")

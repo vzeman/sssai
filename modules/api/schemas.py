@@ -103,6 +103,7 @@ class ScheduledScanCreate(BaseModel):
     cron_expression: str = "daily"  # "hourly", "daily", "weekly", "12h", "30m", etc.
     config: dict | None = None
     max_runs: int | None = None
+    timezone: str | None = "UTC"
 
 
 class ScheduledScanUpdate(BaseModel):
@@ -110,6 +111,7 @@ class ScheduledScanUpdate(BaseModel):
     cron_expression: str | None = None
     config: dict | None = None
     max_runs: int | None = None
+    timezone: str | None = None
 
 
 class ScheduledScanResponse(BaseModel):
@@ -122,6 +124,7 @@ class ScheduledScanResponse(BaseModel):
     last_run_at: datetime | None = None
     run_count: int = 0
     max_runs: int | None = None
+    timezone: str | None = "UTC"
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -184,6 +187,12 @@ class CampaignResponse(BaseModel):
     scans: list[CampaignScanSummary] = []
 
     model_config = {"from_attributes": True}
+
+
+# ─── Verification ─────────────────────────────────────────────────────
+class VerificationCreate(BaseModel):
+    config: dict | None = None
+    finding_ids: list[str] | None = None  # optional subset of findings to verify
 
 
 # ─── Reports ──────────────────────────────────────────────────────────

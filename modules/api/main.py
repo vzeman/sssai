@@ -7,7 +7,10 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from modules.api.database import engine, Base
-from modules.api.routes import scans, auth, monitors, schedules, notifications, reports, tools, search, campaigns, posture, webhooks
+from modules.api.routes import (
+    scans, auth, monitors, schedules, notifications, reports, tools, search,
+    campaigns, posture, webhooks, audit, dashboard, rate_limits, wizard, assets, inventory,
+)
 from modules.infra import get_queue
 
 Base.metadata.create_all(bind=engine)
@@ -107,6 +110,12 @@ app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(campaigns.router, prefix="/api/campaigns", tags=["campaigns"])
 app.include_router(posture.router, prefix="/api/posture", tags=["posture"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(rate_limits.router, prefix="/api/rate-limits", tags=["rate-limits"])
+app.include_router(wizard.router, prefix="/api/wizard", tags=["wizard"])
+app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 
 
 @app.get("/health")
