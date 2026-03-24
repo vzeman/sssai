@@ -7,6 +7,124 @@ import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
+const FINDING_STATUSES = [
+  { value: 'new', label: 'New', color: '#4a9eff', bg: '#2a3a4a' },
+  { value: 'confirmed', label: 'Confirmed', color: '#ff8844', bg: '#4a3a2a' },
+  { value: 'in_progress', label: 'In Progress', color: '#ffcc44', bg: '#4a4a2a' },
+  { value: 'resolved', label: 'Resolved', color: '#44ff44', bg: '#2a4a2a' },
+  { value: 'false_positive', label: 'False Positive', color: '#999', bg: '#2a2d3a' },
+  { value: 'accepted_risk', label: 'Accepted Risk', color: '#bb77ff', bg: '#3a2a4a' },
+]
+
+const STATUS_MAP = Object.fromEntries(FINDING_STATUSES.map(s => [s.value, s]))
+
+function StatusBadge({ status }) {
+  const info = STATUS_MAP[status] || STATUS_MAP['new']
+  return (
+    <span
+      className="finding-status-badge"
+      style={{ background: info.bg, color: info.color }}
+    >
+      {info.label}
+    </span>
+  )
+}
+
+function StatusDropdown({ finding, token, onStatusChange }) {
+  const [changing, setChanging] = useState(false)
+  const [showReason, setShowReason] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState('')
+  const [reason, setReason] = useState('')
+
+  async function handleChange(e) {
+    const newStatus = e.target.value
+    const currentStatus = finding.finding_status || 'new'
+    if (newStatus === currentStatus) return
+
+    // For false_positive and accepted_risk, ask for a reason
+    if (newStatus === 'false_positive' || newStatus === 'accepted_risk') {
+      setPendingStatus(newStatus)
+      setShowReason(true)
+      return
+    }
+
+    await submitStatusChange(newStatus, '')
+  }
+
+  async function submitStatusChange(status, changeReason) {
+    setChanging(true)
+    setShowReason(false)
+    try {
+      const resp = await fetch(`${API_BASE}/api/findings/${finding.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, reason: changeReason }),
+      })
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}))
+        throw new Error(err.detail || 'Failed to update status')
+      }
+      onStatusChange(finding.id, status)
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setChanging(false)
+      setReason('')
+      setPendingStatus('')
+    }
+  }
+
+  function handleReasonSubmit(e) {
+    e.preventDefault()
+    submitStatusChange(pendingStatus, reason)
+  }
+
+  function handleReasonCancel() {
+    setShowReason(false)
+    setPendingStatus('')
+    setReason('')
+  }
+
+  const currentStatus = finding.finding_status || 'new'
+
+  return (
+    <div className="status-dropdown-wrapper">
+      <select
+        className="status-select"
+        value={currentStatus}
+        onChange={handleChange}
+        disabled={changing}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {FINDING_STATUSES.map(s => (
+          <option key={s.value} value={s.value}>{s.label}</option>
+        ))}
+      </select>
+      {showReason && (
+        <div className="reason-popover" onClick={(e) => e.stopPropagation()}>
+          <form onSubmit={handleReasonSubmit}>
+            <label>Reason for marking as {STATUS_MAP[pendingStatus]?.label}:</label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Explain why this is a false positive or accepted risk..."
+              rows={3}
+              autoFocus
+            />
+            <div className="reason-actions">
+              <button type="button" className="btn btn-secondary" onClick={handleReasonCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Confirm</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FindingsPage({ token }) {
   const [findings, setFindings] = useState([])
   const [filteredFindings, setFilteredFindings] = useState([])
@@ -15,6 +133,7 @@ function FindingsPage({ token }) {
   const [selectedFinding, setSelectedFinding] = useState(null)
   const [successMessage, setSuccessMessage] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [hideFalsePositives, setHideFalsePositives] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
@@ -34,7 +153,7 @@ function FindingsPage({ token }) {
   useEffect(() => {
     applyFilters()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findings, filters])
+  }, [findings, filters, hideFalsePositives])
 
   useEffect(() => {
     if (successMessage) {
@@ -64,9 +183,10 @@ function FindingsPage({ token }) {
   function applyFilters() {
     let filtered = findings.filter(f => {
       if (filters.severity !== 'all' && f.severity !== filters.severity) return false
-      if (filters.status !== 'all' && f.status !== filters.status) return false
+      if (filters.status !== 'all' && f.finding_status !== filters.status) return false
       const cvss = parseFloat(f.cvss_score) || 0
       if (cvss < filters.cvssMin || cvss > filters.cvssMax) return false
+      if (hideFalsePositives && f.finding_status === 'false_positive') return false
       return true
     })
     setFilteredFindings(filtered)
@@ -76,6 +196,13 @@ function FindingsPage({ token }) {
     const { name, value } = e.target
     setFilters(prev => ({ ...prev, [name]: value }))
     setCurrentPage(1)
+  }
+
+  function handleStatusChange(findingId, newStatus) {
+    setFindings(prev =>
+      prev.map(f => f.id === findingId ? { ...f, finding_status: newStatus } : f)
+    )
+    setSuccessMessage(`Finding status updated to "${newStatus}"`)
   }
 
   async function handleExportCSV() {
@@ -125,15 +252,28 @@ function FindingsPage({ token }) {
           <h1>Findings</h1>
           <p>Security findings and vulnerabilities across all scans</p>
         </div>
-        {findings.length > 0 && (
-          <button
-            className="btn-export"
-            onClick={handleExportCSV}
-            disabled={exporting}
-          >
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </button>
-        )}
+        <div className="header-actions">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={hideFalsePositives}
+              onChange={(e) => {
+                setHideFalsePositives(e.target.checked)
+                setCurrentPage(1)
+              }}
+            />
+            <span className="toggle-text">Hide False Positives</span>
+          </label>
+          {findings.length > 0 && (
+            <button
+              className="btn-export"
+              onClick={handleExportCSV}
+              disabled={exporting}
+            >
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -185,15 +325,16 @@ function FindingsPage({ token }) {
           <label>Status</label>
           <select name="status" value={filters.status} onChange={handleFilterChange}>
             <option value="all">All Statuses</option>
-            <option value="open">Open</option>
-            <option value="resolved">Resolved</option>
-            <option value="false-positive">False Positive</option>
+            {FINDING_STATUSES.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
           </select>
         </div>
       </div>
 
       <div className="findings-summary">
         Found {filteredFindings.length} finding{filteredFindings.length !== 1 ? 's' : ''}
+        {hideFalsePositives && ' (false positives hidden)'}
       </div>
 
       {findings.length === 0 ? (
@@ -238,7 +379,7 @@ function FindingsPage({ token }) {
             </thead>
             <tbody>
               {paginatedFindings.map((finding, idx) => (
-                <tr key={idx} className="finding-row" onClick={() => setSelectedFinding(finding)} style={{cursor: 'pointer'}}>
+                <tr key={finding.id || idx} className="finding-row" onClick={() => setSelectedFinding(finding)} style={{cursor: 'pointer'}}>
                   <td className="title-cell">
                     <span className="finding-title">{finding.title || 'Unknown'}</span>
                   </td>
@@ -252,16 +393,18 @@ function FindingsPage({ token }) {
                       {finding.cvss_score || 'N/A'}
                     </span>
                   </td>
-                  <td>
-                    <span className={`status-badge ${finding.status || 'open'}`}>
-                      {finding.status || 'open'}
-                    </span>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <StatusDropdown
+                      finding={finding}
+                      token={token}
+                      onStatusChange={handleStatusChange}
+                    />
                   </td>
                   <td className="scan-ref">{finding.scan_id?.substring(0, 8) || 'N/A'}</td>
                   <td>
                     <button
                       className="action-btn"
-                      onClick={() => setSelectedFinding(finding)}
+                      onClick={(e) => { e.stopPropagation(); setSelectedFinding(finding); }}
                     >
                       View
                     </button>
