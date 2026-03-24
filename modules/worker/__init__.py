@@ -144,17 +144,25 @@ def _recover_orphaned_scans():
             )).fetchall()
 
         if not rows:
+            log.info("No orphaned scans found in 'running' status")
             return
 
         log.info("Found %d orphaned scan(s) in 'running' status", len(rows))
 
+        recovered_count = 0
+        failed_count = 0
         for row in rows:
             scan_id, target, scan_type, config = row[0], row[1], row[2], row[3]
             config = config or {}
 
             checkpoint = load_checkpoint(scan_id)
             if checkpoint:
-                log.info("Recovering scan %s from checkpoint (iteration %d)", scan_id, checkpoint.get("iteration", 0))
+                checkpoint_iteration = checkpoint.get("iteration", 0)
+                checkpoint_tools = checkpoint.get("tools_run", [])
+                log.info(
+                    "Recovering scan %s from checkpoint: iteration=%d, tools_run=%d, scan_type=%s, target=%s",
+                    scan_id, checkpoint_iteration, len(checkpoint_tools), scan_type, target,
+                )
                 resume_config = {**config, "resume_context": build_resume_context(checkpoint)}
                 _update_scan_status(scan_id, "queued")
                 queue.send(QUEUE_NAME, {
@@ -163,14 +171,24 @@ def _recover_orphaned_scans():
                     "scan_type": scan_type,
                     "config": resume_config,
                 })
+                recovered_count += 1
             else:
-                log.warning("No checkpoint for orphaned scan %s — marking failed", scan_id)
+                log.warning(
+                    "No checkpoint for orphaned scan %s (target=%s, scan_type=%s) — marking failed",
+                    scan_id, target, scan_type,
+                )
                 _update_scan_status(scan_id, "failed")
                 from modules.infra import get_storage
                 get_storage().put_json(f"scans/{scan_id}/error.json", {
                     "error": "Worker restarted with no checkpoint available. Scan could not be recovered.",
                     "scan_id": scan_id,
                 })
+                failed_count += 1
+
+        log.info(
+            "Orphaned scan recovery complete: %d recovered, %d failed out of %d total",
+            recovered_count, failed_count, len(rows),
+        )
     except Exception as e:
         log.error("Orphaned scan recovery failed: %s", e)
 

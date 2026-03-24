@@ -53,7 +53,7 @@ def search(index: str, query: dict, size: int = 50, sort: list | None = None,
             body["aggs"] = aggs
         return es.search(index=index, body=body)
     except Exception as e:
-        log.warning("ES search failed (%s): %s", index, e)
+        log.warning("ES search failed on index=%s query=%s size=%d: %s", index, query, size, e)
         return {"hits": {"hits": [], "total": {"value": 0}}, "aggregations": {}}
 
 
