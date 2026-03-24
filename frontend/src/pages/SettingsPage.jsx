@@ -154,11 +154,12 @@ function NotificationsSection({ token }) {
   useEffect(() => {
     async function load() {
       try {
-        const resp = await fetch(`${API_BASE}/api/notifications`, {
+        const resp = await fetch(`${API_BASE}/api/notifications?limit=500`, {
           headers: authHeaders(token),
         })
         if (!resp.ok) throw new Error('Failed to fetch channels')
-        setChannels(await resp.json())
+        const data = await resp.json()
+        setChannels(Array.isArray(data) ? data : (data.items || []))
       } catch (err) {
         setError(err.message)
       } finally {

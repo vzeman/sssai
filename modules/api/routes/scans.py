@@ -4,7 +4,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
@@ -25,6 +25,18 @@ _STUCK_TIMEOUT = int(os.environ.get("STUCK_SCAN_TIMEOUT_SECONDS", "600"))
 router = APIRouter()
 
 
+def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
+    """Build a paginated response dict."""
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_next": skip + limit < total,
+        "has_prev": skip > 0,
+    }
+
+
 @router.post("/", response_model=ScanResponse)
 def create_scan(body: ScanCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     scan = Scan(user_id=user.id, target=body.target, scan_type=body.scan_type, config=body.config)
@@ -41,9 +53,17 @@ def create_scan(body: ScanCreate, user: User = Depends(get_current_user), db: Se
     return scan
 
 
-@router.get("/", response_model=list[ScanResponse])
-def list_scans(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(Scan).filter(Scan.user_id == user.id).order_by(Scan.created_at.desc()).all()
+@router.get("/")
+def list_scans(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Scan).filter(Scan.user_id == user.id).order_by(Scan.created_at.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return _paginated_response(items, total, skip, limit)
 
 
 @router.get("/health/stuck")
@@ -337,7 +357,7 @@ def _fetch_findings(scan_id: str) -> list[dict]:
     result = es_search(
         _FINDINGS_INDEX,
         {"bool": {"filter": [{"term": {"scan_id": scan_id}}]}},
-        size=10000,
+        size=1000,
     )
     return [hit["_source"] for hit in result.get("hits", {}).get("hits", [])]
 

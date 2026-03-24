@@ -1,6 +1,6 @@
 """API routes for notification channel management."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
@@ -9,6 +9,18 @@ from modules.api.schemas import NotificationChannelCreate, NotificationChannelUp
 from modules.api.auth import get_current_user
 
 router = APIRouter()
+
+
+def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
+    """Build a paginated response dict."""
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_next": skip + limit < total,
+        "has_prev": skip > 0,
+    }
 
 
 @router.post("/", response_model=NotificationChannelResponse)
@@ -30,9 +42,17 @@ def create_channel(body: NotificationChannelCreate, user: User = Depends(get_cur
     return channel
 
 
-@router.get("/", response_model=list[NotificationChannelResponse])
-def list_channels(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(NotificationChannel).filter(NotificationChannel.user_id == user.id).all()
+@router.get("/")
+def list_channels(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(NotificationChannel).filter(NotificationChannel.user_id == user.id)
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return _paginated_response(items, total, skip, limit)
 
 
 @router.get("/{channel_id}", response_model=NotificationChannelResponse)

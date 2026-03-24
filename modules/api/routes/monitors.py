@@ -15,6 +15,18 @@ from modules.api.auth import get_current_user
 router = APIRouter()
 
 
+def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
+    """Build a paginated response dict."""
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_next": skip + limit < total,
+        "has_prev": skip > 0,
+    }
+
+
 @router.post("/", response_model=MonitorResponse)
 def create_monitor(body: MonitorCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
@@ -45,34 +57,55 @@ def create_monitor(body: MonitorCreate, user: User = Depends(get_current_user), 
         raise HTTPException(status_code=400, detail=f"Failed to create monitor: {str(e)}")
 
 
-@router.get("/", response_model=list[MonitorResponse])
-def list_monitors(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc()).all()
+@router.get("/")
+def list_monitors(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return _paginated_response(items, total, skip, limit)
 
 
 @router.get("/enriched")
 def list_monitors_enriched(
     hours: int = Query(24, ge=1, le=720),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """List monitors with per-monitor stats and recent response times for sparklines."""
-    monitors = db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc()).all()
+    query = db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc())
+    total = query.count()
+    monitors = query.offset(skip).limit(limit).all()
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    # Batch-load all checks for the paginated monitors to avoid N+1
+    monitor_ids = [m.id for m in monitors]
+    all_checks = (
+        db.query(MonitorCheck)
+        .filter(MonitorCheck.monitor_id.in_(monitor_ids), MonitorCheck.checked_at >= since)
+        .order_by(MonitorCheck.checked_at.asc())
+        .all()
+    )
+
+    checks_by_monitor: dict[str, list] = {}
+    for c in all_checks:
+        checks_by_monitor.setdefault(c.monitor_id, []).append(c)
+
     result = []
     for m in monitors:
-        checks = (
-            db.query(MonitorCheck)
-            .filter(MonitorCheck.monitor_id == m.id, MonitorCheck.checked_at >= since)
-            .order_by(MonitorCheck.checked_at.asc())
-            .all()
-        )
-        total = len(checks)
+        checks = checks_by_monitor.get(m.id, [])
+        check_total = len(checks)
         ok = sum(1 for c in checks if c.status == "up")
         failed = sum(1 for c in checks if c.status == "down")
         degraded = sum(1 for c in checks if c.status == "degraded")
-        uptime_pct = round(ok / total * 100, 1) if total > 0 else None
-        avg_ms = round(sum(c.response_ms for c in checks if c.response_ms > 0) / max(1, sum(1 for c in checks if c.response_ms > 0))) if total > 0 else None
+        uptime_pct = round(ok / check_total * 100, 1) if check_total > 0 else None
+        avg_ms = round(sum(c.response_ms for c in checks if c.response_ms > 0) / max(1, sum(1 for c in checks if c.response_ms > 0))) if check_total > 0 else None
 
         # Sparkline data: last 50 response times
         spark = []
@@ -92,7 +125,7 @@ def list_monitors_enriched(
             "last_status": m.last_status,
             "last_response_ms": m.last_response_ms,
             "last_checked_at": str(m.last_checked_at) if m.last_checked_at else None,
-            "total_checks": total,
+            "total_checks": check_total,
             "ok_checks": ok,
             "failed_checks": failed,
             "degraded_checks": degraded,
@@ -100,7 +133,7 @@ def list_monitors_enriched(
             "avg_ms": avg_ms,
             "sparkline": spark,
         })
-    return result
+    return _paginated_response(result, total, skip, limit)
 
 
 @router.get("/summary")

@@ -9,6 +9,7 @@ const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function ScansPage({ token }) {
   const [scans, setScans] = useState([])
+  const [totalScans, setTotalScans] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedScan, setSelectedScan] = useState(null)
@@ -16,28 +17,33 @@ function ScansPage({ token }) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
-  useEffect(() => {
-    fetchScans()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function fetchScans() {
+  async function fetchScans(page, size) {
     try {
       setLoading(true)
-      const resp = await fetch(`${API_BASE}/api/scans`, {
+      const skip = (page - 1) * size
+      const resp = await fetch(`${API_BASE}/api/scans?skip=${skip}&limit=${size}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data)
+      const items = Array.isArray(data) ? data : (data.items || [])
+      const total = Array.isArray(data) ? data.length : (data.total || 0)
+      setScans(items)
+      setTotalScans(total)
       setError('')
     } catch (err) {
       setError(err.message)
       setScans([])
+      setTotalScans(0)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchScans(currentPage, pageSize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, pageSize])
 
   function getStatusClass(status) {
     const map = {
@@ -82,7 +88,6 @@ function ScansPage({ token }) {
     return { text: `${score} Low`, cls: 'risk-low' }
   }
 
-  const paginatedScans = scans.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   if (loading) {
     return (
@@ -135,11 +140,10 @@ function ScansPage({ token }) {
               </tr>
             </thead>
             <tbody>
-              {paginatedScans.map((scan, idx) => {
+              {scans.map((scan, idx) => {
                 const risk = getRiskLabel(scan.risk_score)
-                // Find the previous completed scan for the same target
-                const globalIdx = (currentPage - 1) * pageSize + idx
-                const previousScan = scans.slice(globalIdx + 1).find(
+                // Find a previous completed scan for the same target within current page data
+                const previousScan = scans.slice(idx + 1).find(
                   s => s.status === 'completed' && (s.target || s.target_url) === (scan.target || scan.target_url)
                 )
                 return (
@@ -174,7 +178,7 @@ function ScansPage({ token }) {
             </tbody>
           </table>
           <Pagination
-            totalItems={scans.length}
+            totalItems={totalScans}
             currentPage={currentPage}
             pageSize={pageSize}
             onPageChange={setCurrentPage}

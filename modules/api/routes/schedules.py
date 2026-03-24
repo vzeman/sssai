@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
@@ -16,6 +16,18 @@ router = APIRouter()
 import re
 
 _INTERVAL_RE = re.compile(r"^(\d{1,4})([hmd])$")
+
+
+def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
+    """Build a paginated response dict."""
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "has_next": skip + limit < total,
+        "has_prev": skip > 0,
+    }
 
 
 def calc_first_run(cron_expression: str) -> datetime:
@@ -61,9 +73,17 @@ def create_schedule(body: ScheduledScanCreate, user: User = Depends(get_current_
     return schedule
 
 
-@router.get("/", response_model=list[ScheduledScanResponse])
-def list_schedules(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(ScheduledScan).filter(ScheduledScan.user_id == user.id).order_by(ScheduledScan.created_at.desc()).all()
+@router.get("/")
+def list_schedules(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(ScheduledScan).filter(ScheduledScan.user_id == user.id).order_by(ScheduledScan.created_at.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return _paginated_response(items, total, skip, limit)
 
 
 @router.get("/{schedule_id}", response_model=ScheduledScanResponse)

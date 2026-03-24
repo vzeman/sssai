@@ -230,7 +230,8 @@ async function loadMonitors() {
   try {
     var res = await apiCall('/api/monitors/enriched?hours=24');
     if (!res || !res.ok) return;
-    var monitors = await res.json();
+    var data = await res.json();
+    var monitors = Array.isArray(data) ? data : (data.items || []);
     var tbody = document.getElementById('monitors-table');
     if (!monitors.length) {
       tbody.innerHTML = '<tr><td colspan="9" class="empty">No monitors yet. Add one above!</td></tr>';

@@ -11,6 +11,7 @@ const AUTO_REFRESH_INTERVAL = 30000
 
 function Dashboard({ token }) {
   const [scans, setScans] = useState([])
+  const [totalScans, setTotalScans] = useState(0)
   const [stats, setStats] = useState({ total: 0, critical: 0, high: 0, medium: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -22,15 +23,19 @@ function Dashboard({ token }) {
 
   const fetchData = useCallback(async function () {
     try {
-      const resp = await fetch(`${API_BASE}/api/scans`, {
+      const skip = (currentPage - 1) * pageSize
+      const resp = await fetch(`${API_BASE}/api/scans?skip=${skip}&limit=${pageSize}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data)
+      const items = Array.isArray(data) ? data : (data.items || [])
+      const total = Array.isArray(data) ? data.length : (data.total || 0)
+      setScans(items)
+      setTotalScans(total)
 
       let critical = 0, high = 0, medium = 0
-      data.forEach(scan => {
+      items.forEach(scan => {
         if (scan.findings) {
           scan.findings.forEach(f => {
             if (f.severity === 'critical') critical++
@@ -40,7 +45,7 @@ function Dashboard({ token }) {
         }
       })
 
-      setStats({ total: data.length, critical, high, medium })
+      setStats({ total, critical, high, medium })
       setLastUpdated(new Date())
       setSecondsAgo(0)
       setError('')
@@ -49,7 +54,7 @@ function Dashboard({ token }) {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, currentPage, pageSize])
 
   useEffect(() => {
     fetchData()
@@ -90,7 +95,6 @@ function Dashboard({ token }) {
     return `${mins}m ${seconds % 60}s ago`
   }
 
-  const paginatedScans = scans.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   if (loading && !lastUpdated) {
     return (
@@ -170,7 +174,7 @@ function Dashboard({ token }) {
               <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
             </div>
           ) : (
-            paginatedScans.map(scan => (
+            scans.map(scan => (
               <div key={scan.id} className="scan-item">
                 <div className="scan-title">{scan.target_url || 'Unknown'}</div>
                 <div className="scan-details">
@@ -183,7 +187,7 @@ function Dashboard({ token }) {
         </div>
         {scans.length > 0 && (
           <Pagination
-            totalItems={scans.length}
+            totalItems={totalScans}
             currentPage={currentPage}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
