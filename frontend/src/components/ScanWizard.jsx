@@ -14,6 +14,8 @@ export default function ScanWizard() {
   const [validationErrors, setValidationErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [createdScan, setCreatedScan] = useState(null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState('daily');
 
   const STEPS = [
     { id: 0, name: 'Target', description: 'Enter target to scan' },
@@ -111,8 +113,31 @@ export default function ScanWizard() {
         custom_config: customConfig,
       });
 
-      setCreatedScan(response.data);
-      // Could redirect to scan details here
+      // Create schedule if recurring scan is enabled
+      if (scheduleEnabled) {
+        try {
+          const token = localStorage.getItem('auth_token');
+          const scheduleApiBase = import.meta.env.VITE_API_URL || '';
+          await fetch(`${scheduleApiBase}/api/schedules/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              target,
+              scan_type: selectedTemplate,
+              cron_expression: scheduleFrequency,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+              max_runs: 0,
+            }),
+          });
+        } catch (schedErr) {
+          console.error('Failed to create schedule:', schedErr);
+        }
+      }
+
+      setCreatedScan({ ...response.data, scheduled: scheduleEnabled });
     } catch (error) {
       console.error('Failed to create scan:', error);
       setValidationErrors({
@@ -132,6 +157,9 @@ export default function ScanWizard() {
           <p>Target: {createdScan.target}</p>
           <p>Template: {createdScan.template}</p>
           <p>Status: <span className="status-badge">{createdScan.status}</span></p>
+          {createdScan.scheduled && (
+            <p>Recurring scan scheduled and active</p>
+          )}
 
           <div className="action-buttons">
             <button
@@ -283,7 +311,46 @@ export default function ScanWizard() {
           {currentStep === 2 && (
             <div className="wizard-step">
               <h2>Advanced Configuration (Optional)</h2>
-              <p>Customize scan settings (leave empty for defaults)</p>
+              <p>Customize scan settings and scheduling</p>
+
+              {/* Schedule Section */}
+              <div className="config-section schedule-section">
+                <div className="schedule-toggle">
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={scheduleEnabled}
+                      onChange={(e) => setScheduleEnabled(e.target.checked)}
+                      className="toggle-checkbox"
+                    />
+                    <span className="toggle-switch"></span>
+                    <span className="toggle-text">Schedule recurring scans</span>
+                  </label>
+                  <p className="schedule-hint">
+                    Automatically run this scan on a regular schedule
+                  </p>
+                </div>
+
+                {scheduleEnabled && (
+                  <div className="schedule-options">
+                    <div className="schedule-field">
+                      <label>Frequency</label>
+                      <select
+                        value={scheduleFrequency}
+                        onChange={(e) => setScheduleFrequency(e.target.value)}
+                        className="schedule-select"
+                      >
+                        <option value="hourly">Every hour</option>
+                        <option value="6h">Every 6 hours</option>
+                        <option value="12h">Every 12 hours</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="config-section">
                 <label>Custom Configuration (JSON)</label>
@@ -346,6 +413,23 @@ export default function ScanWizard() {
                   <strong>Estimated Duration:</strong>
                   <span className="review-value">
                     {templates.find((t) => t.id === selectedTemplate)?.duration}
+                  </span>
+                </div>
+                <div className="review-item">
+                  <strong>Recurring Schedule:</strong>
+                  <span className="review-value">
+                    {scheduleEnabled ? (
+                      <span className="schedule-active">
+                        {({
+                          hourly: 'Every hour',
+                          '6h': 'Every 6 hours',
+                          '12h': 'Every 12 hours',
+                          daily: 'Daily',
+                          weekly: 'Weekly',
+                          monthly: 'Monthly',
+                        })[scheduleFrequency] || scheduleFrequency}
+                      </span>
+                    ) : 'One-time scan'}
                   </span>
                 </div>
                 {Object.keys(customConfig).length > 0 && (
