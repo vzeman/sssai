@@ -75,6 +75,7 @@ class UserResponse(BaseModel):
     email: str
     plan: str
     is_active: bool = True
+    is_admin: bool = False
     failed_attempts: int = 0
     locked_until: datetime | None = None
     last_login: datetime | None = None

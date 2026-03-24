@@ -16,6 +16,9 @@ from modules.api.dashboard import (
     ChartDataGenerator,
 )
 from modules.api.models import User
+from jose import JWTError, jwt as jose_jwt
+from modules.api.auth import SECRET_KEY, ALGORITHM, is_token_blacklisted
+from modules.api.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -92,26 +95,41 @@ async def websocket_endpoint(
 ):
     """
     WebSocket endpoint for real-time dashboard updates.
-    Clients should connect with their JWT token as a query parameter.
+    Clients must connect with a valid JWT token as a query parameter.
     """
-    # Token validation would happen here in production
-    # For now, we accept the connection
-    
-    user_id = None
+    # Validate token before accepting connection
+    if not token:
+        await websocket.close(code=4001)
+        return
+
     try:
-        # In production, validate token and extract user_id
-        # For this implementation, we'll use the connection itself
-        await websocket.accept()
-        
-        # Client should send their user_id in first message
-        initial_message = await websocket.receive_text()
-        data = json.loads(initial_message)
-        user_id = data.get("user_id")
-        
-        if not user_id:
-            await websocket.send_json({"error": "user_id required"})
-            await websocket.close(code=4000)
+        payload = jose_jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        token_type = payload.get("type")
+        if not user_id or token_type != "access":
+            await websocket.close(code=4001)
             return
+    except JWTError:
+        await websocket.close(code=4001)
+        return
+
+    if is_token_blacklisted(token):
+        await websocket.close(code=4001)
+        return
+
+    # Verify user exists and is active
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user or not user.is_active:
+            await websocket.close(code=4001)
+            return
+    finally:
+        db.close()
+
+    # Token is valid — accept connection
+    try:
+        await websocket.accept()
 
         # Register this connection
         await ws_manager.connect(websocket, user_id)
@@ -132,7 +150,7 @@ async def websocket_endpoint(
             try:
                 message = await websocket.receive_text()
                 data = json.loads(message)
-                
+
                 # Handle different message types
                 msg_type = data.get("type")
                 if msg_type == "ping":
@@ -141,7 +159,6 @@ async def websocket_endpoint(
                         {"type": "pong", "timestamp": data.get("timestamp")},
                     )
                 elif msg_type == "subscribe":
-                    # Client subscribing to specific updates
                     channel = data.get("channel")
                     logger.debug(f"User {user_id} subscribed to {channel}")
 
@@ -151,9 +168,8 @@ async def websocket_endpoint(
                 logger.error(f"Error processing message for user {user_id}: {e}")
 
     except WebSocketDisconnect:
-        if user_id:
-            ws_manager.disconnect(websocket, user_id)
-            logger.info(f"WebSocket disconnected for user {user_id}")
+        ws_manager.disconnect(websocket, user_id)
+        logger.info(f"WebSocket disconnected for user {user_id}")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         try:

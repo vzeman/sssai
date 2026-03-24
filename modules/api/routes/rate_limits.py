@@ -121,11 +121,5 @@ async def get_rate_limit_config(
 
 
 def is_admin(user: User) -> bool:
-    """
-    Check if user is admin.
-    
-    This is a placeholder. Enhance with proper role-based access control.
-    """
-    # For now, admins are users who created the account before a certain date
-    # or have a special flag set (can be enhanced)
-    return True  # Allow for now, should be based on actual admin role
+    """Check if user has admin privileges."""
+    return user.is_admin
