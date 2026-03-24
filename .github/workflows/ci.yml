@@ -194,21 +194,7 @@ jobs:
           ref: ${{ needs.risk-gate.outputs.sha }}
 
       - name: Validate harness.config.json
-        run: |
-          python3 -c "
-          import json, sys
-          config = json.load(open('harness.config.json'))
-          required = ['version', 'riskTiers', 'commands', 'shaDiscipline', 'architecturalBoundaries']
-          missing = [k for k in required if k not in config]
-          if missing:
-              print(f'Missing keys: {", ".join(missing)}', file=sys.stderr)
-              sys.exit(1)
-          for t in ['tier1', 'tier2', 'tier3']:
-              if t not in config['riskTiers']:
-                  print(f'Missing tier: {t}', file=sys.stderr)
-                  sys.exit(1)
-          print(f'harness.config.json schema valid ({len(config[\"riskTiers\"])} tiers)')
-          "
+        run: python3 -c "import json, sys; c = json.load(open('harness.config.json')); req = ['version','riskTiers','commands','shaDiscipline','architecturalBoundaries']; miss = [k for k in req if k not in c]; tiers = [t for t in ['tier1','tier2','tier3'] if t not in c.get('riskTiers',{})]; err = miss + tiers; sys.exit(print('Missing:' + ','.join(err), file=sys.stderr) or 1) if err else print('OK')"
 
       - name: Check CLAUDE.md
         run: |
