@@ -1,15 +1,35 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+  /* App-level theme tokens (dark defaults) */
+  --app-bg: #0f1117;
+  --app-text: #e8eaed;
+  --app-text-secondary: #888;
+  --app-text-muted: #666;
+  --card-bg: #1a1d27;
+  --card-border: #2a2d3a;
+  --card-hover-bg: #252c3a;
+  --card-hover-border: #3a4050;
+  --input-bg: #0f1117;
+  --input-border: #3a3d4a;
+  --sidebar-bg: #1a1d27;
+  --sidebar-border: #2a2d3a;
+  --nav-link-color: #aaa;
+  --nav-link-hover-bg: #252c3a;
+  --nav-active-bg: #3a4050;
+  --btn-secondary-border: #3a3d4a;
+  --error-bg: #2a1a1a;
+  --error-border: #4a2a2a;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -30,24 +50,55 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+[data-theme="dark"] {
+  --text: #9ca3af;
+  --text-h: #f3f4f6;
+  --bg: #16171d;
+  --border: #2e303a;
+  --code-bg: #1f2028;
+  --accent: #c084fc;
+  --accent-bg: rgba(192, 132, 252, 0.15);
+  --accent-border: rgba(192, 132, 252, 0.5);
+  --social-bg: rgba(47, 48, 58, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+}
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+[data-theme="dark"] #social .button-icon {
+  filter: invert(1) brightness(2);
+}
+
+[data-theme="light"] {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --app-bg: #f5f6fa;
+  --app-text: #1a1d27;
+  --app-text-secondary: #6b7280;
+  --app-text-muted: #9ca3af;
+  --card-bg: #ffffff;
+  --card-border: #e2e4e9;
+  --card-hover-bg: #f0f1f5;
+  --card-hover-border: #c8cad0;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --sidebar-bg: #1e2130;
+  --sidebar-border: #2a2d3a;
+  --nav-link-color: #b0b4c0;
+  --nav-link-hover-bg: #2a2f40;
+  --nav-active-bg: #3a4050;
+  --btn-secondary-border: #d1d5db;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
 }
 
 body {
