@@ -204,12 +204,12 @@ function FindingsPage({ token }) {
   async function fetchFindings() {
     try {
       setLoading(true)
-      const resp = await fetch(`${API_BASE}/api/search?q=severity:*`, {
+      const resp = await fetch(`${API_BASE}/api/search/findings`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch findings')
       const data = await resp.json()
-      setFindings(data.findings || [])
+      setFindings(data.findings || data.items || [])
       setError('')
     } catch (err) {
       setError(err.message)

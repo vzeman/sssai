@@ -24,7 +24,8 @@ function ReportsPage({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(Array.isArray(data) ? data : (data.items || []))
+      const allScans = Array.isArray(data) ? data : (data.items || [])
+      setScans(allScans.filter(s => s.status === 'completed'))
       setError('')
     } catch (err) {
       setError(err.message)
@@ -106,7 +107,17 @@ function ReportsPage({ token }) {
                 </div>
                 <div className="meta-item">
                   <span className="label">Findings</span>
-                  <span className="value">{scan.findings?.length || 0}</span>
+                  <span className="value">{scan.findings_count || scan.findings?.length || 0}</span>
+                </div>
+                {scan.risk_score != null && (
+                  <div className="meta-item">
+                    <span className="label">Risk</span>
+                    <span className="value">{scan.risk_score}</span>
+                  </div>
+                )}
+                <div className="meta-item">
+                  <span className="label">Type</span>
+                  <span className="value">{scan.scan_type || 'security'}</span>
                 </div>
               </div>
 
