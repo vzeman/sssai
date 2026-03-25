@@ -31,8 +31,27 @@
 
 .nav-menu {
   flex: 1;
+  padding: 4px 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.nav-group {
+  margin-bottom: 4px;
+}
+
+.nav-group-title {
+  padding: 12px 16px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--app-text-muted, #555);
+}
+
+.nav-group-items {
   list-style: none;
-  padding: 8px 0;
+  padding: 0;
   margin: 0;
 }
 
