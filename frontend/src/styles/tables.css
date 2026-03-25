@@ -1,0 +1,138 @@
+/* ─── Shared Table Styles ─────────────────────────────────────────── */
+
+.data-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 16px;
+  color: var(--app-text-secondary);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--card-border);
+  background: var(--card-bg);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--card-border);
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--card-hover-bg);
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge-completed, .badge.completed { background: #1a3a2a; color: #44cc88; }
+.badge-running, .badge.running { background: #1a2a3a; color: #44aaff; }
+.badge-queued, .badge.queued, .badge-pending, .badge.pending { background: #2a2a1a; color: #ccaa44; }
+.badge-failed, .badge.failed { background: #2a1a1a; color: #ff6666; }
+.badge-active, .badge.active { background: #1a3a2a; color: #44cc88; }
+.badge-paused, .badge.paused { background: #2a2a1a; color: #ccaa44; }
+
+/* Action buttons in tables */
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.table-action-btn {
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.table-action-btn:hover {
+  border-color: var(--app-text-secondary);
+  color: var(--app-text);
+}
+
+.table-action-btn.danger {
+  border-color: #5a2a2a;
+  color: #ff6b6b;
+}
+
+.table-action-btn.danger:hover {
+  background: #2a1a1a;
+}
+
+.table-action-btn.success {
+  border-color: #2a5a3a;
+  color: #6fdf8f;
+}
+
+.table-action-btn.success:hover {
+  background: #1a2a1a;
+}
+
+.table-action-link {
+  color: #00d4ff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.table-action-link:hover {
+  text-decoration: underline;
+}
+
+/* Cell helpers */
+.cell-truncate {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-nowrap {
+  white-space: nowrap;
+}
+
+.cell-muted {
+  color: var(--app-text-secondary);
+}
+
+.cell-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
