@@ -1,4 +1,4 @@
-.scan-details {
+.page-container.scan-details {
   padding: 24px;
   flex-direction: column !important;
 }
