@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -63,15 +63,23 @@ export default function ScanWizard({ token }) {
     }
   };
 
-  const detectTarget = async (value) => {
+  const debounceRef = useRef(null);
+
+  const handleTargetChange = (value) => {
     setTarget(value);
-    if (value.length < 3) {
+    setValidationErrors({});
+
+    // Debounce detection — only fire after user stops typing for 800ms
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.length < 5) {
       setTargetDetection(null);
       return;
     }
+    debounceRef.current = setTimeout(() => detectTarget(value), 800);
+  };
 
+  const detectTarget = async (value) => {
     try {
-      setLoading(true);
       const res = await fetch(`${API_BASE}/api/wizard/detect-target`, {
         method: 'POST',
         headers: authHeaders,
@@ -80,24 +88,9 @@ export default function ScanWizard({ token }) {
       if (res.ok) {
         const data = await res.json();
         setTargetDetection(data);
-
-        // Auto-recommend template
-        const recRes = await fetch(`${API_BASE}/api/wizard/recommend-template`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ target: value }),
-        });
-        if (recRes.ok) {
-          const recData = await recRes.json();
-          if (recData.recommended_template) {
-            setSelectedTemplate(recData.recommended_template);
-          }
-        }
       }
     } catch {
-      setTargetDetection(null);
-    } finally {
-      setLoading(false);
+      // Detection API not available — that's fine
     }
   };
 
@@ -250,7 +243,7 @@ export default function ScanWizard({ token }) {
                 type="text"
                 placeholder="example.com, 192.168.1.1, https://example.com"
                 value={target}
-                onChange={(e) => detectTarget(e.target.value)}
+                onChange={(e) => handleTargetChange(e.target.value)}
                 className="theme-input-lg"
                 disabled={loading}
               />
