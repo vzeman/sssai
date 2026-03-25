@@ -24,7 +24,7 @@ function ReportsPage({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data)
+      setScans(Array.isArray(data) ? data : (data.items || []))
       setError('')
     } catch (err) {
       setError(err.message)
@@ -95,7 +95,7 @@ function ReportsPage({ token }) {
           scans.map(scan => (
             <div key={scan.id} className="report-card">
               <div className="report-header">
-                <h3>{scan.target_url || 'Untitled Scan'}</h3>
+                <h3>{scan.target || 'Untitled Scan'}</h3>
                 <span className={`status-badge ${scan.status}`}>{scan.status}</span>
               </div>
 

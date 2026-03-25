@@ -116,8 +116,8 @@ function ScanDetailsPage({ token }) {
       <div className="page-header">
         <div className="header-title">
           <div>
-            <h1>{scan.target_url || 'Scan Details'}</h1>
-            <p>Target: {scan.target_url || 'Unknown'}</p>
+            <h1>{scan.target || 'Scan Details'}</h1>
+            <p>Target: {scan.target || 'Unknown'}</p>
           </div>
         </div>
         <div className="header-actions">

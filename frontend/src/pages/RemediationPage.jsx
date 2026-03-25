@@ -35,7 +35,8 @@ function RemediationPage({ token }) {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
-      const scansData = await resp.json()
+      const scansRaw = await resp.json()
+      const scansData = Array.isArray(scansRaw) ? scansRaw : (scansRaw.items || [])
       const completedScans = scansData.filter(s => s.status === 'completed')
       const allFindings = []
       const buckets = { immediate_action: [], this_sprint: [], backlog: [] }

@@ -16,7 +16,8 @@ function QueuePage({ token }) {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (resp.ok && !cancelled) {
-          setQueue(await resp.json())
+          const qData = await resp.json()
+          setQueue(Array.isArray(qData) ? qData : (qData.items || []))
         }
       } catch (err) {
         if (!cancelled) console.error('Failed to fetch queue:', err)
@@ -72,7 +73,7 @@ function QueuePage({ token }) {
           <tbody>
             {queue.map((scan, idx) => (
               <tr key={scan.id}>
-                <td>{scan.target_url || 'N/A'}</td>
+                <td>{scan.target || 'N/A'}</td>
                 <td>
                   <span className={`queue-status-badge ${scan.status}`}>
                     {scan.status}
