@@ -83,24 +83,25 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --app-bg: #f5f6fa;
-  --app-text: #1a1d27;
-  --app-text-secondary: #4b5563;
+  /* Force dark theme for consistency with Tailwind dark UI */
+  --app-bg: #111827;
+  --app-text: #e5e7eb;
+  --app-text-secondary: #9ca3af;
   --app-text-muted: #6b7280;
-  --card-bg: #ffffff;
-  --card-border: #e2e4e9;
-  --card-hover-bg: #f0f1f5;
-  --card-hover-border: #c8cad0;
-  --input-bg: #ffffff;
-  --input-border: #d1d5db;
-  --sidebar-bg: #1e2130;
-  --sidebar-border: #2a2d3a;
-  --nav-link-color: #b0b4c0;
-  --nav-link-hover-bg: #2a2f40;
-  --nav-active-bg: #3a4050;
-  --btn-secondary-border: #d1d5db;
-  --error-bg: #fef2f2;
-  --error-border: #fecaca;
+  --card-bg: #1f2937;
+  --card-border: #374151;
+  --card-hover-bg: #293548;
+  --card-hover-border: #4b5563;
+  --input-bg: #1f2937;
+  --input-border: #4b5563;
+  --sidebar-bg: #030712;
+  --sidebar-border: #1f2937;
+  --nav-link-color: #9ca3af;
+  --nav-link-hover-bg: #1f2937;
+  --nav-active-bg: #1e3a5f;
+  --btn-secondary-border: #4b5563;
+  --error-bg: #450a0a;
+  --error-border: #7f1d1d;
 }
 
 body {
