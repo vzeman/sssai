@@ -60,35 +60,51 @@ function LoginForm({ onLogin }) {
   }
 
   return (
-    <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <span className="login-icon" role="img" aria-label="Security shield">🛡️</span>
-          <h1>SSSAI Security Advisor</h1>
-          <p>Sign in to access your AI security dashboard</p>
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-3" role="img" aria-label="Security shield">🛡️</div>
+            <h1 className="text-2xl font-bold text-white">SSSAI <span className="text-cyan-400">Security</span></h1>
+            <p className="text-gray-400 text-sm mt-1">Sign in to your security dashboard</p>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
+              <input
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
+              />
+            </div>
+            {error && (
+              <div className="bg-red-900/30 border border-red-800 text-red-400 px-4 py-2 rounded-lg text-sm" role="alert" aria-live="assertive">
+                {error}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white font-semibold rounded-lg transition duration-200"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
         </div>
-        <form onSubmit={handleSubmit} className="login-form">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="login-input"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="login-input"
-          />
-          {error && <div className="login-error" role="alert" aria-live="assertive">{error}</div>}
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
       </div>
     </div>
   )
@@ -109,9 +125,9 @@ function AppLayout({ token, onLogout }) {
   }, [])
 
   return (
-    <div className="app-layout">
+    <div className="flex">
       <Navigation onLogout={onLogout} />
-      <main className="app-main" aria-label="Main content">
+      <main className="ml-60 min-h-screen bg-gray-900 p-0" aria-label="Main content">
         <Breadcrumbs />
         <ErrorBoundary>
           <Routes>

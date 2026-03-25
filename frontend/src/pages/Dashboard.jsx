@@ -4,7 +4,6 @@ import { LoadingSkeleton } from '../components/LoadingSkeleton'
 import { Pagination } from '../components/Pagination'
 import { useToast } from '../components/ToastContext'
 import { useScanUpdates } from '../hooks/useWebSocket'
-import './Dashboard.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 const AUTO_REFRESH_INTERVAL = 30000
@@ -98,105 +97,89 @@ function Dashboard({ token }) {
 
   if (loading && !lastUpdated) {
     return (
-      <div className="page-container">
-        <div className="page-header"><h1>Dashboard</h1></div>
-        <LoadingSkeleton rows={5} columns={4} />
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-white mb-6">Dashboard</h1>
+        <div className="text-gray-400 text-center py-12">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header dashboard-header">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1>Dashboard</h1>
-          <p>Security overview and recent activity</p>
+          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm text-gray-400 mt-1">Security overview and recent activity</p>
         </div>
-        <div className="header-actions">
-          <span className={`ws-status ws-${wsStatus}`} title={`Live updates: ${wsStatus}`}>
-            <span className="ws-dot" />
-            {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting' : 'Offline'}
+        <div className="flex items-center gap-3">
+          <span className={`flex items-center gap-1.5 text-xs ${wsStatus === 'connected' ? 'text-green-400' : 'text-gray-500'}`}>
+            <span className={`w-2 h-2 rounded-full ${wsStatus === 'connected' ? 'bg-green-400' : 'bg-gray-500'}`} />
+            {wsStatus === 'connected' ? 'Live' : 'Offline'}
           </span>
-          {lastUpdated && (
-            <span className="last-updated">
-              Last updated: {formatTimeAgo(secondsAgo)}
-            </span>
-          )}
-          <button className="refresh-btn" onClick={fetchData} title="Refresh data">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            Refresh
-          </button>
-          <Link to="/scans/new" className="dashboard-new-scan">+ New Scan</Link>
+          {lastUpdated && <span className="text-xs text-gray-500">Updated: {formatTimeAgo(secondsAgo)}</span>}
+          <button onClick={fetchData} className="px-4 py-2 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg text-sm border border-gray-700 transition">Refresh</button>
+          <Link to="/scans/new" className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition">+ New Scan</Link>
         </div>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="bg-red-900/20 border border-red-800 text-red-400 px-4 py-3 rounded-lg text-sm mb-6">{error}</div>}
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Total Scans</div>
-          <div className="stat-value">{stats.total}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Scans</div>
+          <div className="text-3xl font-bold text-white mt-2">{stats.total}</div>
         </div>
-        <div className="stat-card critical">
-          <div className="stat-label">Critical</div>
-          <div className="stat-value">{stats.critical}</div>
+        <div className="bg-gray-800/50 border border-red-900/50 rounded-xl p-5">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Critical</div>
+          <div className="text-3xl font-bold text-red-400 mt-2">{stats.critical}</div>
         </div>
-        <div className="stat-card high">
-          <div className="stat-label">High</div>
-          <div className="stat-value">{stats.high}</div>
+        <div className="bg-gray-800/50 border border-orange-900/50 rounded-xl p-5">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">High</div>
+          <div className="text-3xl font-bold text-orange-400 mt-2">{stats.high}</div>
         </div>
-        <div className="stat-card medium">
-          <div className="stat-label">Medium</div>
-          <div className="stat-value">{stats.medium}</div>
+        <div className="bg-gray-800/50 border border-yellow-900/50 rounded-xl p-5">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Medium</div>
+          <div className="text-3xl font-bold text-yellow-400 mt-2">{stats.medium}</div>
         </div>
       </div>
 
-      <div className="recent-scans">
-        <h2>Recent Scans</h2>
-        <div className="scans-list">
+      <div>
+        <h2 className="text-lg font-semibold text-white mb-4">Recent Scans</h2>
+        <div className="space-y-3">
           {scans.length === 0 ? (
-            <div className="empty-state-card">
-              <div className="empty-state-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
-              <h3 className="empty-state-title">No scans yet</h3>
-              <p className="empty-state-text">
-                Get started by creating your first security scan to analyze a target for vulnerabilities.
-              </p>
-              <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
+            <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-12 text-center">
+              <div className="text-gray-500 text-5xl mb-4">&#128269;</div>
+              <h3 className="text-lg font-semibold text-gray-300 mb-2">No scans yet</h3>
+              <p className="text-gray-500 text-sm mb-4">Start your first security scan to analyze vulnerabilities.</p>
+              <Link to="/scans/new" className="inline-block px-6 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition">Start a New Scan</Link>
             </div>
           ) : (
             scans.map(scan => (
-              <div key={scan.id} className="scan-item">
-                <div className="scan-title">{scan.target || 'Unknown'}</div>
-                <div className="scan-details">
-                  <span className={`status ${scan.status}`}>{scan.status}</span>
-                  <span className="scan-detail-sep">|</span>
-                  <span className="scan-type">{scan.scan_type || 'security'}</span>
+              <div key={scan.id} className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 hover:bg-gray-800/60 transition cursor-pointer">
+                <div className="font-medium text-white text-sm mb-2">{scan.target || 'Unknown'}</div>
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                    scan.status === 'completed' ? 'bg-green-900/50 text-green-400' :
+                    scan.status === 'running' ? 'bg-blue-900/50 text-blue-400' :
+                    scan.status === 'failed' ? 'bg-red-900/50 text-red-400' :
+                    'bg-yellow-900/50 text-yellow-400'
+                  }`}>{scan.status}</span>
+                  <span className="text-gray-500">|</span>
+                  <span className="text-gray-400">{scan.scan_type || 'security'}</span>
                   {scan.findings_count > 0 && (
                     <>
-                      <span className="scan-detail-sep">|</span>
-                      <span className="scan-findings">{scan.findings_count} findings</span>
+                      <span className="text-gray-500">|</span>
+                      <span className="text-gray-300">{scan.findings_count} findings</span>
                     </>
                   )}
                   {scan.risk_score != null && (
                     <>
-                      <span className="scan-detail-sep">|</span>
-                      <span className={`scan-risk ${scan.risk_score >= 30 ? 'high' : scan.risk_score >= 15 ? 'medium' : 'low'}`}>
-                        Risk: {scan.risk_score}
-                      </span>
+                      <span className="text-gray-500">|</span>
+                      <span className={scan.risk_score >= 30 ? 'text-red-400' : scan.risk_score >= 15 ? 'text-orange-400' : 'text-green-400'}>Risk: {scan.risk_score}</span>
                     </>
                   )}
-                  <span className="scan-detail-sep">|</span>
-                  <span className="timestamp">{new Date(scan.created_at).toLocaleDateString()}</span>
+                  <span className="text-gray-500">|</span>
+                  <span className="text-gray-500">{new Date(scan.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
             ))
