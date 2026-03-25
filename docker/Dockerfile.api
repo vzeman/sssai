@@ -20,7 +20,8 @@ RUN pip install --no-cache-dir \
     python-multipart httpx alembic \
     jinja2 weasyprint pyyaml anthropic "elasticsearch>=8.13,<9" \
     pyotp "qrcode[pil]" \
-    python-socketio python-socketio-client aiofiles
+    python-socketio python-socketio-client aiofiles \
+    "mcp[sse]"
 
 COPY modules/ /app/modules/
 COPY config/ /app/config/
