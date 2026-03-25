@@ -1121,6 +1121,15 @@ def start_validation(
     return {"task_id": task_id, "status": "queued"}
 
 
+# ─── MCP Server ───────────────────────────────────────────────────────
+try:
+    from modules.api.mcp_server import mcp_app
+    app.mount("/mcp", mcp_app)
+    logger.info("MCP server mounted at /mcp")
+except ImportError:
+    logger.warning("MCP SDK not installed — MCP server disabled. Install with: pip install 'mcp[sse]'")
+
+
 # ─── React SPA ────────────────────────────────────────────────────────
 _SPA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend-dist")
 _SPA_INDEX = os.path.join(_SPA_DIR, "index.html")
@@ -1222,7 +1231,7 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/{path:path}", response_class=HTMLResponse)
 def spa_catch_all(path: str):
     # Don't intercept API, health, docs, or WebSocket routes
-    if path.startswith(("api/", "health", "docs", "openapi.json", "ws")):
+    if path.startswith(("api/", "health", "docs", "openapi.json", "ws", "mcp")):
         raise HTTPException(status_code=404, detail="Not found")
     # Serve static file if it exists (e.g. favicon.ico)
     static_path = os.path.join(_SPA_DIR, path)

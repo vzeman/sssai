@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from modules.api.database import get_db
-from modules.api.models import ScheduledScan, User
+from modules.api.models import Scan, ScheduledScan, User
 from modules.api.schemas import ScheduledScanCreate, ScheduledScanUpdate, ScheduledScanResponse
 from modules.api.auth import get_current_user
+from modules.infra import get_queue
 
 router = APIRouter()
 
@@ -123,3 +124,47 @@ def delete_schedule(schedule_id: str, user: User = Depends(get_current_user), db
     db.delete(schedule)
     db.commit()
     return {"status": "deleted"}
+
+
+@router.post("/{schedule_id}/toggle")
+def toggle_schedule(schedule_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Toggle a schedule between active and paused."""
+    schedule = db.query(ScheduledScan).filter(ScheduledScan.id == schedule_id, ScheduledScan.user_id == user.id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    schedule.is_active = not schedule.is_active
+    if schedule.is_active:
+        schedule.next_run_at = calc_first_run(schedule.cron_expression)
+    db.commit()
+    db.refresh(schedule)
+    return {"status": "active" if schedule.is_active else "paused", "is_active": schedule.is_active}
+
+
+@router.post("/{schedule_id}/run")
+def run_schedule_now(schedule_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Immediately trigger a scan from this schedule."""
+    schedule = db.query(ScheduledScan).filter(ScheduledScan.id == schedule_id, ScheduledScan.user_id == user.id).first()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+
+    scan = Scan(
+        user_id=user.id,
+        target=schedule.target,
+        scan_type=schedule.scan_type,
+        config=schedule.config,
+        schedule_id=schedule.id,
+    )
+    db.add(scan)
+    schedule.run_count = (schedule.run_count or 0) + 1
+    schedule.last_run_at = datetime.utcnow()
+    db.commit()
+    db.refresh(scan)
+
+    get_queue().send("scan-jobs", {
+        "scan_id": scan.id,
+        "target": scan.target,
+        "scan_type": scan.scan_type,
+        "config": scan.config or {},
+    })
+
+    return {"scan_id": scan.id, "status": "queued", "target": scan.target}
