@@ -6,24 +6,53 @@ function Navigation({ onLogout }) {
   const location = useLocation()
   const { theme, toggleTheme } = useTheme()
 
-  const navItems = [
-    { label: 'Dashboard', path: '/', icon: '📊' },
-    { label: 'Scans', path: '/scans', icon: '🔍' },
-    { label: 'Findings', path: '/findings', icon: '🐛' },
-    { label: 'Assets', path: '/assets', icon: '🖥' },
-    { label: 'Inventory', path: '/inventory', icon: '📡' },
-    { label: 'Reports', path: '/reports', icon: '📋' },
-    { label: 'Campaigns', path: '/campaigns', icon: '🎯' },
-    { label: 'Compliance', path: '/compliance', icon: '✓' },
-    { label: 'Remediation', path: '/remediation', icon: '🔧' },
-    { label: 'Schedules', path: '/schedules', icon: '⏰' },
-    { label: 'Webhooks', path: '/webhooks', icon: '🔗' },
-    { label: 'Queue', path: '/queue', icon: '📦' },
-    { label: 'Posture', path: '/posture', icon: '🛡' },
-    { label: 'Alerts', path: '/alerts', icon: '🚨' },
-    { label: 'Audit Logs', path: '/audit-logs', icon: '📜' },
-    { label: 'Advisor', path: '/advisor', icon: '💡' },
-    { label: 'Settings', path: '/settings', icon: '⚙️' },
+  const navGroups = [
+    {
+      items: [
+        { label: 'Dashboard', path: '/', icon: '📊' },
+      ],
+    },
+    {
+      title: 'Scanning',
+      items: [
+        { label: 'Scans', path: '/scans', icon: '🔍' },
+        { label: 'Queue', path: '/queue', icon: '📦' },
+        { label: 'Schedules', path: '/schedules', icon: '⏰' },
+        { label: 'Campaigns', path: '/campaigns', icon: '🎯' },
+      ],
+    },
+    {
+      title: 'Results',
+      items: [
+        { label: 'Findings', path: '/findings', icon: '🐛' },
+        { label: 'Reports', path: '/reports', icon: '📋' },
+        { label: 'Remediation', path: '/remediation', icon: '🔧' },
+        { label: 'Compliance', path: '/compliance', icon: '✓' },
+      ],
+    },
+    {
+      title: 'Assets',
+      items: [
+        { label: 'Assets', path: '/assets', icon: '🖥' },
+        { label: 'Inventory', path: '/inventory', icon: '📡' },
+        { label: 'Posture', path: '/posture', icon: '🛡' },
+      ],
+    },
+    {
+      title: 'Monitoring',
+      items: [
+        { label: 'Alerts', path: '/alerts', icon: '🚨' },
+        { label: 'Webhooks', path: '/webhooks', icon: '🔗' },
+        { label: 'Audit Logs', path: '/audit-logs', icon: '📜' },
+      ],
+    },
+    {
+      title: 'Tools',
+      items: [
+        { label: 'Advisor', path: '/advisor', icon: '💡' },
+        { label: 'Settings', path: '/settings', icon: '⚙️' },
+      ],
+    },
   ]
 
   return (
@@ -37,20 +66,29 @@ function Navigation({ onLogout }) {
         <Link to="/scans/new" className="new-scan-btn" aria-label="Create new scan">+ New Scan</Link>
       </div>
 
-      <ul className="nav-menu" role="list">
-        {navItems.map((item) => (
-          <li key={item.label}>
-            <Link
-              to={item.path}
-              className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
-              {...(location.pathname === item.path ? { 'aria-current': 'page' } : {})}
-            >
-              <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
-            </Link>
-          </li>
+      <div className="nav-menu" role="list">
+        {navGroups.map((group, gi) => (
+          <div key={group.title || gi} className="nav-group">
+            {group.title && (
+              <div className="nav-group-title">{group.title}</div>
+            )}
+            <ul className="nav-group-items" role="list">
+              {group.items.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    to={item.path}
+                    className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                    {...(location.pathname === item.path ? { 'aria-current': 'page' } : {})}
+                  >
+                    <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="nav-label">{item.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
 
       <div className="nav-footer">
         <button onClick={toggleTheme} className="theme-toggle-btn" title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
