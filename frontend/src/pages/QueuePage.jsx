@@ -12,7 +12,7 @@ function QueuePage({ token }) {
     let cancelled = false
     async function poll() {
       try {
-        const resp = await fetch(`${API_BASE}/api/scans?status=queued,running`, {
+        const resp = await fetch(`${API_BASE}/api/scans/?status=queued,running`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (resp.ok && !cancelled) {

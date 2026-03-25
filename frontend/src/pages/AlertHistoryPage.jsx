@@ -15,7 +15,7 @@ function AlertHistoryPage({ token }) {
     let cancelled = false
     async function load() {
       try {
-        let url = `${API_BASE}/api/notifications`
+        let url = `${API_BASE}/api/notifications/`
         if (filter !== 'all') {
           url += `?status=${filter}`
         }

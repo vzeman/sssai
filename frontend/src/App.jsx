@@ -43,14 +43,11 @@ function LoginForm({ onLogin }) {
     setError('')
     setLoading(true)
     try {
-      const form = new URLSearchParams()
-      form.append('username', email)
-      form.append('password', password)
-      const resp = await fetch(`${API_BASE}/api/auth/token`, {
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
-        credentials: 'include', // receive refresh_token cookie from backend
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
       })
       const data = await resp.json()
       if (!resp.ok) throw new Error(data.detail || 'Login failed')

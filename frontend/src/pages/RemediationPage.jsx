@@ -31,7 +31,7 @@ function RemediationPage({ token }) {
   async function fetchScansAndFindings() {
     try {
       setLoading(true)
-      const resp = await fetch(`${API_BASE}/api/scans`, {
+      const resp = await fetch(`${API_BASE}/api/scans/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')

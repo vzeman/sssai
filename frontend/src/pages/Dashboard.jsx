@@ -24,7 +24,7 @@ function Dashboard({ token }) {
   const fetchData = useCallback(async function () {
     try {
       const skip = (currentPage - 1) * pageSize
-      const resp = await fetch(`${API_BASE}/api/scans?skip=${skip}&limit=${pageSize}`, {
+      const resp = await fetch(`${API_BASE}/api/scans/?skip=${skip}&limit=${pageSize}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
