@@ -11,7 +11,9 @@ function ScanDetailsPage({ token }) {
   const { scanId } = useParams()
   const { showToast } = useToast()
   const [scan, setScan] = useState(null)
+  const [report, setReport] = useState(null)
   const [findings, setFindings] = useState([])
+  const [activities, setActivities] = useState([])
   const [logs, setLogs] = useState('')
   const [activeTab, setActiveTab] = useState('findings')
   const [loading, setLoading] = useState(true)
@@ -42,18 +44,48 @@ function ScanDetailsPage({ token }) {
   async function fetchScanDetails() {
     try {
       setLoading(true)
-      const resp = await fetch(`${API_BASE}/api/scans/${scanId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!resp.ok) throw new Error('Failed to fetch scan details')
-      const data = await resp.json()
-      setScan(data)
-      setFindings(data.findings || [])
-      
-      // Try to fetch logs if available
-      if (data.logs) {
-        setLogs(typeof data.logs === 'string' ? data.logs : JSON.stringify(data.logs, null, 2))
+      const headers = { Authorization: `Bearer ${token}` }
+
+      // Fetch scan metadata
+      const scanResp = await fetch(`${API_BASE}/api/scans/${scanId}`, { headers })
+      if (!scanResp.ok) throw new Error('Failed to fetch scan details')
+      const scanData = await scanResp.json()
+      setScan(scanData)
+
+      // Fetch report (contains findings, summary, risk details)
+      try {
+        const reportResp = await fetch(`${API_BASE}/api/scans/${scanId}/report`, { headers })
+        if (reportResp.ok) {
+          const reportData = await reportResp.json()
+          setReport(reportData)
+          setFindings(reportData.findings || [])
+        }
+      } catch {
+        // Report not ready yet
       }
+
+      // Fetch activity timeline
+      try {
+        const actResp = await fetch(`${API_BASE}/api/scans/${scanId}/activity`, { headers })
+        if (actResp.ok) {
+          const actData = await actResp.json()
+          setActivities(actData.activities || [])
+        }
+      } catch {
+        // Activity not available
+      }
+
+      // Fetch worker logs
+      try {
+        const logResp = await fetch(`${API_BASE}/api/logs/worker`, { headers })
+        if (logResp.ok) {
+          const logData = await logResp.json()
+          setLogs(logData.logs || '')
+        }
+      } catch {
+        // Logs not available
+      }
+
       setError('')
     } catch (err) {
       setError(err.message)
@@ -140,18 +172,39 @@ function ScanDetailsPage({ token }) {
           </span>
         </div>
         <div className="metadata-item">
-          <span className="label">Started</span>
-          <span>{new Date(scan.created_at).toLocaleString()}</span>
-        </div>
-        <div className="metadata-item">
-          <span className="label">Duration</span>
-          <span>{scan.duration || 'N/A'}</span>
+          <span className="label">Risk Score</span>
+          <span className={`risk-value ${(report?.risk_score || 0) >= 30 ? 'critical' : (report?.risk_score || 0) >= 15 ? 'high' : 'low'}`}>
+            {report?.risk_score != null ? report.risk_score : scan.risk_score ?? 'N/A'}
+          </span>
         </div>
         <div className="metadata-item">
           <span className="label">Findings</span>
-          <span>{findings.length}</span>
+          <span>{findings.length || scan.findings_count || 0}</span>
         </div>
+        <div className="metadata-item">
+          <span className="label">Started</span>
+          <span>{new Date(scan.created_at).toLocaleString()}</span>
+        </div>
+        {scan.completed_at && (
+          <div className="metadata-item">
+            <span className="label">Completed</span>
+            <span>{new Date(scan.completed_at).toLocaleString()}</span>
+          </div>
+        )}
+        {report?.scan_metadata?.total_tool_calls && (
+          <div className="metadata-item">
+            <span className="label">Tool Calls</span>
+            <span>{report.scan_metadata.total_tool_calls}</span>
+          </div>
+        )}
       </div>
+
+      {report?.summary && (
+        <div className="scan-summary">
+          <h3>Summary</h3>
+          <p>{report.summary}</p>
+        </div>
+      )}
 
       <div className="tabs">
         <button
@@ -226,59 +279,32 @@ function ScanDetailsPage({ token }) {
 
         {activeTab === 'timeline' && (
           <div className="timeline-section">
-            <div className="timeline">
-              <div className="timeline-item">
-                <span className="timeline-marker"></span>
-                <div className="timeline-content">
-                  <div className="timeline-title">Scan Started</div>
-                  <div className="timeline-time">
-                    {new Date(scan.created_at).toLocaleString()}
+            {activities.length === 0 ? (
+              <p className="empty-text">No activity recorded for this scan.</p>
+            ) : (
+              <div className="timeline">
+                {activities.map((act, idx) => (
+                  <div key={idx} className={`timeline-item ${act.phase || act.type || ''}`}>
+                    <span className={`timeline-marker ${act.type === 'finding' ? 'finding' : act.type === 'error' ? 'failed' : ''}`}></span>
+                    <div className="timeline-content">
+                      <div className="timeline-title">
+                        {act.phase && <span className="timeline-phase">[{act.phase}]</span>}
+                        {act.tool && <span className="timeline-tool">{act.tool}</span>}
+                        {!act.phase && !act.tool && <span>{act.type || 'event'}</span>}
+                      </div>
+                      <div className="timeline-message">{act.message || act.result || ''}</div>
+                      {act.timestamp && <div className="timeline-time">{act.timestamp}</div>}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-
-              {scan.status === 'completed' && (
-                <div className="timeline-item">
-                  <span className="timeline-marker completed"></span>
-                  <div className="timeline-content">
-                    <div className="timeline-title">Scan Completed</div>
-                    <div className="timeline-time">
-                      {scan.completed_at
-                        ? new Date(scan.completed_at).toLocaleString()
-                        : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {scan.status === 'failed' && (
-                <div className="timeline-item">
-                  <span className="timeline-marker failed"></span>
-                  <div className="timeline-content">
-                    <div className="timeline-title">Scan Failed</div>
-                    <div className="timeline-time">
-                      {scan.error_message || 'Unknown error'}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {scan.status === 'running' && (
-                <div className="timeline-item">
-                  <span className="timeline-marker running"></span>
-                  <div className="timeline-content">
-                    <div className="timeline-title">Scan In Progress</div>
-                    <div className="timeline-time">Currently running...</div>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
 
         {activeTab === 'logs' && (
           <div className="logs-section">
-            <pre className="logs-viewer">{logs || 'No logs available'}</pre>
+            <pre className="logs-viewer">{logs || 'No logs available. Logs are available during and shortly after scan execution.'}</pre>
           </div>
         )}
       </div>
