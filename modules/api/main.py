@@ -101,9 +101,44 @@ except Exception:
     pass  # ES may not be ready yet; indices will be created on first use
 
 app = FastAPI(
-    title="Security Scanner API",
+    title="SSSAI Security Scanner API",
     version="0.2.0",
-    description="AI-powered autonomous security scanning, SEO analysis, and compliance monitoring platform",
+    description="""
+## AI-Powered Security Scanning Platform
+
+SSSAI provides autonomous security scanning with AI-driven analysis.
+
+### Authentication
+All endpoints require JWT bearer token authentication unless noted otherwise.
+1. Register: `POST /api/auth/register`
+2. Login: `POST /api/auth/login` → returns `access_token`
+3. Use token: `Authorization: Bearer <token>` header
+4. Refresh: `POST /api/auth/refresh` (uses refresh token cookie)
+
+### WebSocket
+Real-time updates via `ws://host/ws`. Send `{"type": "auth", "token": "<jwt>"}` after connecting.
+
+### Pagination
+List endpoints return `{"items": [...], "total": N, "skip": N, "limit": N, "has_next": bool, "has_prev": bool}`.
+Default: skip=0, limit=50, max=500.
+""",
+    openapi_tags=[
+        {"name": "auth", "description": "User registration, login, JWT tokens, 2FA, and admin user management"},
+        {"name": "scans", "description": "Create, list, and manage security scans. View reports and compare results"},
+        {"name": "findings", "description": "View and update finding status (false positive, accepted risk)"},
+        {"name": "monitors", "description": "Uptime monitors — create, list, get checks and stats"},
+        {"name": "schedules", "description": "Recurring scan schedules — create, update, delete, run now"},
+        {"name": "notifications", "description": "Notification channels — email, Slack, Discord, webhook"},
+        {"name": "reports", "description": "Report generation — PDF, HTML, executive briefs"},
+        {"name": "campaigns", "description": "Multi-target scan campaigns"},
+        {"name": "search", "description": "Global search across findings, scans, activity, and analytics"},
+        {"name": "dashboard", "description": "Dashboard stats, heatmaps, trends, and WebSocket updates"},
+        {"name": "tools", "description": "Available scanning tools and their capabilities"},
+        {"name": "posture", "description": "Security posture scoring and trends"},
+        {"name": "webhooks", "description": "Webhook configuration for external integrations"},
+        {"name": "export", "description": "Export findings and scans as CSV"},
+        {"name": "audit", "description": "Audit log viewing"},
+    ],
 )
 
 _ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8000").split(",")

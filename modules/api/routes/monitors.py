@@ -29,6 +29,7 @@ def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
 
 @router.post("/", response_model=MonitorResponse)
 def create_monitor(body: MonitorCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create a new uptime monitor for a target URL or domain."""
     try:
         # Check if monitor for this target already exists
         existing = db.query(Monitor).filter(
@@ -64,6 +65,7 @@ def list_monitors(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """List all uptime monitors for the current user with pagination."""
     query = db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc())
     total = query.count()
     items = query.offset(skip).limit(limit).all()

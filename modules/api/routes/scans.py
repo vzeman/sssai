@@ -39,6 +39,11 @@ def _paginated_response(items: list, total: int, skip: int, limit: int) -> dict:
 
 @router.post("/", response_model=ScanResponse)
 def create_scan(body: ScanCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create and queue a new security scan.
+
+    The scan is queued for processing by the worker service.
+    Supported scan types: security, adaptive, quick, api, ssl, headers, recon, vulnerability.
+    """
     scan = Scan(user_id=user.id, target=body.target, scan_type=body.scan_type, config=body.config)
     db.add(scan)
     db.commit()
@@ -60,6 +65,11 @@ def list_scans(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """List all scans for the current user with pagination.
+
+    Returns paginated results sorted by creation date (newest first).
+    Query params: skip (default 0), limit (default 50, max 500).
+    """
     query = db.query(Scan).filter(Scan.user_id == user.id).order_by(Scan.created_at.desc())
     total = query.count()
     items = query.offset(skip).limit(limit).all()
@@ -155,6 +165,7 @@ def get_scan(scan_id: str, user: User = Depends(get_current_user), db: Session =
 
 @router.get("/{scan_id}/report")
 def get_report(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get the full scan report including findings, risk score, and recommendations."""
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -167,7 +178,7 @@ def get_report(scan_id: str, user: User = Depends(get_current_user), db: Session
 
 @router.post("/{scan_id}/retry")
 def retry_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Retry a failed or completed scan.
+    """Retry a failed or completed scan with context from the previous attempt.
 
     For failed scans: re-queues the entire scan.
     For completed scans with errors: creates a follow-up scan that focuses on
@@ -253,7 +264,7 @@ def verify_scan(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a targeted re-scan to verify whether original findings have been remediated.
+    """Create a verification scan to re-test findings from a completed scan.
 
     The verification scan tests ONLY the specific findings from the original scan,
     not a full re-scan. Each finding receives a status of verified_fixed,
@@ -332,7 +343,7 @@ def verify_scan(
 
 @router.post("/{scan_id}/stop")
 def stop_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Stop a running scan by setting a Redis signal that the agent checks each iteration."""
+    """Stop a running scan by sending a stop signal via Redis."""
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -377,7 +388,7 @@ def compare_scans(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Compare findings between a current scan and a baseline scan."""
+    """Compare findings between two scans to identify new, resolved, and changed vulnerabilities."""
     current_scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
     if not current_scan:
         raise HTTPException(status_code=404, detail="Current scan not found")
