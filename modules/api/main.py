@@ -1,5 +1,8 @@
+import logging
 import os
 import subprocess
+
+logger = logging.getLogger(__name__)
 
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -1083,44 +1086,29 @@ def start_validation(
     return {"task_id": task_id, "status": "queued"}
 
 
-# ─── Dashboard UI ─────────────────────────────────────────────────────
-_STATIC = os.path.join(os.path.dirname(__file__), "static")
+# ─── React SPA ────────────────────────────────────────────────────────
+_SPA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend-dist")
+_SPA_INDEX = os.path.join(_SPA_DIR, "index.html")
+
+# Serve static assets (JS, CSS) from the SPA build
+if os.path.isdir(os.path.join(_SPA_DIR, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_SPA_DIR, "assets")), name="spa-assets")
+
+
+def _serve_spa():
+    """Serve the React SPA index.html for client-side routing."""
+    if os.path.exists(_SPA_INDEX):
+        with open(_SPA_INDEX) as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse(
+        "<h1>Frontend not built</h1><p>Run <code>cd frontend && npm run build</code> or rebuild the Docker image.</p>",
+        status_code=404,
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard():
-    path = os.path.join(_STATIC, "dashboard.html")
-    if os.path.exists(path):
-        with open(path) as f:
-            return HTMLResponse(f.read())
-    return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
-
-
-@app.get("/admin", response_class=HTMLResponse)
-def admin_page():
-    path = os.path.join(_STATIC, "admin.html")
-    if os.path.exists(path):
-        with open(path) as f:
-            return HTMLResponse(f.read())
-    return HTMLResponse("<h1>Admin page not found</h1>", status_code=404)
-
-
-@app.get("/analytics", response_class=HTMLResponse)
-def analytics_page():
-    path = os.path.join(_STATIC, "analytics.html")
-    if os.path.exists(path):
-        with open(path) as f:
-            return HTMLResponse(f.read())
-    return HTMLResponse("<h1>Analytics page not found</h1>", status_code=404)
-
-
-@app.get("/uptime", response_class=HTMLResponse)
-def uptime_page():
-    path = os.path.join(_STATIC, "uptime.html")
-    if os.path.exists(path):
-        with open(path) as f:
-            return HTMLResponse(f.read())
-    return HTMLResponse("<h1>Uptime page not found</h1>", status_code=404)
+def spa_root():
+    return _serve_spa()
 
 
 # ─── WebSocket endpoint for real-time scan updates ─────────────────────
@@ -1193,3 +1181,17 @@ async def websocket_endpoint(websocket: WebSocket):
     finally:
         if user_id:
             ws_manager.disconnect(websocket, user_id)
+
+
+# ─── SPA catch-all (must be last route) ──────────────────────────────
+@app.get("/{path:path}", response_class=HTMLResponse)
+def spa_catch_all(path: str):
+    # Don't intercept API, health, docs, or WebSocket routes
+    if path.startswith(("api/", "health", "docs", "openapi.json", "ws")):
+        raise HTTPException(status_code=404, detail="Not found")
+    # Serve static file if it exists (e.g. favicon.ico)
+    static_path = os.path.join(_SPA_DIR, path)
+    if os.path.isfile(static_path):
+        return FileResponse(static_path)
+    # Otherwise serve SPA index.html for client-side routing
+    return _serve_spa()
