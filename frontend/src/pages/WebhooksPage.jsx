@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import '../styles/tables.css'
 import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -63,26 +64,28 @@ function WebhooksPage({ token }) {
       {webhooks.length > 0 && (
         <div className="webhooks-list">
           <h2>Configured Webhooks</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#111420', borderBottom: '1px solid #2a2d3a' }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>URL</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>Event</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {webhooks.map(wh => (
-                <tr key={wh.id} style={{ borderBottom: '1px solid #2a2d3a' }}>
-                  <td style={{ padding: '12px 16px', color: '#e8eaed', fontSize: '12px' }}>
-                    {wh.url?.substring(0, 50)}...
-                  </td>
-                  <td style={{ padding: '12px 16px', color: '#e8eaed' }}>{wh.event || 'N/A'}</td>
-                  <td style={{ padding: '12px 16px', color: '#44ff44' }}>Active</td>
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>URL</th>
+                  <th>Event</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {webhooks.map(wh => (
+                  <tr key={wh.id}>
+                    <td className="cell-mono cell-truncate">
+                      {wh.url?.substring(0, 50)}...
+                    </td>
+                    <td>{wh.event || 'N/A'}</td>
+                    <td><span className="badge active">Active</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

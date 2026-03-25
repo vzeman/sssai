@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import '../styles/tables.css'
 import './StubPage.css'
 import './Common.css'
-import './QueuePage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -62,30 +62,32 @@ function QueuePage({ token }) {
           <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
         </div>
       ) : (
-        <table className="queue-table">
-          <thead>
-            <tr>
-              <th>Target</th>
-              <th>Status</th>
-              <th>Position</th>
-              <th>ETA</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((scan, idx) => (
-              <tr key={scan.id}>
-                <td>{scan.target || 'N/A'}</td>
-                <td>
-                  <span className={`queue-status-badge ${scan.status}`}>
-                    {scan.status}
-                  </span>
-                </td>
-                <td className="muted">{idx + 1}</td>
-                <td className="muted">~5 min</td>
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Status</th>
+                <th>Position</th>
+                <th>ETA</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {queue.map((scan, idx) => (
+                <tr key={scan.id}>
+                  <td>{scan.target || 'N/A'}</td>
+                  <td>
+                    <span className={`badge ${scan.status}`}>
+                      {scan.status}
+                    </span>
+                  </td>
+                  <td className="cell-muted">{idx + 1}</td>
+                  <td className="cell-muted">~5 min</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

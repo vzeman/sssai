@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DetailModal from '../components/DetailModal'
+import '../styles/tables.css'
 import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -245,69 +246,67 @@ function SchedulesPage({ token }) {
           <button onClick={() => setShowForm(true)} className="empty-state-cta">Create Schedule</button>
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+        <div className="data-table-wrapper">
+          <table className="data-table">
             <thead>
-              <tr style={{ background: '#111420', borderBottom: '1px solid #2a2d3a' }}>
-                <th style={thStyle}>Target</th>
-                <th style={thStyle}>Type</th>
-                <th style={thStyle}>Frequency</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Next Run</th>
-                <th style={thStyle}>Last Run</th>
-                <th style={thStyle}>Runs</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th>Target</th>
+                <th>Type</th>
+                <th>Frequency</th>
+                <th>Status</th>
+                <th>Next Run</th>
+                <th>Last Run</th>
+                <th>Runs</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {schedules.map(sched => (
-                <tr key={sched.id} style={rowStyle} onClick={() => setSelectedSchedule(sched)}>
-                  <td style={tdStyle}>
+                <tr key={sched.id} onClick={() => setSelectedSchedule(sched)}>
+                  <td>
                     <span style={{ color: '#4a9eff' }}>{sched.target}</span>
                   </td>
-                  <td style={tdStyle}>
-                    <span style={badgeStyle}>{sched.scan_type}</span>
+                  <td>
+                    <span className="badge">{sched.scan_type}</span>
                   </td>
-                  <td style={tdStyle}>{frequencyLabel(sched.cron_expression)}</td>
-                  <td style={tdStyle}>
-                    <span style={{
-                      ...statusDotStyle,
-                      background: sched.is_active ? '#44ff44' : '#666',
-                    }} />
-                    {sched.is_active ? 'Active' : 'Paused'}
+                  <td>{frequencyLabel(sched.cron_expression)}</td>
+                  <td>
+                    <span className={`badge ${sched.is_active ? 'active' : 'paused'}`}>
+                      {sched.is_active ? 'Active' : 'Paused'}
+                    </span>
                   </td>
-                  <td style={{ ...tdStyle, color: '#b0b4c0' }}>{formatDate(sched.next_run_at)}</td>
-                  <td style={{ ...tdStyle, color: '#b0b4c0' }}>{formatDate(sched.last_run_at)}</td>
-                  <td style={tdStyle}>
+                  <td className="cell-muted">{formatDate(sched.next_run_at)}</td>
+                  <td className="cell-muted">{formatDate(sched.last_run_at)}</td>
+                  <td>
                     {sched.run_count || 0}
                     {sched.max_runs ? ` / ${sched.max_runs}` : ''}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                    <div className="table-actions">
                       <button
                         onClick={() => handleToggle(sched.id)}
-                        style={actionBtnStyle}
+                        className="table-action-btn"
                         title={sched.is_active ? 'Pause' : 'Resume'}
                       >
                         {sched.is_active ? 'Pause' : 'Resume'}
                       </button>
                       <button
                         onClick={() => handleRunNow(sched.id)}
-                        style={{ ...actionBtnStyle, borderColor: '#2a5a3a', color: '#6fdf8f' }}
+                        className="table-action-btn success"
                         title="Run scan now"
                       >
                         Run Now
                       </button>
                       <button
                         onClick={() => startEdit(sched)}
-                        style={actionBtnStyle}
+                        className="table-action-btn"
                         title="Edit schedule"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setConfirmingDelete(sched.id)}
-                        style={{ ...actionBtnStyle, borderColor: '#5a2a2a', color: '#ff6b6b' }}
+                        className="table-action-btn danger"
                         title="Delete schedule"
                       >
                         Delete
@@ -342,6 +341,7 @@ function SchedulesPage({ token }) {
   )
 }
 
+/* Form styles (kept as inline style objects — table styles moved to tables.css) */
 const btnStyle = {
   padding: '8px 20px',
   background: '#2a3d50',
@@ -396,64 +396,6 @@ const inputStyle = {
   color: '#e8eaed',
   fontSize: 13,
   outline: 'none',
-}
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  background: '#1a1d27',
-  borderRadius: 8,
-  overflow: 'hidden',
-}
-
-const thStyle = {
-  padding: '12px 16px',
-  textAlign: 'left',
-  color: '#b0b4c0',
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-}
-
-const tdStyle = {
-  padding: '12px 16px',
-  color: '#e8eaed',
-  fontSize: 13,
-  borderBottom: '1px solid #2a2d3a',
-}
-
-const rowStyle = {
-  cursor: 'pointer',
-  transition: 'background 0.15s',
-}
-
-const badgeStyle = {
-  padding: '2px 8px',
-  background: '#2a3040',
-  borderRadius: 4,
-  fontSize: 11,
-  color: '#ccc',
-  textTransform: 'uppercase',
-}
-
-const statusDotStyle = {
-  display: 'inline-block',
-  width: 8,
-  height: 8,
-  borderRadius: '50%',
-  marginRight: 8,
-}
-
-const actionBtnStyle = {
-  padding: '4px 10px',
-  background: 'transparent',
-  border: '1px solid #2a2d3a',
-  borderRadius: 4,
-  color: '#ccc',
-  fontSize: 11,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
 }
 
 export default SchedulesPage
