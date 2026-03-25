@@ -3270,7 +3270,33 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Clean up checkpoint ──
     delete_checkpoint(scan_id)
 
-    # ── Phase 3.5: Attack Chain Analysis (post-processing fallback) ──
+    # ── Phase 3.5: Finding Verification (automated false-positive reduction) ──
+    _record_phase(scan_context, "finding_verification")
+    try:
+        from modules.agent.finding_verification import verify_findings
+        _log_activity(scan_id, {
+            "type": "phase",
+            "phase": "finding_verification",
+            "message": f"Verifying {len(report.get('findings', []))} findings to reduce false positives...",
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+        report = verify_findings(report, target, scan_id)
+        vsummary = report.get("verification_summary", {})
+        _log_activity(scan_id, {
+            "type": "phase",
+            "phase": "finding_verification",
+            "message": f"Verification complete: {vsummary.get('confirmed', 0)} confirmed, {vsummary.get('demoted', 0)} false positives demoted to info",
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+        _post_agent_chat(
+            scan_id,
+            f"Finding verification: {vsummary.get('confirmed', 0)} confirmed, "
+            f"{vsummary.get('demoted', 0)} demoted as false positives.",
+        )
+    except Exception as exc:
+        log.warning("Finding verification failed for scan %s: %s", scan_id, exc)
+
+    # ── Phase 3.6: Attack Chain Analysis (post-processing fallback) ──
     # If the agent didn't produce attack_chains itself, generate them now.
     if not report.get("attack_chains"):
         _record_phase(scan_context, "attack_chain_analysis")
