@@ -21,7 +21,7 @@ function ScansPage({ token }) {
     try {
       setLoading(true)
       const skip = (page - 1) * size
-      const resp = await fetch(`${API_BASE}/api/scans?skip=${skip}&limit=${size}`, {
+      const resp = await fetch(`${API_BASE}/api/scans/?skip=${skip}&limit=${size}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
