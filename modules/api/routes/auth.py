@@ -29,6 +29,11 @@ GENERIC_AUTH_ERROR = "Invalid email or password"
 
 @router.post("/register", response_model=UserResponse)
 def register(body: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user account.
+
+    The first registered user is automatically promoted to admin.
+    Password requirements: minimum 8 characters, must contain uppercase letter.
+    """
     pw_error = validate_password(body.password)
     if pw_error:
         raise HTTPException(status_code=400, detail=pw_error)
@@ -64,6 +69,11 @@ class TwoFactorVerifyRequest(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 def login(body: UserCreate, response: Response, db: Session = Depends(get_db)):
+    """Authenticate and get JWT access token.
+
+    If 2FA is enabled, returns a temporary token with requires_2fa=true.
+    Use /verify-2fa with the temporary token and TOTP code to complete login.
+    """
     email = body.email.lower().strip()
 
     if check_rate_limit(email):
@@ -263,7 +273,7 @@ def disable_2fa(
 
 @router.post("/refresh", response_model=LoginResponse)
 def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
-    """Issue a new access token using a valid refresh token."""
+    """Refresh an expired access token using the refresh token cookie."""
     raw_token = request.cookies.get("refresh_token")
     if not raw_token:
         auth = request.headers.get("authorization", "")
@@ -357,6 +367,7 @@ class AdminCreateUserRequest(BaseModel):
 
 @router.get("/users", response_model=list[UserResponse])
 def list_users(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List all users (admin only)."""
     _require_admin(user, db)
     return db.query(User).order_by(User.created_at.asc()).all()
 
