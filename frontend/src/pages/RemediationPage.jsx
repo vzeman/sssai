@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/ToastContext'
+import './Common.css'
 import './RemediationPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''

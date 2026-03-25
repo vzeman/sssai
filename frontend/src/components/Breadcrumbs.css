@@ -15,13 +15,13 @@
 }
 
 .breadcrumb-separator {
-  color: var(--app-text-muted, #555);
+  color: var(--app-text-muted, #888);
   margin: 0 4px;
   user-select: none;
 }
 
 .breadcrumb-link {
-  color: var(--app-text-secondary, #888);
+  color: var(--app-text-secondary, #9ca3af);
   text-decoration: none;
   transition: color 0.15s;
 }

@@ -373,7 +373,7 @@
 .modal-header h2 {
   margin: 0;
   font-size: 20px;
-  color: #fff;
+  color: var(--app-text);
 }
 
 .close-btn {

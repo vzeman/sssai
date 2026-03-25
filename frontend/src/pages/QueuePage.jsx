@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import './StubPage.css'
+import './Common.css'
 import './QueuePage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''

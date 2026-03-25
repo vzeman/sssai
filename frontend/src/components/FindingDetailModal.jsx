@@ -21,7 +21,7 @@ export default function FindingDetailModal({ finding, onClose }) {
     low: '#44ff44',
     info: '#4a9eff',
   }
-  const color = severityColors[finding.severity] || '#888'
+  const color = severityColors[finding.severity] || '#b0b4c0'
 
   return (
     <div className="fdm-overlay" onClick={onClose} role="dialog" aria-modal="true">

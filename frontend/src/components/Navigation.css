@@ -46,7 +46,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--app-text-muted, #555);
+  color: var(--app-text-muted, #888);
 }
 
 .nav-group-items {

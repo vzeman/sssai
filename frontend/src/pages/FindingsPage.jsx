@@ -14,7 +14,7 @@ const FINDING_STATUSES = [
   { value: 'confirmed', label: 'Confirmed', color: '#ff8844', bg: '#4a3a2a' },
   { value: 'in_progress', label: 'In Progress', color: '#ffcc44', bg: '#4a4a2a' },
   { value: 'resolved', label: 'Resolved', color: '#44ff44', bg: '#2a4a2a' },
-  { value: 'false_positive', label: 'False Positive', color: '#999', bg: '#2a2d3a' },
+  { value: 'false_positive', label: 'False Positive', color: '#b0b4c0', bg: '#2a2d3a' },
   { value: 'accepted_risk', label: 'Accepted Risk', color: '#bb77ff', bg: '#3a2a4a' },
 ]
 
