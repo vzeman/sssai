@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import './Breadcrumbs.css'
 
 const ROUTE_LABELS = {
   scans: 'Scans',
@@ -47,14 +46,14 @@ export default function Breadcrumbs() {
   }
 
   return (
-    <nav className="breadcrumbs" aria-label="Breadcrumb">
+    <nav className="flex items-center gap-1 text-sm mb-4 px-6 pt-4" aria-label="Breadcrumb">
       {crumbs.map((crumb, idx) => (
-        <span key={crumb.path} className="breadcrumb-item">
-          {idx > 0 && <span className="breadcrumb-separator" aria-hidden="true">/</span>}
+        <span key={crumb.path} className="flex items-center gap-1">
+          {idx > 0 && <span className="text-gray-600 mx-1" aria-hidden="true">/</span>}
           {idx < crumbs.length - 1 ? (
-            <Link className="breadcrumb-link" to={crumb.path}>{crumb.label}</Link>
+            <Link className="text-gray-400 hover:text-gray-200 transition" to={crumb.path}>{crumb.label}</Link>
           ) : (
-            <span className="breadcrumb-current" aria-current="page">{crumb.label}</span>
+            <span className="text-gray-200 font-medium" aria-current="page">{crumb.label}</span>
           )}
         </span>
       ))}
