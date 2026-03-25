@@ -179,15 +179,23 @@ function Dashboard({ token }) {
                 <div className="scan-title">{scan.target || 'Unknown'}</div>
                 <div className="scan-details">
                   <span className={`status ${scan.status}`}>{scan.status}</span>
+                  <span className="scan-detail-sep">|</span>
                   <span className="scan-type">{scan.scan_type || 'security'}</span>
                   {scan.findings_count > 0 && (
-                    <span className="scan-findings">{scan.findings_count} findings</span>
+                    <>
+                      <span className="scan-detail-sep">|</span>
+                      <span className="scan-findings">{scan.findings_count} findings</span>
+                    </>
                   )}
                   {scan.risk_score != null && (
-                    <span className={`scan-risk ${scan.risk_score >= 30 ? 'high' : scan.risk_score >= 15 ? 'medium' : 'low'}`}>
-                      Risk: {scan.risk_score}
-                    </span>
+                    <>
+                      <span className="scan-detail-sep">|</span>
+                      <span className={`scan-risk ${scan.risk_score >= 30 ? 'high' : scan.risk_score >= 15 ? 'medium' : 'low'}`}>
+                        Risk: {scan.risk_score}
+                      </span>
+                    </>
                   )}
+                  <span className="scan-detail-sep">|</span>
                   <span className="timestamp">{new Date(scan.created_at).toLocaleDateString()}</span>
                 </div>
               </div>

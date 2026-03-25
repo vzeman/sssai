@@ -14,8 +14,8 @@
   /* App-level theme tokens (dark defaults) */
   --app-bg: #0f1117;
   --app-text: #e8eaed;
-  --app-text-secondary: #888;
-  --app-text-muted: #666;
+  --app-text-secondary: #9ca3af;
+  --app-text-muted: #888;
   --card-bg: #1a1d27;
   --card-border: #2a2d3a;
   --card-hover-bg: #252c3a;
@@ -83,8 +83,8 @@
 
   --app-bg: #f5f6fa;
   --app-text: #1a1d27;
-  --app-text-secondary: #6b7280;
-  --app-text-muted: #9ca3af;
+  --app-text-secondary: #4b5563;
+  --app-text-muted: #6b7280;
   --card-bg: #ffffff;
   --card-border: #e2e4e9;
   --card-hover-bg: #f0f1f5;

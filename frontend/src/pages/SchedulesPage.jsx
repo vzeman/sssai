@@ -276,8 +276,8 @@ function SchedulesPage({ token }) {
                     }} />
                     {sched.is_active ? 'Active' : 'Paused'}
                   </td>
-                  <td style={{ ...tdStyle, color: '#888' }}>{formatDate(sched.next_run_at)}</td>
-                  <td style={{ ...tdStyle, color: '#888' }}>{formatDate(sched.last_run_at)}</td>
+                  <td style={{ ...tdStyle, color: '#b0b4c0' }}>{formatDate(sched.next_run_at)}</td>
+                  <td style={{ ...tdStyle, color: '#b0b4c0' }}>{formatDate(sched.last_run_at)}</td>
                   <td style={tdStyle}>
                     {sched.run_count || 0}
                     {sched.max_runs ? ` / ${sched.max_runs}` : ''}
@@ -357,7 +357,7 @@ const btnSecondaryStyle = {
   ...btnStyle,
   background: 'transparent',
   borderColor: '#2a2d3a',
-  color: '#888',
+  color: '#b0b4c0',
 }
 
 const formContainerStyle = {
@@ -382,7 +382,7 @@ const fieldStyle = {
 
 const labelStyle = {
   fontSize: 12,
-  color: '#888',
+  color: '#b0b4c0',
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.5px',
@@ -409,7 +409,7 @@ const tableStyle = {
 const thStyle = {
   padding: '12px 16px',
   textAlign: 'left',
-  color: '#888',
+  color: '#b0b4c0',
   fontSize: 11,
   fontWeight: 600,
   textTransform: 'uppercase',
@@ -433,7 +433,7 @@ const badgeStyle = {
   background: '#2a3040',
   borderRadius: 4,
   fontSize: 11,
-  color: '#aaa',
+  color: '#ccc',
   textTransform: 'uppercase',
 }
 
@@ -450,7 +450,7 @@ const actionBtnStyle = {
   background: 'transparent',
   border: '1px solid #2a2d3a',
   borderRadius: 4,
-  color: '#aaa',
+  color: '#ccc',
   fontSize: 11,
   cursor: 'pointer',
   whiteSpace: 'nowrap',

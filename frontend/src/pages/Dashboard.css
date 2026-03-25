@@ -146,6 +146,11 @@
   color: #ff4a4a;
 }
 
+.scan-detail-sep {
+  color: var(--app-text-muted, #888);
+  margin: 0 4px;
+}
+
 .timestamp {
   color: var(--app-text-muted);
 }

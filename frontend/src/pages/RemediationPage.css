@@ -14,7 +14,7 @@
 .summary-critical .count { color: #ff4444; }
 .summary-high .count { color: #ff8844; }
 .summary-medium .count { color: #ffaa44; }
-.summary-low .count { color: #44ff44; }
+.summary-low .count { color: #22c55e; }
 
 /* View Tabs */
 
@@ -94,13 +94,13 @@
 
 .finding-card:hover {
   border-color: var(--card-hover-border);
-  background: #1e2130;
+  background: var(--card-hover-bg);
 }
 
 .finding-card.severity-border-critical { border-left-color: #ff4444; }
 .finding-card.severity-border-high { border-left-color: #ff8844; }
 .finding-card.severity-border-medium { border-left-color: #ffaa44; }
-.finding-card.severity-border-low { border-left-color: #44ff44; }
+.finding-card.severity-border-low { border-left-color: #22c55e; }
 .finding-card.severity-border-info { border-left-color: #4a9eff; }
 
 .finding-card-header {
@@ -347,7 +347,7 @@
 .bucket-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #fff;
+  color: var(--app-text);
 }
 
 .bucket-count {

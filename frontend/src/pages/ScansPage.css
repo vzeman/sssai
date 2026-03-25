@@ -89,11 +89,11 @@
 }
 
 .scans-table tr:hover td {
-  background: #1e2230;
+  background: var(--card-hover-bg);
 }
 
 .scan-target {
-  color: #fff;
+  color: var(--app-text);
   font-weight: 500;
   max-width: 300px;
   overflow: hidden;

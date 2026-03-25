@@ -66,9 +66,9 @@ function WebhooksPage({ token }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#111420', borderBottom: '1px solid #2a2d3a' }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>URL</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>Event</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#888' }}>Status</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>URL</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>Event</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#b0b4c0' }}>Status</th>
               </tr>
             </thead>
             <tbody>
