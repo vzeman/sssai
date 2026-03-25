@@ -5,7 +5,6 @@ import FindingDetailModal from '../components/FindingDetailModal'
 import { LoadingSkeleton } from '../components/LoadingSkeleton'
 import { Pagination } from '../components/Pagination'
 import { useToast } from '../components/ToastContext'
-import './FindingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -20,11 +19,19 @@ const FINDING_STATUSES = [
 
 const STATUS_MAP = Object.fromEntries(FINDING_STATUSES.map(s => [s.value, s]))
 
+const SEVERITY_BADGE_CLASSES = {
+  critical: 'bg-red-900/50 text-red-400',
+  high: 'bg-orange-900/50 text-orange-400',
+  medium: 'bg-yellow-900/50 text-yellow-400',
+  low: 'bg-green-900/50 text-green-400',
+  info: 'bg-blue-900/50 text-blue-400',
+}
+
 function StatusBadge({ status }) {
   const info = STATUS_MAP[status] || STATUS_MAP['new']
   return (
     <span
-      className="finding-status-badge"
+      className="px-2.5 py-0.5 rounded-full text-xs font-semibold"
       style={{ background: info.bg, color: info.color }}
     >
       {info.label}
@@ -110,9 +117,9 @@ function StatusDropdown({ finding, token, onStatusChange }) {
   const currentStatus = finding.finding_status || 'new'
 
   return (
-    <div className="status-dropdown-wrapper">
+    <div className="relative">
       <select
-        className="status-select"
+        className="w-full px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500"
         value={currentStatus}
         onChange={handleChange}
         disabled={changing}
@@ -123,19 +130,20 @@ function StatusDropdown({ finding, token, onStatusChange }) {
         ))}
       </select>
       {showReason && (
-        <div className="reason-popover" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute z-50 top-full left-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-lg p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <form onSubmit={handleReasonSubmit}>
-            <label>Reason for marking as {STATUS_MAP[pendingStatus]?.label}:</label>
+            <label className="block text-sm text-gray-300 mb-2">Reason for marking as {STATUS_MAP[pendingStatus]?.label}:</label>
             <textarea
+              className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Explain why this is a false positive or accepted risk..."
               rows={3}
               autoFocus
             />
-            <div className="reason-actions">
-              <button type="button" className="btn btn-secondary" onClick={handleReasonCancel}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Confirm</button>
+            <div className="flex justify-end gap-2 mt-3">
+              <button type="button" className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium transition" onClick={handleReasonCancel}>Cancel</button>
+              <button type="submit" className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-semibold transition">Confirm</button>
             </div>
           </form>
         </div>
@@ -312,22 +320,22 @@ function FindingsPage({ token }) {
 
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="page-header"><h1>Findings</h1></div>
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="mb-6"><h1 className="text-2xl font-bold text-white">Findings</h1></div>
         <LoadingSkeleton rows={8} columns={6} />
       </div>
     )
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
         <div>
-          <h1>Findings</h1>
-          <p>Security findings and vulnerabilities across all scans</p>
+          <h1 className="text-2xl font-bold text-white">Findings</h1>
+          <p className="text-sm text-gray-400 mt-1">Security findings and vulnerabilities across all scans</p>
         </div>
-        <div className="header-actions">
-          <label className="toggle-label">
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={hideFalsePositives}
@@ -335,12 +343,13 @@ function FindingsPage({ token }) {
                 setHideFalsePositives(e.target.checked)
                 setCurrentPage(1)
               }}
+              className="rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
             />
-            <span className="toggle-text">Hide False Positives</span>
+            <span className="text-sm text-gray-300">Hide False Positives</span>
           </label>
           {findings.length > 0 && (
             <button
-              className="btn-export"
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition"
               onClick={handleExportCSV}
               disabled={exporting}
             >
@@ -350,75 +359,80 @@ function FindingsPage({ token }) {
         </div>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="bg-red-900/20 border border-red-800 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">{error}</div>}
 
       {successMessage && (
-        <div className="success-message">{successMessage}</div>
+        <div className="bg-green-900/20 border border-green-800 text-green-400 px-4 py-3 rounded-lg text-sm mb-4">{successMessage}</div>
       )}
 
-      <div className="filters-section">
-        <div className="filter-group filter-group-wide">
-          <label>Search</label>
-          <input
-            type="text"
-            name="search"
-            value={filters.search}
-            onChange={handleFilterChange}
-            placeholder="Search by title or description..."
-          />
-        </div>
-
-        <div className="filter-group">
-          <label>Severity</label>
-          <select name="severity" value={filters.severity} onChange={handleFilterChange}>
-            <option value="all">All Severities</option>
-            <option value="critical">Critical</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-
-        <div className="filter-group">
-          <label>Category</label>
-          <select name="category" value={filters.category} onChange={handleFilterChange}>
-            <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-group">
-          <label>CVSS Score</label>
-          <div className="cvss-range">
+      <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-5 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="sm:col-span-2 lg:col-span-2">
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Search</label>
             <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.5"
-              name="cvssMin"
-              value={filters.cvssMin}
+              type="text"
+              name="search"
+              value={filters.search}
               onChange={handleFilterChange}
-              placeholder="Min"
+              placeholder="Search by title or description..."
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
             />
-            <span>-</span>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.5"
-              name="cvssMax"
-              value={filters.cvssMax}
-              onChange={handleFilterChange}
-              placeholder="Max"
-            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Severity</label>
+            <select name="severity" value={filters.severity} onChange={handleFilterChange} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+              <option value="all">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Category</label>
+            <select name="category" value={filters.category} onChange={handleFilterChange} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
+              <option value="all">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">CVSS Score</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                name="cvssMin"
+                value={filters.cvssMin}
+                onChange={handleFilterChange}
+                placeholder="Min"
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+              <span className="text-gray-500">-</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                name="cvssMax"
+                value={filters.cvssMax}
+                onChange={handleFilterChange}
+                placeholder="Max"
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="filter-group">
-          <label>Status</label>
-          <select name="status" value={filters.status} onChange={handleFilterChange}>
+        <div className="mt-4">
+          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Status</label>
+          <select name="status" value={filters.status} onChange={handleFilterChange} className="w-full sm:w-48 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500">
             <option value="all">All Statuses</option>
             {FINDING_STATUSES.map(s => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -427,45 +441,45 @@ function FindingsPage({ token }) {
         </div>
       </div>
 
-      <div className="saved-filters-section">
-        <div className="saved-filters-actions">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-2">
           {!showSaveInput ? (
-            <button className="btn-save-filter" onClick={() => setShowSaveInput(true)}>
+            <button className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium transition" onClick={() => setShowSaveInput(true)}>
               Save Current Filter
             </button>
           ) : (
-            <form className="save-filter-form" onSubmit={(e) => { e.preventDefault(); handleSaveFilter(); }}>
+            <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); handleSaveFilter(); }}>
               <input
                 type="text"
                 value={saveFilterName}
                 onChange={(e) => setSaveFilterName(e.target.value)}
                 placeholder="Filter preset name..."
-                className="save-filter-input"
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 autoFocus
               />
-              <button type="submit" className="btn-save-confirm" disabled={!saveFilterName.trim()}>
+              <button type="submit" className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-semibold transition" disabled={!saveFilterName.trim()}>
                 Save
               </button>
-              <button type="button" className="btn-save-cancel" onClick={() => { setShowSaveInput(false); setSaveFilterName(''); }}>
+              <button type="button" className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium transition" onClick={() => { setShowSaveInput(false); setSaveFilterName(''); }}>
                 Cancel
               </button>
             </form>
           )}
         </div>
         {savedFilters.length > 0 && (
-          <div className="saved-filters-list">
-            <span className="saved-filters-label">Saved:</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Saved:</span>
             {savedFilters.map(preset => (
-              <div key={preset.name} className="saved-filter-chip">
+              <div key={preset.name} className="flex items-center bg-gray-800 border border-gray-700 rounded-full overflow-hidden">
                 <button
-                  className="saved-filter-chip-name"
+                  className="px-3 py-1 text-xs text-cyan-400 hover:text-cyan-300 transition"
                   onClick={() => handleLoadFilter(preset)}
                   title={`Load filter: ${preset.name}`}
                 >
                   {preset.name}
                 </button>
                 <button
-                  className="saved-filter-chip-delete"
+                  className="px-2 py-1 text-xs text-gray-500 hover:text-red-400 transition border-l border-gray-700"
                   onClick={() => handleDeleteFilter(preset.name)}
                   title={`Delete filter: ${preset.name}`}
                 >
@@ -477,78 +491,78 @@ function FindingsPage({ token }) {
         )}
       </div>
 
-      <div className="findings-summary">
+      <div className="text-sm text-gray-400 mb-4">
         Found {filteredFindings.length} finding{filteredFindings.length !== 1 ? 's' : ''}
         {hideFalsePositives && ' (false positives hidden)'}
       </div>
 
       {findings.length === 0 ? (
-        <div className="empty-state-card">
-          <div className="empty-state-icon">
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-12 text-center">
+          <div className="flex justify-center mb-4">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <path d="M9 12l2 2 4-4" />
             </svg>
           </div>
-          <h3 className="empty-state-title">No findings yet</h3>
-          <p className="empty-state-text">
+          <h3 className="text-lg font-semibold text-white mb-2">No findings yet</h3>
+          <p className="text-gray-500 mb-4">
             Run a security scan to discover vulnerabilities and findings across your targets.
           </p>
-          <Link to="/scans/new" className="empty-state-cta">Start a New Scan</Link>
+          <Link to="/scans/new" className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition inline-block">Start a New Scan</Link>
         </div>
       ) : filteredFindings.length === 0 ? (
-        <div className="empty-state-card">
-          <div className="empty-state-icon">
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-12 text-center">
+          <div className="flex justify-center mb-4">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
           </div>
-          <h3 className="empty-state-title">No findings match your filters</h3>
-          <p className="empty-state-text">
+          <h3 className="text-lg font-semibold text-white mb-2">No findings match your filters</h3>
+          <p className="text-gray-500">
             Try adjusting the severity, CVSS score range, or status filters to see more results.
           </p>
         </div>
       ) : (
-        <div className="findings-table">
-          <table>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+          <table className="w-full text-left">
             <thead>
-              <tr>
-                <th>Title</th>
-                <th>Severity</th>
-                <th>CVSS</th>
-                <th>Status</th>
-                <th>Scan</th>
-                <th>Action</th>
+              <tr className="border-b border-gray-700">
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Title</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Severity</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">CVSS</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Scan</th>
+                <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody>
               {paginatedFindings.map((finding, idx) => (
-                <tr key={finding.id || idx} className="finding-row" onClick={() => setSelectedFinding(finding)} style={{cursor: 'pointer'}}>
-                  <td className="title-cell">
-                    <span className="finding-title">{finding.title || 'Unknown'}</span>
+                <tr key={finding.id || idx} className="border-b border-gray-800 hover:bg-gray-800/50 transition cursor-pointer" onClick={() => setSelectedFinding(finding)}>
+                  <td className="px-4 py-3 text-gray-200 font-medium max-w-xs truncate">
+                    {finding.title || 'Unknown'}
                   </td>
-                  <td>
-                    <span className={`severity-badge ${finding.severity}`}>
+                  <td className="px-4 py-3">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${SEVERITY_BADGE_CLASSES[finding.severity] || 'bg-gray-700 text-gray-400'}`}>
                       {finding.severity || 'unknown'}
                     </span>
                   </td>
-                  <td>
-                    <span className={`cvss-badge ${finding.severity}`}>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_BADGE_CLASSES[finding.severity] || 'bg-gray-700 text-gray-400'}`}>
                       {finding.cvss_score || 'N/A'}
                     </span>
                   </td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <StatusDropdown
                       finding={finding}
                       token={token}
                       onStatusChange={handleStatusChange}
                     />
                   </td>
-                  <td className="scan-ref">{finding.scan_id?.substring(0, 8) || 'N/A'}</td>
-                  <td>
+                  <td className="px-4 py-3 text-gray-400 text-sm font-mono">{finding.scan_id?.substring(0, 8) || 'N/A'}</td>
+                  <td className="px-4 py-3">
                     <button
-                      className="action-btn"
+                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs font-medium transition"
                       onClick={(e) => { e.stopPropagation(); setSelectedFinding(finding); }}
                     >
                       View

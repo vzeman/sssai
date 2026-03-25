@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DetailModal from '../components/DetailModal'
-import '../styles/tables.css'
-import './StubPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -151,43 +149,43 @@ function SchedulesPage({ token }) {
   }
 
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading schedules...</div></div>
+    return <div className="p-6 max-w-6xl mx-auto"><div className="text-gray-400 text-sm">Loading schedules...</div></div>
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1>Scheduled Scans</h1>
-          <p>Create and manage recurring security scans</p>
+          <h1 className="text-2xl font-bold text-white">Scheduled Scans</h1>
+          <p className="text-sm text-gray-400">Create and manage recurring security scans</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(!showForm) }}
-          style={btnStyle}
+          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition"
         >
           {showForm ? 'Cancel' : '+ New Schedule'}
         </button>
       </div>
 
       {actionMsg && (
-        <div style={{ padding: '10px 16px', background: '#1a3a2a', border: '1px solid #2a5a3a', borderRadius: 8, color: '#6fdf8f', marginBottom: 16, fontSize: 13 }}>
+        <div className="px-4 py-2.5 bg-green-900/30 border border-green-800 rounded-lg text-green-400 mb-4 text-sm">
           {actionMsg}
         </div>
       )}
 
       {error && (
-        <div style={{ padding: '10px 16px', background: '#3a1a1a', border: '1px solid #5a2a2a', borderRadius: 8, color: '#ff6b6b', marginBottom: 16, fontSize: 13 }}>
+        <div className="px-4 py-2.5 bg-red-900/30 border border-red-800 rounded-lg text-red-400 mb-4 text-sm flex items-center">
           {error}
-          <button onClick={() => setError('')} style={{ marginLeft: 12, background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer' }}>dismiss</button>
+          <button onClick={() => setError('')} className="ml-3 bg-transparent border-none text-red-400 cursor-pointer text-sm hover:text-red-300">dismiss</button>
         </div>
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} style={formContainerStyle}>
-          <h3 style={{ margin: '0 0 16px', color: '#e8eaed' }}>{editingId ? 'Edit Schedule' : 'Create New Schedule'}</h3>
-          <div style={formGridStyle}>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Target URL *</label>
+        <form onSubmit={handleSubmit} className="bg-gray-800/30 border border-gray-700 rounded-xl p-5 mb-5">
+          <h3 className="text-white font-semibold mb-4">{editingId ? 'Edit Schedule' : 'Create New Schedule'}</h3>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Target URL *</label>
               <input
                 type="url"
                 required
@@ -195,118 +193,116 @@ function SchedulesPage({ token }) {
                 value={form.target}
                 onChange={e => setForm({ ...form, target: e.target.value })}
                 disabled={!!editingId}
-                style={inputStyle}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-gray-500"
               />
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Scan Type</label>
-              <select value={form.scan_type} onChange={e => setForm({ ...form, scan_type: e.target.value })} style={inputStyle}>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Scan Type</label>
+              <select value={form.scan_type} onChange={e => setForm({ ...form, scan_type: e.target.value })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-gray-500">
                 {SCAN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Frequency</label>
-              <select value={form.cron_expression} onChange={e => setForm({ ...form, cron_expression: e.target.value })} style={inputStyle}>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Frequency</label>
+              <select value={form.cron_expression} onChange={e => setForm({ ...form, cron_expression: e.target.value })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-gray-500">
                 {FREQUENCY_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Timezone</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Timezone</label>
               <input
                 type="text"
                 value={form.timezone}
                 onChange={e => setForm({ ...form, timezone: e.target.value })}
-                style={inputStyle}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-gray-500"
                 placeholder="UTC"
               />
             </div>
-            <div style={fieldStyle}>
-              <label style={labelStyle}>Max Runs (0 = unlimited)</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Max Runs (0 = unlimited)</label>
               <input
                 type="number"
                 min="0"
                 value={form.max_runs}
                 onChange={e => setForm({ ...form, max_runs: parseInt(e.target.value) || 0 })}
-                style={inputStyle}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-gray-500"
               />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button type="submit" style={btnStyle}>{editingId ? 'Update Schedule' : 'Create Schedule'}</button>
-            <button type="button" onClick={resetForm} style={btnSecondaryStyle}>Cancel</button>
+          <div className="flex gap-2 mt-4">
+            <button type="submit" className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition">{editingId ? 'Update Schedule' : 'Create Schedule'}</button>
+            <button type="button" onClick={resetForm} className="px-4 py-2 bg-transparent hover:bg-gray-800 text-gray-400 font-semibold rounded-lg text-sm transition border border-gray-700">Cancel</button>
           </div>
         </form>
       )}
 
       {schedules.length === 0 ? (
-        <div className="empty-state-card">
-          <div className="empty-state-icon" style={{ fontSize: 48 }}>&#128197;</div>
-          <h3 className="empty-state-title">No scheduled scans</h3>
-          <p className="empty-state-text">Create your first recurring scan to automatically monitor your targets on a schedule.</p>
-          <button onClick={() => setShowForm(true)} className="empty-state-cta">Create Schedule</button>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-10 text-center">
+          <div className="text-5xl mb-4">&#128197;</div>
+          <h3 className="text-white font-semibold mb-2">No scheduled scans</h3>
+          <p className="text-gray-400 text-sm mb-4">Create your first recurring scan to automatically monitor your targets on a schedule.</p>
+          <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-lg text-sm transition">Create Schedule</button>
         </div>
       ) : (
-        <div className="data-table-wrapper">
-          <table className="data-table">
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+          <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th>Target</th>
-                <th>Type</th>
-                <th>Frequency</th>
-                <th>Status</th>
-                <th>Next Run</th>
-                <th>Last Run</th>
-                <th>Runs</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Target</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Type</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Frequency</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Next Run</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Last Run</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Runs</th>
+                <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {schedules.map(sched => (
-                <tr key={sched.id} onClick={() => setSelectedSchedule(sched)}>
-                  <td>
-                    <span style={{ color: '#4a9eff' }}>{sched.target}</span>
+                <tr key={sched.id} onClick={() => setSelectedSchedule(sched)} className="cursor-pointer hover:bg-gray-800/50 transition">
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-cyan-400">{sched.target}</td>
+                  <td className="border-b border-gray-700/50 px-4 py-3">
+                    <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-700/50 text-gray-300">{sched.scan_type}</span>
                   </td>
-                  <td>
-                    <span className="badge">{sched.scan_type}</span>
-                  </td>
-                  <td>{frequencyLabel(sched.cron_expression)}</td>
-                  <td>
-                    <span className={`badge ${sched.is_active ? 'active' : 'paused'}`}>
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-300">{frequencyLabel(sched.cron_expression)}</td>
+                  <td className="border-b border-gray-700/50 px-4 py-3">
+                    <span className={`inline-block px-2.5 py-1 rounded text-xs font-semibold ${sched.is_active ? 'bg-green-900/50 text-green-400' : 'bg-gray-700/50 text-gray-400'}`}>
                       {sched.is_active ? 'Active' : 'Paused'}
                     </span>
                   </td>
-                  <td className="cell-muted">{formatDate(sched.next_run_at)}</td>
-                  <td className="cell-muted">{formatDate(sched.last_run_at)}</td>
-                  <td>
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-500">{formatDate(sched.next_run_at)}</td>
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-500">{formatDate(sched.last_run_at)}</td>
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-300">
                     {sched.run_count || 0}
                     {sched.max_runs ? ` / ${sched.max_runs}` : ''}
                   </td>
-                  <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                    <div className="table-actions">
+                  <td className="border-b border-gray-700/50 px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1 justify-end">
                       <button
                         onClick={() => handleToggle(sched.id)}
-                        className="table-action-btn"
+                        className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded transition"
                         title={sched.is_active ? 'Pause' : 'Resume'}
                       >
                         {sched.is_active ? 'Pause' : 'Resume'}
                       </button>
                       <button
                         onClick={() => handleRunNow(sched.id)}
-                        className="table-action-btn success"
+                        className="px-2 py-1 text-xs font-medium text-green-400 hover:text-green-300 bg-green-900/30 hover:bg-green-900/50 rounded transition"
                         title="Run scan now"
                       >
                         Run Now
                       </button>
                       <button
                         onClick={() => startEdit(sched)}
-                        className="table-action-btn"
+                        className="px-2 py-1 text-xs font-medium text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded transition"
                         title="Edit schedule"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setConfirmingDelete(sched.id)}
-                        className="table-action-btn danger"
+                        className="px-2 py-1 text-xs font-medium text-red-400 hover:text-red-300 bg-red-900/30 hover:bg-red-900/50 rounded transition"
                         title="Delete schedule"
                       >
                         Delete
@@ -339,63 +335,6 @@ function SchedulesPage({ token }) {
       />
     </div>
   )
-}
-
-/* Form styles (kept as inline style objects — table styles moved to tables.css) */
-const btnStyle = {
-  padding: '8px 20px',
-  background: '#2a3d50',
-  color: '#4a9eff',
-  border: '1px solid #3a5070',
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-}
-
-const btnSecondaryStyle = {
-  ...btnStyle,
-  background: 'transparent',
-  borderColor: '#2a2d3a',
-  color: '#b0b4c0',
-}
-
-const formContainerStyle = {
-  background: '#1a1d27',
-  border: '1px solid #2a2d3a',
-  borderRadius: 8,
-  padding: 24,
-  marginBottom: 20,
-}
-
-const formGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: 16,
-}
-
-const fieldStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 6,
-}
-
-const labelStyle = {
-  fontSize: 12,
-  color: '#b0b4c0',
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-}
-
-const inputStyle = {
-  padding: '8px 12px',
-  background: '#111420',
-  border: '1px solid #2a2d3a',
-  borderRadius: 6,
-  color: '#e8eaed',
-  fontSize: 13,
-  outline: 'none',
 }
 
 export default SchedulesPage
