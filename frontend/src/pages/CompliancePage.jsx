@@ -162,7 +162,7 @@ function CompliancePage({ token }) {
       })
       if (!resp.ok) throw new Error('Failed to fetch scans')
       const data = await resp.json()
-      setScans(data)
+      setScans(Array.isArray(data) ? data : (data.items || []))
       setError('')
     } catch (err) {
       setError(err.message)
