@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import './SettingsPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -14,38 +13,38 @@ function formatDate(dateStr) {
 
 // ─── Profile Section ─────────────────────────────────────────────────
 function ProfileSection({ user, loading }) {
-  if (loading) return <div className="settings-card"><p className="settings-muted">Loading profile...</p></div>
-  if (!user) return <div className="settings-card"><p className="settings-muted">Unable to load profile.</p></div>
+  if (loading) return <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6"><p className="text-sm text-gray-500">Loading profile...</p></div>
+  if (!user) return <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6"><p className="text-sm text-gray-500">Unable to load profile.</p></div>
 
   return (
-    <div className="settings-card">
-      <h2 className="settings-card-title">Profile</h2>
-      <div className="settings-field-grid">
-        <div className="settings-field">
-          <label>Email</label>
-          <span>{user.email}</span>
+    <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Profile</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Email</label>
+          <span className="block text-sm text-white">{user.email}</span>
         </div>
-        <div className="settings-field">
-          <label>Plan</label>
-          <span className="settings-badge">{user.plan}</span>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Plan</label>
+          <span className="inline-block px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-xs font-medium">{user.plan}</span>
         </div>
-        <div className="settings-field">
-          <label>Account Created</label>
-          <span>{formatDate(user.created_at)}</span>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Account Created</label>
+          <span className="block text-sm text-white">{formatDate(user.created_at)}</span>
         </div>
-        <div className="settings-field">
-          <label>Last Login</label>
-          <span>{formatDate(user.last_login)}</span>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Last Login</label>
+          <span className="block text-sm text-white">{formatDate(user.last_login)}</span>
         </div>
-        <div className="settings-field">
-          <label>2FA Status</label>
-          <span className={user.totp_enabled ? 'settings-badge-green' : 'settings-badge-dim'}>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">2FA Status</label>
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${user.totp_enabled ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
             {user.totp_enabled ? 'Enabled' : 'Disabled'}
           </span>
         </div>
-        <div className="settings-field">
-          <label>Account Status</label>
-          <span className={user.is_active ? 'settings-badge-green' : 'settings-badge-red'}>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Account Status</label>
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
             {user.is_active ? 'Active' : 'Inactive'}
           </span>
         </div>
@@ -100,43 +99,46 @@ function PasswordSection({ token }) {
   }
 
   return (
-    <div className="settings-card">
-      <h2 className="settings-card-title">Change Password</h2>
-      <form onSubmit={handleSubmit} className="settings-form">
-        <div className="settings-form-field">
-          <label>Current Password</label>
+    <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Change Password</h2>
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Current Password</label>
           <input
             type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="Enter current password"
             autoComplete="current-password"
+            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
           />
         </div>
-        <div className="settings-form-field">
-          <label>New Password</label>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">New Password</label>
           <input
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Min 8 characters"
             autoComplete="new-password"
+            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
           />
         </div>
-        <div className="settings-form-field">
-          <label>Confirm New Password</label>
+        <div className="space-y-1">
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Confirm New Password</label>
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Repeat new password"
             autoComplete="new-password"
+            className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
           />
         </div>
         {message.text && (
-          <div className={`settings-message settings-message-${message.type}`}>{message.text}</div>
+          <div className={`px-3 py-2 rounded-lg text-sm ${message.type === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{message.text}</div>
         )}
-        <button type="submit" className="settings-btn" disabled={submitting}>
+        <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50" disabled={submitting}>
           {submitting ? 'Changing...' : 'Change Password'}
         </button>
       </form>
@@ -212,68 +214,68 @@ function NotificationsSection({ token }) {
   }
 
   return (
-    <div className="settings-card">
-      <div className="settings-card-header">
-        <h2 className="settings-card-title">Notification Channels</h2>
-      </div>
-      {error && <div className="settings-message settings-message-error">{error}</div>}
+    <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Notification Channels</h2>
+      {error && <div className="px-3 py-2 rounded-lg text-sm bg-red-500/20 text-red-400 mb-4">{error}</div>}
       {loading ? (
-        <p className="settings-muted">Loading channels...</p>
+        <p className="text-sm text-gray-500">Loading channels...</p>
       ) : channels.length === 0 ? (
-        <p className="settings-muted">No notification channels configured.</p>
+        <p className="text-sm text-gray-500">No notification channels configured.</p>
       ) : (
-        <div className="settings-table-wrap">
-          <table className="settings-table">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Min Severity</th>
-                <th>Status</th>
-                <th>Actions</th>
+              <tr className="border-b border-gray-700">
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Name</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Type</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Min Severity</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Status</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {channels.map(ch => (
-                <tr key={ch.id}>
-                  <td>{ch.name}</td>
-                  <td>{typeLabels[ch.channel_type] || ch.channel_type}</td>
-                  <td className="settings-muted">{ch.min_severity}</td>
-                  <td>
-                    <span className={ch.is_active ? 'settings-badge-green' : 'settings-badge-dim'}>
+                <tr key={ch.id} className="border-b border-gray-700/50 hover:bg-gray-800/40">
+                  <td className="py-2 px-3 text-white">{ch.name}</td>
+                  <td className="py-2 px-3 text-white">{typeLabels[ch.channel_type] || ch.channel_type}</td>
+                  <td className="py-2 px-3 text-gray-400">{ch.min_severity}</td>
+                  <td className="py-2 px-3">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${ch.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
                       {ch.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="settings-actions">
-                    <button
-                      className="settings-btn-sm"
-                      onClick={() => toggleChannel(ch.id, ch.is_active)}
-                    >
-                      {ch.is_active ? 'Disable' : 'Enable'}
-                    </button>
-                    {confirmingDelete === ch.id ? (
-                      <>
+                  <td className="py-2 px-3">
+                    <div className="flex gap-2">
+                      <button
+                        className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition"
+                        onClick={() => toggleChannel(ch.id, ch.is_active)}
+                      >
+                        {ch.is_active ? 'Disable' : 'Enable'}
+                      </button>
+                      {confirmingDelete === ch.id ? (
+                        <>
+                          <button
+                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition"
+                            onClick={() => deleteChannel(ch.id)}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition"
+                            onClick={() => setConfirmingDelete(null)}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          className="settings-btn-sm settings-btn-danger"
+                          className="px-2 py-1 text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded transition"
                           onClick={() => deleteChannel(ch.id)}
                         >
-                          Confirm
+                          Delete
                         </button>
-                        <button
-                          className="settings-btn-sm"
-                          onClick={() => setConfirmingDelete(null)}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="settings-btn-sm settings-btn-danger"
-                        onClick={() => deleteChannel(ch.id)}
-                      >
-                        Delete
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -375,94 +377,96 @@ function ApiKeysSection({ token }) {
   }
 
   return (
-    <div className="settings-card">
-      <h2 className="settings-card-title">API Keys</h2>
-      <p className="settings-muted" style={{ marginBottom: '16px' }}>
+    <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-2">API Keys</h2>
+      <p className="text-sm text-gray-500 mb-4">
         API keys are used for CI/CD webhook integrations. Keys are shown only once at creation.
       </p>
 
       {createdKey && (
-        <div className="settings-created-key">
-          <p className="settings-created-key-label">New API key created. Copy it now -- it will not be shown again.</p>
-          <div className="settings-key-display">
-            <code>{createdKey}</code>
-            <button className="settings-btn-sm" onClick={copyKey}>
+        <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+          <p className="text-sm text-green-400 mb-2">New API key created. Copy it now -- it will not be shown again.</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 px-2 py-1 bg-gray-900 rounded text-xs text-cyan-400 font-mono overflow-x-auto">{createdKey}</code>
+            <button className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition" onClick={copyKey}>
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
         </div>
       )}
 
-      <form onSubmit={createKey} className="settings-inline-form">
+      <form onSubmit={createKey} className="flex gap-2 mb-4">
         <input
           type="text"
           value={newKeyName}
           onChange={(e) => setNewKeyName(e.target.value)}
           placeholder="Key name (e.g. CI pipeline)"
-          className="settings-inline-input"
+          className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
         />
-        <button type="submit" className="settings-btn" disabled={creating || !newKeyName.trim()}>
+        <button type="submit" className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50" disabled={creating || !newKeyName.trim()}>
           {creating ? 'Creating...' : 'Generate New Key'}
         </button>
       </form>
 
-      {error && <div className="settings-message settings-message-error" style={{ marginTop: '12px' }}>{error}</div>}
+      {error && <div className="px-3 py-2 rounded-lg text-sm bg-red-500/20 text-red-400 mb-4">{error}</div>}
 
       {loading ? (
-        <p className="settings-muted" style={{ marginTop: '16px' }}>Loading keys...</p>
+        <p className="text-sm text-gray-500">Loading keys...</p>
       ) : webhooks.length === 0 ? (
-        <p className="settings-muted" style={{ marginTop: '16px' }}>No API keys configured.</p>
+        <p className="text-sm text-gray-500">No API keys configured.</p>
       ) : (
-        <div className="settings-table-wrap" style={{ marginTop: '16px' }}>
-          <table className="settings-table">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr>
-                <th>Name</th>
-                <th>Key Prefix</th>
-                <th>Scan Type</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Last Used</th>
-                <th>Actions</th>
+              <tr className="border-b border-gray-700">
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Name</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Key Prefix</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Scan Type</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Status</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Created</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Last Used</th>
+                <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {webhooks.map(wh => (
-                <tr key={wh.id}>
-                  <td>{wh.name}</td>
-                  <td><code className="settings-code">{wh.key_prefix}...</code></td>
-                  <td className="settings-muted">{wh.scan_type}</td>
-                  <td>
-                    <span className={wh.is_active ? 'settings-badge-green' : 'settings-badge-dim'}>
+                <tr key={wh.id} className="border-b border-gray-700/50 hover:bg-gray-800/40">
+                  <td className="py-2 px-3 text-white">{wh.name}</td>
+                  <td className="py-2 px-3"><code className="text-xs text-cyan-400 font-mono">{wh.key_prefix}...</code></td>
+                  <td className="py-2 px-3 text-gray-400">{wh.scan_type}</td>
+                  <td className="py-2 px-3">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${wh.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
                       {wh.is_active ? 'Active' : 'Revoked'}
                     </span>
                   </td>
-                  <td className="settings-muted">{formatDate(wh.created_at)}</td>
-                  <td className="settings-muted">{formatDate(wh.last_used_at)}</td>
-                  <td>
-                    {confirmingRevoke === wh.id ? (
-                      <>
+                  <td className="py-2 px-3 text-gray-400">{formatDate(wh.created_at)}</td>
+                  <td className="py-2 px-3 text-gray-400">{formatDate(wh.last_used_at)}</td>
+                  <td className="py-2 px-3">
+                    <div className="flex gap-2">
+                      {confirmingRevoke === wh.id ? (
+                        <>
+                          <button
+                            className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition"
+                            onClick={() => revokeKey(wh.id)}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition"
+                            onClick={() => setConfirmingRevoke(null)}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          className="settings-btn-sm settings-btn-danger"
+                          className="px-2 py-1 text-xs bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded transition"
                           onClick={() => revokeKey(wh.id)}
                         >
-                          Confirm
+                          Revoke
                         </button>
-                        <button
-                          className="settings-btn-sm"
-                          onClick={() => setConfirmingRevoke(null)}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="settings-btn-sm settings-btn-danger"
-                        onClick={() => revokeKey(wh.id)}
-                      >
-                        Revoke
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -495,21 +499,25 @@ function ScanDefaultsSection() {
   }
 
   return (
-    <div className="settings-card">
-      <h2 className="settings-card-title">Scan Defaults</h2>
-      <p className="settings-muted" style={{ marginBottom: '16px' }}>
+    <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-6">
+      <h2 className="text-lg font-semibold text-white mb-2">Scan Defaults</h2>
+      <p className="text-sm text-gray-500 mb-4">
         Default settings applied when creating new scans.
       </p>
-      <div className="settings-form-field">
-        <label>Default Scan Type</label>
-        <select value={scanType} onChange={(e) => setScanType(e.target.value)} className="settings-select">
+      <div className="space-y-1 max-w-md">
+        <label className="text-xs text-gray-500 uppercase tracking-wider">Default Scan Type</label>
+        <select
+          value={scanType}
+          onChange={(e) => setScanType(e.target.value)}
+          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+        >
           {scanTypes.map(t => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
       </div>
-      <div style={{ marginTop: '16px' }}>
-        <button className="settings-btn" onClick={handleSave}>
+      <div className="mt-4">
+        <button className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition" onClick={handleSave}>
           {saved ? 'Saved' : 'Save Defaults'}
         </button>
       </div>
@@ -550,17 +558,17 @@ function SettingsPage({ token }) {
   ]
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Settings</h1>
-        <p>Manage your account, security, and preferences</p>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-sm text-gray-400 mt-1">Manage your account, security, and preferences</p>
       </div>
 
-      <div className="settings-tabs">
+      <div className="flex gap-0 border-b border-gray-700 mb-6">
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`settings-tab ${activeTab === tab.id ? 'settings-tab-active' : ''}`}
+            className={`px-4 py-2 text-sm transition ${activeTab === tab.id ? 'border-b-2 border-cyan-400 text-cyan-400 font-medium' : 'text-gray-500 hover:text-gray-300'}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -568,7 +576,7 @@ function SettingsPage({ token }) {
         ))}
       </div>
 
-      <div className="settings-content">
+      <div className="space-y-6">
         {activeTab === 'profile' && <ProfileSection user={user} loading={loading} />}
         {activeTab === 'security' && <PasswordSection token={token} />}
         {activeTab === 'notifications' && <NotificationsSection token={token} />}

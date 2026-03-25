@@ -2,12 +2,39 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/ToastContext'
-import './Common.css'
-import './RemediationPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+
+const SEVERITY_BADGE_CLASSES = {
+  critical: 'bg-red-900/50 text-red-400',
+  high: 'bg-orange-900/50 text-orange-400',
+  medium: 'bg-yellow-900/50 text-yellow-400',
+  low: 'bg-green-900/50 text-green-400',
+  info: 'bg-blue-900/50 text-blue-400',
+}
+
+const SEVERITY_BORDER_CLASSES = {
+  critical: 'border-l-red-500',
+  high: 'border-l-orange-500',
+  medium: 'border-l-yellow-500',
+  low: 'border-l-green-500',
+  info: 'border-l-blue-500',
+}
+
+const SEVERITY_STAT_CLASSES = {
+  critical: 'text-red-400',
+  high: 'text-orange-400',
+  medium: 'text-yellow-400',
+  low: 'text-green-400',
+}
+
+const VERIFICATION_BADGE_CLASSES = {
+  verified: 'bg-green-900/50 text-green-400',
+  unverified: 'bg-yellow-900/50 text-yellow-400',
+  false_positive: 'bg-gray-700 text-gray-400',
+}
 
 function severityRank(sev) {
   return SEVERITY_ORDER[sev] ?? 5
@@ -137,69 +164,70 @@ function RemediationPage({ token }) {
   function renderFindingCard(finding, idx) {
     const key = `${finding.scanId}-${idx}`
     const isExpanded = expandedIds.has(key)
+    const sev = finding.severity || 'unknown'
 
     return (
-      <div key={key} className={`finding-card severity-border-${finding.severity || 'unknown'}`}>
-        <div className="finding-card-header" onClick={() => toggleExpand(key)}>
-          <div className="finding-title-row">
-            <span className={`severity-badge ${finding.severity}`}>
-              {finding.severity || 'unknown'}
+      <div key={key} className={`bg-gray-800/30 border-l-4 ${SEVERITY_BORDER_CLASSES[sev] || 'border-l-gray-500'} border border-gray-700 rounded-lg p-4 mb-2 cursor-pointer hover:bg-gray-800/60 transition`}>
+        <div className="flex items-center justify-between" onClick={() => toggleExpand(key)}>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 ${SEVERITY_BADGE_CLASSES[sev] || 'bg-gray-700 text-gray-400'}`}>
+              {sev}
             </span>
-            <h4 className="finding-title">{finding.title || 'Untitled Finding'}</h4>
+            <h4 className="text-sm font-medium text-white truncate">{finding.title || 'Untitled Finding'}</h4>
             {finding.priority_score != null && (
-              <span className="priority-score" title="Priority Score">
+              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-900/50 text-indigo-400 shrink-0" title="Priority Score">
                 P{finding.priority_score}
               </span>
             )}
           </div>
-          <span className="expand-icon">{isExpanded ? '\u25B2' : '\u25BC'}</span>
+          <span className="text-gray-500 text-xs ml-2 shrink-0">{isExpanded ? '\u25B2' : '\u25BC'}</span>
         </div>
 
-        <div className="finding-card-meta">
+        <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 flex-wrap">
           {finding.url && (
-            <span className="affected-url" title={finding.url}>
+            <span className="truncate max-w-xs" title={finding.url}>
               {finding.url}
             </span>
           )}
           {finding.affected_url && !finding.url && (
-            <span className="affected-url" title={finding.affected_url}>
+            <span className="truncate max-w-xs" title={finding.affected_url}>
               {finding.affected_url}
             </span>
           )}
-          <span className="finding-scan-ref">
-            Scan: <Link to={`/scans/${finding.scanId}`}>{finding.scanId?.substring(0, 8)}</Link>
+          <span>
+            Scan: <Link to={`/scans/${finding.scanId}`} className="text-cyan-400 hover:text-cyan-300 transition">{finding.scanId?.substring(0, 8)}</Link>
           </span>
           {finding.verification_status && (
-            <span className={`verification-badge ${finding.verification_status}`}>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${VERIFICATION_BADGE_CLASSES[finding.verification_status] || 'bg-gray-700 text-gray-400'}`}>
               {finding.verification_status}
             </span>
           )}
         </div>
 
         {isExpanded && (
-          <div className="finding-card-details">
+          <div className="mt-3 pt-3 border-t border-gray-700">
             {finding.description && (
-              <div className="detail-block">
-                <h5>Description</h5>
-                <p>{finding.description}</p>
+              <div className="mb-3">
+                <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Description</h5>
+                <p className="text-sm text-gray-300">{finding.description}</p>
               </div>
             )}
             {finding.remediation && (
-              <div className="detail-block remediation-block">
-                <h5>Remediation</h5>
-                <p>{finding.remediation}</p>
+              <div className="mb-3 bg-cyan-900/10 border border-cyan-800/30 rounded-lg p-3">
+                <h5 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-1">Remediation</h5>
+                <p className="text-sm text-gray-300">{finding.remediation}</p>
               </div>
             )}
             {finding.cvss_score != null && (
-              <div className="detail-inline">
-                <span className="detail-label">CVSS:</span>
-                <span className={`cvss-value ${finding.severity}`}>{finding.cvss_score}</span>
-                {finding.cvss_vector && <span className="cvss-vector">{finding.cvss_vector}</span>}
+              <div className="flex items-center gap-2 mb-3 text-sm">
+                <span className="text-gray-400">CVSS:</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_BADGE_CLASSES[sev] || 'bg-gray-700 text-gray-400'}`}>{finding.cvss_score}</span>
+                {finding.cvss_vector && <span className="text-xs text-gray-500 font-mono">{finding.cvss_vector}</span>}
               </div>
             )}
-            <div className="finding-card-actions">
+            <div className="mt-3">
               <button
-                className="btn btn-primary btn-sm"
+                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded-lg transition font-medium"
                 onClick={() => setConfirmVerifyScanId(finding.scanId)}
                 disabled={verifyingIds.has(finding.scanId)}
               >
@@ -212,24 +240,28 @@ function RemediationPage({ token }) {
     )
   }
 
-  function renderTriageBucket(label, items, className) {
+  function renderTriageBucket(label, items, colorClass) {
     return (
-      <div className={`triage-bucket ${className}`}>
-        <div className="bucket-header">
-          <h3>{label}</h3>
-          <span className="bucket-count">{items.length}</span>
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-lg font-semibold text-white">{label}</h3>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${colorClass}`}>{items.length}</span>
         </div>
         {items.length === 0 ? (
-          <p className="bucket-empty">No items in this bucket</p>
+          <p className="text-gray-500 text-sm">No items in this bucket</p>
         ) : (
-          items.map((f, idx) => renderFindingCard(f, `triage-${className}-${idx}`))
+          items.map((f, idx) => renderFindingCard(f, `triage-${label}-${idx}`))
         )}
       </div>
     )
   }
 
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading remediation data...</div></div>
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="text-gray-400 text-sm">Loading remediation data...</div>
+      </div>
+    )
   }
 
   const severityGroups = groupBySeverity()
@@ -241,47 +273,47 @@ function RemediationPage({ token }) {
   const lowCount = (severityGroups.low || []).length
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Remediation Tracker</h1>
-        <p>Prioritize and track remediation of security findings</p>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Remediation Tracker</h1>
+        <p className="text-sm text-gray-400 mt-1">Prioritize and track remediation of security findings</p>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="bg-red-900/20 border border-red-800 text-red-400 px-4 py-3 rounded-lg text-sm mb-6">{error}</div>}
 
-      <div className="remediation-summary">
-        <div className="summary-item">
-          <span className="label">Total Findings</span>
-          <span className="count">{findings.length}</span>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 text-center">
+          <span className="text-xs text-gray-400 uppercase block mb-1">Total Findings</span>
+          <span className="text-2xl font-bold text-white">{findings.length}</span>
         </div>
-        <div className="summary-item summary-critical">
-          <span className="label">Critical</span>
-          <span className="count">{criticalCount}</span>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 text-center">
+          <span className="text-xs text-gray-400 uppercase block mb-1">Critical</span>
+          <span className={`text-2xl font-bold ${SEVERITY_STAT_CLASSES.critical}`}>{criticalCount}</span>
         </div>
-        <div className="summary-item summary-high">
-          <span className="label">High</span>
-          <span className="count">{highCount}</span>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 text-center">
+          <span className="text-xs text-gray-400 uppercase block mb-1">High</span>
+          <span className={`text-2xl font-bold ${SEVERITY_STAT_CLASSES.high}`}>{highCount}</span>
         </div>
-        <div className="summary-item summary-medium">
-          <span className="label">Medium</span>
-          <span className="count">{mediumCount}</span>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 text-center">
+          <span className="text-xs text-gray-400 uppercase block mb-1">Medium</span>
+          <span className={`text-2xl font-bold ${SEVERITY_STAT_CLASSES.medium}`}>{mediumCount}</span>
         </div>
-        <div className="summary-item summary-low">
-          <span className="label">Low</span>
-          <span className="count">{lowCount}</span>
+        <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 text-center">
+          <span className="text-xs text-gray-400 uppercase block mb-1">Low</span>
+          <span className={`text-2xl font-bold ${SEVERITY_STAT_CLASSES.low}`}>{lowCount}</span>
         </div>
       </div>
 
       {triageBuckets && (
-        <div className="view-tabs">
+        <div className="flex items-center gap-1 mb-6 bg-gray-800/30 border border-gray-700 rounded-lg p-1 w-fit">
           <button
-            className={`tab-btn ${activeTab === 'severity' ? 'active' : ''}`}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'severity' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}
             onClick={() => setActiveTab('severity')}
           >
             By Severity
           </button>
           <button
-            className={`tab-btn ${activeTab === 'triage' ? 'active' : ''}`}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === 'triage' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}
             onClick={() => setActiveTab('triage')}
           >
             Triage Buckets
@@ -290,19 +322,19 @@ function RemediationPage({ token }) {
       )}
 
       {activeTab === 'severity' && (
-        <div className="severity-groups">
+        <div>
           {findings.length === 0 ? (
-            <div className="empty-state">
-              <p>No findings to remediate. Run a scan to get started.</p>
+            <div className="text-center py-12">
+              <p className="text-gray-500">No findings to remediate. Run a scan to get started.</p>
             </div>
           ) : (
             severityKeys.map(sev => (
-              <div key={sev} className="severity-group">
-                <div className="group-header">
-                  <span className={`severity-badge ${sev}`}>{sev}</span>
-                  <span className="group-count">{severityGroups[sev].length} finding{severityGroups[sev].length !== 1 ? 's' : ''}</span>
+              <div key={sev} className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${SEVERITY_BADGE_CLASSES[sev] || 'bg-gray-700 text-gray-400'}`}>{sev}</span>
+                  <span className="text-sm text-gray-400">{severityGroups[sev].length} finding{severityGroups[sev].length !== 1 ? 's' : ''}</span>
                 </div>
-                <div className="findings-list">
+                <div>
                   {severityGroups[sev].map((f, idx) => renderFindingCard(f, idx))}
                 </div>
               </div>
@@ -312,10 +344,10 @@ function RemediationPage({ token }) {
       )}
 
       {activeTab === 'triage' && triageBuckets && (
-        <div className="triage-view">
-          {renderTriageBucket('Immediate Action', triageBuckets.immediate_action, 'bucket-immediate')}
-          {renderTriageBucket('This Sprint', triageBuckets.this_sprint, 'bucket-sprint')}
-          {renderTriageBucket('Backlog', triageBuckets.backlog, 'bucket-backlog')}
+        <div>
+          {renderTriageBucket('Immediate Action', triageBuckets.immediate_action, 'bg-red-900/50 text-red-400')}
+          {renderTriageBucket('This Sprint', triageBuckets.this_sprint, 'bg-yellow-900/50 text-yellow-400')}
+          {renderTriageBucket('Backlog', triageBuckets.backlog, 'bg-blue-900/50 text-blue-400')}
         </div>
       )}
 

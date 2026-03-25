@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import './InventoryPage.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
@@ -93,32 +92,37 @@ function InventoryPage({ token }) {
     }
   }
 
-  function getSeverityClass(severity) {
-    return severity?.toLowerCase() || 'unknown'
+  function severityBadgeClass(severity) {
+    const s = severity?.toLowerCase()
+    if (s === 'critical') return 'bg-red-500/20 text-red-400'
+    if (s === 'high') return 'bg-orange-500/20 text-orange-400'
+    if (s === 'medium') return 'bg-yellow-500/20 text-yellow-400'
+    if (s === 'low') return 'bg-blue-500/20 text-blue-400'
+    return 'bg-gray-700 text-gray-400'
   }
 
   if (loading) {
-    return <div className="page-container"><div className="loading">Loading inventory...</div></div>
+    return <div className="p-6 max-w-6xl mx-auto"><p className="text-sm text-gray-400">Loading inventory...</p></div>
   }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Inventory</h1>
-        <p>Detected technologies and CVE vulnerability alerts</p>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Inventory</h1>
+        <p className="text-sm text-gray-400 mt-1">Detected technologies and CVE vulnerability alerts</p>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="px-3 py-2 rounded-lg text-sm bg-red-500/20 text-red-400 mb-4">{error}</div>}
 
-      <div className="inventory-tabs">
+      <div className="flex gap-0 border-b border-gray-700 mb-6">
         <button
-          className={`tab-btn ${activeTab === 'technologies' ? 'active' : ''}`}
+          className={`px-4 py-2 text-sm transition ${activeTab === 'technologies' ? 'border-b-2 border-cyan-400 text-cyan-400 font-medium' : 'text-gray-500 hover:text-gray-300'}`}
           onClick={() => setActiveTab('technologies')}
         >
           Technologies
         </button>
         <button
-          className={`tab-btn ${activeTab === 'cve-alerts' ? 'active' : ''}`}
+          className={`px-4 py-2 text-sm transition ${activeTab === 'cve-alerts' ? 'border-b-2 border-cyan-400 text-cyan-400 font-medium' : 'text-gray-500 hover:text-gray-300'}`}
           onClick={() => setActiveTab('cve-alerts')}
         >
           CVE Alerts
@@ -126,46 +130,52 @@ function InventoryPage({ token }) {
       </div>
 
       {activeTab === 'technologies' && (
-        <div className="inventory-panel">
-          <div className="inventory-summary">
+        <div>
+          <p className="text-sm text-gray-400 mb-3">
             Found {technologies.length} technolog{technologies.length !== 1 ? 'ies' : 'y'}
-          </div>
+          </p>
 
-          <div className="inventory-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Version</th>
-                  <th>Vendor</th>
-                  <th>Assets</th>
-                </tr>
-              </thead>
-              <tbody>
-                {technologies.length === 0 ? (
-                  <tr><td colSpan="4" className="empty-cell">No technologies detected</td></tr>
-                ) : (
-                  technologies.map((tech, idx) => (
-                    <tr key={idx} className="tech-row">
-                      <td className="tech-name">{tech.name || '-'}</td>
-                      <td className="mono-cell">{tech.version || '-'}</td>
-                      <td>{tech.vendor || '-'}</td>
-                      <td className="count-cell">{tech.asset_count ?? tech.count ?? '-'}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Name</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Version</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Vendor</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Assets</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {technologies.length === 0 ? (
+                    <tr><td colSpan="4" className="py-6 px-3 text-gray-500 text-center">No technologies detected</td></tr>
+                  ) : (
+                    technologies.map((tech, idx) => (
+                      <tr key={idx} className="border-b border-gray-700/50 hover:bg-gray-800/40">
+                        <td className="py-2 px-3 text-white font-medium">{tech.name || '-'}</td>
+                        <td className="py-2 px-3 text-gray-400 font-mono text-xs">{tech.version || '-'}</td>
+                        <td className="py-2 px-3 text-gray-300">{tech.vendor || '-'}</td>
+                        <td className="py-2 px-3 text-gray-400">{tech.asset_count ?? tech.count ?? '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
       {activeTab === 'cve-alerts' && (
-        <div className="inventory-panel">
-          <div className="filters-section">
-            <div className="filter-group">
-              <label>Severity</label>
-              <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}>
+        <div>
+          <div className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 mb-4">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 uppercase tracking-wider">Severity</label>
+              <select
+                value={severityFilter}
+                onChange={e => setSeverityFilter(e.target.value)}
+                className="w-full max-w-xs px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500"
+              >
                 <option value="all">All Severities</option>
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
@@ -175,55 +185,57 @@ function InventoryPage({ token }) {
             </div>
           </div>
 
-          <div className="inventory-summary">
+          <p className="text-sm text-gray-400 mb-3">
             Found {filteredAlerts.length} CVE alert{filteredAlerts.length !== 1 ? 's' : ''}
-          </div>
+          </p>
 
-          <div className="inventory-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>CVE ID</th>
-                  <th>Technology</th>
-                  <th>CVSS Score</th>
-                  <th>Severity</th>
-                  <th>Affected Version</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredAlerts.length === 0 ? (
-                  <tr><td colSpan="6" className="empty-cell">No CVE alerts match your filters</td></tr>
-                ) : (
-                  filteredAlerts.map((alert, idx) => (
-                    <tr key={idx} className="cve-row">
-                      <td className="cve-id">{alert.cve_id || '-'}</td>
-                      <td>{alert.technology || '-'}</td>
-                      <td>
-                        <span className={`cvss-badge ${getSeverityClass(alert.severity)}`}>
-                          {alert.cvss_score ?? '-'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`severity-badge ${getSeverityClass(alert.severity)}`}>
-                          {alert.severity || 'unknown'}
-                        </span>
-                      </td>
-                      <td className="mono-cell">{alert.affected_version || '-'}</td>
-                      <td>
-                        <button
-                          className="action-btn rescan-btn"
-                          onClick={() => handleTriggerRescan(alert.id)}
-                          disabled={rescanningIds.has(alert.id)}
-                        >
-                          {rescanningIds.has(alert.id) ? 'Rescanning...' : 'Trigger Rescan'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="bg-gray-800/30 border border-gray-700 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">CVE ID</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Technology</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">CVSS Score</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Severity</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Affected Version</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-500 uppercase tracking-wider font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAlerts.length === 0 ? (
+                    <tr><td colSpan="6" className="py-6 px-3 text-gray-500 text-center">No CVE alerts match your filters</td></tr>
+                  ) : (
+                    filteredAlerts.map((alert, idx) => (
+                      <tr key={idx} className="border-b border-gray-700/50 hover:bg-gray-800/40">
+                        <td className="py-2 px-3 text-cyan-400 font-mono text-xs">{alert.cve_id || '-'}</td>
+                        <td className="py-2 px-3 text-white">{alert.technology || '-'}</td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${severityBadgeClass(alert.severity)}`}>
+                            {alert.cvss_score ?? '-'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${severityBadgeClass(alert.severity)}`}>
+                            {alert.severity || 'unknown'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-gray-400 font-mono text-xs">{alert.affected_version || '-'}</td>
+                        <td className="py-2 px-3">
+                          <button
+                            className="px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded transition disabled:opacity-50"
+                            onClick={() => handleTriggerRescan(alert.id)}
+                            disabled={rescanningIds.has(alert.id)}
+                          >
+                            {rescanningIds.has(alert.id) ? 'Rescanning...' : 'Trigger Rescan'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
