@@ -164,8 +164,13 @@ def get_scan(scan_id: str, user: User = Depends(get_current_user), db: Session =
 
 
 @router.get("/{scan_id}/report")
-def get_report(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Get the full scan report including findings, risk score, and recommendations."""
+def get_report(
+    scan_id: str,
+    format: str = Query("json", description="Report format: json, html, or pdf"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get the full scan report. Supports JSON (default), HTML, and PDF formats."""
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
@@ -173,6 +178,45 @@ def get_report(scan_id: str, user: User = Depends(get_current_user), db: Session
     report = get_storage().get_json(f"scans/{scan_id}/report.json")
     if not report:
         raise HTTPException(status_code=404, detail="Report not ready")
+
+    if format == "json":
+        return report
+
+    scan_info = {
+        "scan_id": scan.id,
+        "target": scan.target,
+        "scan_type": scan.scan_type,
+        "status": scan.status,
+        "created_at": scan.created_at.isoformat() if scan.created_at else None,
+        "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+        "risk_score": scan.risk_score,
+        "findings_count": scan.findings_count,
+    }
+
+    try:
+        from modules.reports.generator import ReportGenerator
+        gen = ReportGenerator()
+
+        if format == "html":
+            from fastapi.responses import HTMLResponse
+            html = gen.generate_html(report, scan_info)
+            return HTMLResponse(
+                content=html,
+                headers={"Content-Disposition": f'attachment; filename="scan-report-{scan_id[:8]}.html"'},
+            )
+
+        if format == "pdf":
+            from fastapi.responses import Response
+            pdf_bytes = gen.generate_pdf(report, scan_info)
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="scan-report-{scan_id[:8]}.pdf"'},
+            )
+    except Exception as e:
+        logger.error("Report generation failed for scan %s format %s: %s", scan_id, format, e)
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {e}")
+
     return report
 
 
