@@ -325,6 +325,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "challenge_finding":
         return _handle_challenge_finding(input, scan_context)
 
+    elif name == "fork_hypothesis_branches":
+        return _handle_fork_hypothesis_branches(input, scan_context)
+
     elif name == "get_session_headers":
         return _handle_get_session_headers(scan_context)
 
@@ -776,6 +779,54 @@ def _handle_challenge_finding(input: dict, scan_context: dict | None) -> str:
         return _json.dumps(verdict, default=str)[:8000]
     except Exception as e:
         return f"ERROR: challenge_finding failed: {e}"
+
+def _handle_fork_hypothesis_branches(input: dict, scan_context: dict | None) -> str:
+    """Parallel hypothesis-branch executor (#168)."""
+    try:
+        from modules.agent.hypothesis_executor import fork_hypotheses, run_parallel
+        if not scan_context:
+            return "ERROR: fork_hypothesis_branches requires scan_context"
+
+        attack_surface = scan_context.get("_attack_surface") or {}
+        if not attack_surface:
+            return (
+                "ERROR: No attack surface discovered yet. Call update_attack_surface "
+                "with your findings before forking hypothesis branches."
+            )
+
+        scan_type = scan_context.get("scan_type", "security")
+        hypotheses = fork_hypotheses(attack_surface, scan_type)
+        if not hypotheses:
+            return "No hypotheses could be derived from the current attack surface."
+
+        scan_id = scan_context.get("scan_id", "")
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "hypothesis_fork_start",
+                "count": len(hypotheses),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        result = run_parallel(
+            hypotheses,
+            scan_context,
+            _handle_subagent,
+            concurrency=input.get("concurrency"),
+            max_branches=input.get("max_branches"),
+        )
+
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "hypothesis_fork_complete",
+                "count": result.get("count", 0),
+                "summary": result.get("summary"),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        import json as _json
+        return _json.dumps(result, default=str)[:30_000]
+    except Exception as e:
+        return f"ERROR: fork_hypothesis_branches failed: {e}"
 
 
 def _handle_load_knowledge(input: dict, scan_context: dict | None) -> str:
