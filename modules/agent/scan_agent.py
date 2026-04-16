@@ -322,6 +322,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "sweep_payloads":
         return _handle_sweep_payloads(input, scan_context)
 
+    elif name == "challenge_finding":
+        return _handle_challenge_finding(input, scan_context)
+
     elif name == "get_session_headers":
         return _handle_get_session_headers(scan_context)
 
@@ -749,6 +752,30 @@ def _handle_sweep_payloads(input: dict, scan_context: dict | None) -> str:
         return _json.dumps(result, default=str)[:20_000]
     except Exception as e:
         return f"ERROR: sweep_payloads failed: {e}"
+
+
+def _handle_challenge_finding(input: dict, scan_context: dict | None) -> str:
+    """Dispatch a finding to the red-team critic sub-agent (#170)."""
+    try:
+        from modules.agent.critic_agent import challenge_finding
+        finding = input.get("finding") or {}
+        if not finding:
+            return "ERROR: challenge_finding requires a non-empty `finding` object"
+        verdict = challenge_finding(finding)
+
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "critic_verdict",
+                "verdict": verdict.get("verdict"),
+                "confidence": verdict.get("confidence"),
+                "finding": finding.get("title") or finding.get("id"),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+        import json as _json
+        return _json.dumps(verdict, default=str)[:8000]
+    except Exception as e:
+        return f"ERROR: challenge_finding failed: {e}"
 
 
 def _handle_load_knowledge(input: dict, scan_context: dict | None) -> str:
@@ -3302,8 +3329,36 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                         _record_phase(scan_context, "reporting")
                         report = block.input
 
+                        # ── Pre-report critic sweep (#170) ──
+                        # Automatically critique high/critical findings and attach
+                        # verdicts before exploitation gating.
+                        if os.environ.get("CRITIC_AUTO_ENABLED", "true").lower() in ("1", "true", "yes"):
+                            try:
+                                from modules.agent.critic_agent import challenge_finding as _critique
+                                _critiqued = 0
+                                for _f in report.get("findings") or []:
+                                    if not isinstance(_f, dict):
+                                        continue
+                                    sev = (_f.get("severity") or "").lower()
+                                    if sev not in ("high", "critical"):
+                                        continue
+                                    if _f.get("critic_verdict"):
+                                        continue
+                                    _f["critic_verdict"] = _critique(_f)
+                                    _critiqued += 1
+                                    if _critiqued >= 15:
+                                        break
+                                if _critiqued:
+                                    _log_activity(scan_id, {
+                                        "type": "critic_sweep",
+                                        "message": f"Auto-critiqued {_critiqued} high/critical findings",
+                                        "timestamp": time.strftime("%H:%M:%S"),
+                                    })
+                            except Exception as _cerr:
+                                log.warning("Pre-report critic sweep failed: %s", _cerr)
+
                         # ── Mandatory exploitation gate (#167) ──
-                        # Runs BEFORE persistence. Attempts PoC on high/critical
+                        # Runs after the critic sweep. Attempts PoC on high/critical
                         # findings; demotes those that cannot be proven with
                         # read-only techniques.
                         try:
