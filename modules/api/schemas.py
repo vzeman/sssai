@@ -297,18 +297,56 @@ class ReportRequest(BaseModel):
     format: str = "json"  # json, html, pdf
 
 
+# ─── Assets ──────────────────────────────────────────────────────────
+class AssetResponse(BaseModel):
+    id: str
+    target: str
+    asset_type: str
+    hostname: str | None = None
+    ip: str | None = None
+    port: int | None = None
+    service: str | None = None
+    technology: str | None = None
+    technology_name: str | None = None
+    version: str | None = None
+    technology_version: str | None = None
+    extra: dict | None = None
+    first_seen: datetime
+    last_seen: datetime
+    is_active: bool = True
+    scan_id: str | None = None
+
+    model_config = {"from_attributes": True}
+
+    def model_post_init(self, __context):
+        if not self.technology and self.technology_name:
+            self.technology = self.technology_name
+        if not self.version and self.technology_version:
+            self.version = self.technology_version
+
+
 # ─── Asset Inventory ──────────────────────────────────────────────────
 class AssetInventoryResponse(BaseModel):
     id: str
     scan_id: str | None = None
     target: str
-    technology_name: str
+    technology_name: str | None = None
     technology_version: str | None = None
+    name: str | None = None
+    version: str | None = None
+    vendor: str | None = None
+    asset_count: int = 1
     cpe_entries: list | None = None
     first_seen: datetime
     last_seen: datetime
 
     model_config = {"from_attributes": True}
+
+    def model_post_init(self, __context):
+        if self.name is None:
+            self.name = self.technology_name
+        if self.version is None:
+            self.version = self.technology_version
 
 
 class CveAlertResponse(BaseModel):
