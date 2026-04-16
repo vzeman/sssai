@@ -1,9 +1,23 @@
 """
 Autonomous Security Agent - Core Decision Engine (Issue #50)
 
-This module implements the autonomous agent that can audit targets completely
-without human input. It uses a state machine to manage scan phases, Claude to
-make intelligent decisions, and a learning feedback loop to improve over time.
+STATUS (Issue #173): This module is NOT the active scan entry point.
+Production scans run through `modules/agent/scan_agent.py:run_scan` which
+is invoked by `modules/worker/__init__.py`. This state-machine-based
+implementation was built as an alternative architecture and remains
+in-tree pending a decision to either:
+
+  (A) Migrate scan_agent.py's battle-tested capabilities (checkpointing,
+      reflector, loop-detector, 40-tool registry) into this state machine
+      and flip `USE_AUTONOMOUS_AGENT=true` to cut over, OR
+  (B) Remove this module entirely and evolve scan_agent.py in place.
+
+Feature flag `USE_AUTONOMOUS_AGENT` (see modules/config.py) currently
+defaults to `false`. No code path reads it — it exists for future
+migration work. See issue #173 for context.
+
+This module implements an autonomous agent using a state machine for
+scan phases, Claude-driven decisions, and a learning feedback loop.
 
 Architecture:
   ├─ StateManager: Manages scan state machine transitions
