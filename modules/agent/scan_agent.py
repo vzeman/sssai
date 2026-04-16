@@ -319,6 +319,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "update_attack_surface":
         return _handle_update_attack_surface(input, scan_context)
 
+    elif name == "sweep_payloads":
+        return _handle_sweep_payloads(input, scan_context)
+
     elif name == "get_session_headers":
         return _handle_get_session_headers(scan_context)
 
@@ -700,6 +703,52 @@ def _handle_adapt_plan(input: dict, scan_context: dict | None) -> str:
 
     except Exception as e:
         return f"ERROR: adapt_plan failed: {e}"
+
+
+def _handle_sweep_payloads(input: dict, scan_context: dict | None) -> str:
+    """Dispatch to the payload sweeper (Issue #169).
+
+    Injects the current authenticated session (if any) so the agent sweeps
+    as the logged-in user when relevant.
+    """
+    try:
+        from modules.agent.payload_sweeper import sweep
+        session_headers: dict = {}
+        session_cookies: dict = {}
+        if scan_context:
+            session_mgr: SessionManager | None = scan_context.get("_session_manager")
+            if session_mgr and session_mgr.is_session_valid():
+                session_headers = session_mgr.get_headers() or {}
+                session_cookies = session_mgr.get_cookies() or {}
+
+        result = sweep(
+            url=input["url"],
+            vulnerability_class=input["vulnerability_class"],
+            method=input.get("method", "GET"),
+            parameter=input.get("parameter"),
+            extra_headers=input.get("extra_headers") or {},
+            max_variants=int(input.get("max_variants", 20)),
+            delay_ms=int(input.get("delay_ms", 100)),
+            session_headers=session_headers,
+            session_cookies=session_cookies,
+        )
+
+        scan_id = scan_context.get("scan_id", "") if scan_context else ""
+        if scan_id:
+            _log_activity(scan_id, {
+                "type": "payload_sweep",
+                "url": input["url"],
+                "class": input["vulnerability_class"],
+                "variants": result.get("total_variants", 0),
+                "top_score": (result.get("top_hits") or [{}])[0].get("hit_score", 0),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
+        # Return compact JSON — full details available in logs
+        import json as _json
+        return _json.dumps(result, default=str)[:20_000]
+    except Exception as e:
+        return f"ERROR: sweep_payloads failed: {e}"
 
 
 def _handle_load_knowledge(input: dict, scan_context: dict | None) -> str:

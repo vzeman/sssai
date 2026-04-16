@@ -1332,4 +1332,62 @@ SUBAGENT_TOOLS = [
             "required": ["question"],
         },
     },
+    {
+        "name": "sweep_payloads",
+        "description": (
+            "Systematically sweep N payload variants against a single endpoint "
+            "and return structured results sorted by hit-score. Use this when "
+            "a mature scanner isn't available for your target (custom chatbot "
+            "APIs, GraphQL mutations, discovered app endpoints) OR to "
+            "independently verify a scanner's finding. All payloads are "
+            "read-only oracle probes; destructive payloads are blocked by "
+            "safety_guard.\n\n"
+            "Available vulnerability_class values:\n"
+            "  sqli_boolean, sqli_time, sqli_error\n"
+            "  xss_reflected\n"
+            "  path_traversal\n"
+            "  open_redirect\n"
+            "  ssrf_internal\n"
+            "  cmd_injection_safe\n"
+            "  graphql_introspection\n"
+            "  jwt_tamper\n\n"
+            "Returns: { vulnerability_class, url, total_variants, variants[], "
+            "top_hits[] }. Each variant has payload, status_code, "
+            "response_length, response_time_s, hit_score (0.0–1.0), hit_reason."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Target URL",
+                },
+                "vulnerability_class": {
+                    "type": "string",
+                    "description": "One of the catalog keys (see tool description)",
+                },
+                "method": {
+                    "type": "string",
+                    "description": "HTTP method (default GET)",
+                },
+                "parameter": {
+                    "type": "string",
+                    "description": "Query parameter to inject into (omit for POST body)",
+                },
+                "extra_headers": {
+                    "type": "object",
+                    "description": "Additional headers to send",
+                },
+                "max_variants": {
+                    "type": "integer",
+                    "description": "Cap on variants to send (max 50, default 20)",
+                },
+                "delay_ms": {
+                    "type": "integer",
+                    "description": "Delay between requests in ms (default 100)",
+                },
+            },
+            "required": ["url", "vulnerability_class"],
+        },
+    },
 ]
