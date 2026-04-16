@@ -1,5 +1,5 @@
 """
-Central configuration for AI model selection.
+Central configuration for AI model selection and agent feature flags.
 
 Tier system (Issue #171):
   AI_MODEL_DISCOVERY  — routine tool dispatch, discovery, HTTP parsing (fast/cheap)
@@ -13,6 +13,11 @@ Back-compat:
 Extended thinking:
   EXTENDED_THINKING_BUDGET  — thinking token budget on Sonnet/Opus calls (0 disables)
   Haiku models do NOT support extended thinking and skip the thinking block.
+
+Feature flags:
+  USE_AUTONOMOUS_AGENT — state-machine scan entry point in
+                          modules/agent/autonomous_agent.py. Default false —
+                          reserved for #173 migration (not currently wired).
 
 Environment overrides:
   AI_MODEL_DISCOVERY=claude-haiku-4-5-20251001
@@ -42,6 +47,13 @@ AI_MODEL = AI_MODEL_DISCOVERY
 
 # Extended thinking budget (tokens). 0 disables. Only applied on Sonnet/Opus.
 EXTENDED_THINKING_BUDGET = int(os.environ.get("EXTENDED_THINKING_BUDGET", "8000"))
+
+# Feature flag for the state-machine agent (Issue #173) — NOT yet wired into
+# the worker. Reserved for the future migration from while-loop to state
+# machine. Leave false unless you are actively working on that migration.
+USE_AUTONOMOUS_AGENT = os.environ.get("USE_AUTONOMOUS_AGENT", "false").lower() in (
+    "1", "true", "yes", "on",
+)
 
 # Cost per 1M tokens: (input_cost, output_cost)
 _PRICING = {
