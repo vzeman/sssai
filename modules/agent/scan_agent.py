@@ -3379,55 +3379,11 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                     if result == "__REPORT__":
                         _record_phase(scan_context, "reporting")
                         report = block.input
-
-                        # ── Pre-report critic sweep (#170) ──
-                        # Automatically critique high/critical findings and attach
-                        # verdicts before exploitation gating.
-                        if os.environ.get("CRITIC_AUTO_ENABLED", "true").lower() in ("1", "true", "yes"):
-                            try:
-                                from modules.agent.critic_agent import challenge_finding as _critique
-                                _critiqued = 0
-                                for _f in report.get("findings") or []:
-                                    if not isinstance(_f, dict):
-                                        continue
-                                    sev = (_f.get("severity") or "").lower()
-                                    if sev not in ("high", "critical"):
-                                        continue
-                                    if _f.get("critic_verdict"):
-                                        continue
-                                    _f["critic_verdict"] = _critique(_f)
-                                    _critiqued += 1
-                                    if _critiqued >= 15:
-                                        break
-                                if _critiqued:
-                                    _log_activity(scan_id, {
-                                        "type": "critic_sweep",
-                                        "message": f"Auto-critiqued {_critiqued} high/critical findings",
-                                        "timestamp": time.strftime("%H:%M:%S"),
-                                    })
-                            except Exception as _cerr:
-                                log.warning("Pre-report critic sweep failed: %s", _cerr)
-
-                        # ── Mandatory exploitation gate (#167) ──
-                        # Runs after the critic sweep. Attempts PoC on high/critical
-                        # findings; demotes those that cannot be proven with
-                        # read-only techniques.
-                        try:
-                            from modules.agent.exploitation_gate import enforce_exploitation_gate
-                            report = enforce_exploitation_gate(report, target, scan_id)
-                            gate = report.get("exploitation_gate", {})
-                            if gate.get("attempted", 0) > 0:
-                                _log_activity(scan_id, {
-                                    "type": "exploitation_gate",
-                                    "message": (
-                                        f"Exploitation gate: attempted={gate['attempted']} "
-                                        f"proven={gate['proven']} demoted={gate['demoted']} "
-                                        f"({gate.get('duration_seconds', 0)}s)"
-                                    ),
-                                    "timestamp": time.strftime("%H:%M:%S"),
-                                })
-                        except Exception as gate_err:
-                            log.warning("Exploitation gate failed for scan %s: %s", scan_id, gate_err)
+                        # Critic sweep (#170) and exploitation gate (#167) moved
+                        # to post-processing so they see FINAL severities (after
+                        # CVSS scoring and triage re-score findings). Running
+                        # here would miss findings the agent submitted at lower
+                        # severity that post-processing later promoted.
 
                         report["scan_metadata"] = {
                             **report.get("scan_metadata", {}),
@@ -3634,6 +3590,56 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         log.info("Scan %s: recommended interval = %s", scan_id, interval_rec.get("recommended_scan_interval"))
     except Exception as exc:
         log.warning("Scan interval recommendation failed for scan %s: %s", scan_id, exc)
+
+    # ── Critic sweep (#170) — runs AFTER all post-processing so severities
+    #    are final (verification, triage, CVSS). Auto-critique high/critical.
+    if os.environ.get("CRITIC_AUTO_ENABLED", "true").lower() in ("1", "true", "yes"):
+        try:
+            from modules.agent.critic_agent import challenge_finding as _critique
+            _critiqued = 0
+            for _f in report.get("findings") or []:
+                if not isinstance(_f, dict):
+                    continue
+                sev = (_f.get("severity") or "").lower()
+                if sev not in ("high", "critical"):
+                    continue
+                if _f.get("critic_verdict"):
+                    continue
+                _f["critic_verdict"] = _critique(_f)
+                _critiqued += 1
+                if _critiqued >= 15:
+                    break
+            if _critiqued:
+                _log_activity(scan_id, {
+                    "type": "critic_sweep",
+                    "message": f"Auto-critiqued {_critiqued} high/critical findings",
+                    "timestamp": time.strftime("%H:%M:%S"),
+                })
+                log.info("Scan %s: critic sweep auto-critiqued %d findings", scan_id, _critiqued)
+        except Exception as _cerr:
+            log.warning("Pre-report critic sweep failed: %s", _cerr)
+
+    # ── Exploitation gate (#167) — runs AFTER critic on final severities. ──
+    try:
+        from modules.agent.exploitation_gate import enforce_exploitation_gate
+        report = enforce_exploitation_gate(report, target, scan_id)
+        gate = report.get("exploitation_gate", {})
+        if gate.get("attempted", 0) > 0:
+            _log_activity(scan_id, {
+                "type": "exploitation_gate",
+                "message": (
+                    f"Exploitation gate: attempted={gate['attempted']} "
+                    f"proven={gate['proven']} demoted={gate['demoted']} "
+                    f"({gate.get('duration_seconds', 0)}s)"
+                ),
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            log.info(
+                "Scan %s: exploitation gate attempted=%d proven=%d demoted=%d",
+                scan_id, gate["attempted"], gate["proven"], gate["demoted"],
+            )
+    except Exception as gate_err:
+        log.warning("Exploitation gate failed for scan %s: %s", scan_id, gate_err)
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
