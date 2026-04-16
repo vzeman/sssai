@@ -336,12 +336,17 @@ jobs:
             }
 
       # ================================================================
-      # Step 11: Agent execution (placeholder)
+      # Step 11: Agent execution
       # ================================================================
       - name: Run AI agent
         if: steps.guard.outputs.should-implement == 'true'
         id: agent
-        run: echo "::notice::AI agent execution would run here"
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.build-prompt.outputs.prompt }}
+          claude_args: '--model claude-opus-4-6 --max-turns 100 --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash"'
+          allowed_bots: 'github-actions'
 
       # ================================================================
       # Step 12: Check for file changes
