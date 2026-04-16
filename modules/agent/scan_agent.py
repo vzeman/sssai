@@ -28,6 +28,7 @@ from modules.agent.prompts import get_prompt
 from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
 from modules.agent.session_manager import SessionManager
 from modules.agent.browser import run_browser_test, run_browser_crawl
+from modules.agent.budget import ScanBudget
 from modules.config import (
     AI_MODEL,
     AI_MODEL_LIGHT,
@@ -2806,11 +2807,16 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
 
     token_tracker = TokenTracker()
 
+    # Budget enforcement (Issue #172). Per-scan-type defaults, overridable via
+    # config["budget"] = {"max_usd_cost": 1.0, ...} from the API layer.
+    budget = ScanBudget.for_scan_type(scan_type, (config or {}).get("budget"))
+
     scan_context = {
         "scan_id": scan_id,
         "target": target,
         "scan_type": scan_type,
         "_token_tracker": token_tracker,
+        "_budget": budget,
     }
 
     # ── Authenticated session setup ──
@@ -2984,8 +2990,44 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     })
 
     iteration = 0
-    while iteration < MAX_ITERATIONS:
+    while True:
+        # ── Budget check (Issue #172) ──
+        budget_status = budget.status()
+        if budget_status == "exhausted":
+            _log_activity(scan_id, {
+                "type": "system",
+                "message": f"Budget exhausted ({budget.most_consumed()}). Forcing final report.",
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            # Nudge agent one last time to call report; fallback below handles no-response.
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"[SYSTEM] Scan budget exhausted ({budget.most_consumed()} at 100%). "
+                    "Stop all testing and call the `report` tool NOW with whatever findings you have."
+                ),
+            })
+            # Break will be triggered after one more attempt via iteration ceiling below.
+        elif budget.should_warn_once():
+            _log_activity(scan_id, {
+                "type": "system",
+                "message": f"Budget at 80% ({budget.most_consumed()}). Wrapping up.",
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+            messages.append({
+                "role": "user",
+                "content": (
+                    "[SYSTEM] Scan budget 80% consumed. Finalize findings and call the "
+                    "`report` tool soon — avoid starting new lines of investigation."
+                ),
+            })
+
+        # Hard iteration ceiling (safety net, not primary stop)
         iteration += 1
+        budget.record_iteration()
+        if iteration > MAX_ITERATIONS:
+            log.warning("Scan %s hit MAX_ITERATIONS=%s safety ceiling", scan_id, MAX_ITERATIONS)
+            break
 
         # ── Heartbeat ping ──
         _ping_heartbeat(scan_id)
@@ -3088,12 +3130,25 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         response = client.messages.create(**_kwargs)
         token_tracker.record(response, caller="main")
 
+        # Record in scan budget (#172) for stopping decisions
+        try:
+            _usage = getattr(response, "usage", None)
+            if _usage:
+                budget.record(
+                    getattr(_usage, "input_tokens", 0) or 0,
+                    getattr(_usage, "output_tokens", 0) or 0,
+                    AI_MODEL,
+                )
+        except Exception:
+            pass
+
         # Publish token usage in progress events
         if token_tracker.calls % 3 == 0:  # every 3rd API call
             queue.publish(f"scan-progress:{scan_id}", {
                 "scan_id": scan_id,
                 "status": "running",
                 "token_usage": token_tracker.summary(),
+                "budget": budget.summary(),
             })
 
         if response.stop_reason == "tool_use":
@@ -3183,6 +3238,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             "target": target,
                             "scan_type": scan_type,
                             "phase_timings": _finalise_phase_timings(scan_context),
+                            "budget": budget.summary(),
                             **token_tracker.summary(),
                         }
                         if plan:
@@ -3260,11 +3316,12 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 }
             break
 
-    # ── Approaching limit warning ──
-    if iteration >= MAX_ITERATIONS and not report:
-        log.warning("Scan %s hit max iterations (%d)", scan_id, MAX_ITERATIONS)
+    # ── Budget / iteration-cap fallback report ──
+    if not report:
+        reason = "budget exhausted" if budget.status() == "exhausted" else "iteration safety ceiling reached"
+        log.warning("Scan %s %s (iter=%d)", scan_id, reason, iteration)
         report = {
-            "summary": "Scan reached maximum iteration limit. Partial results below.",
+            "summary": f"Scan stopped early: {reason}. Partial results below.",
             "risk_score": 0,
             "findings": [],
             "scan_metadata": {
@@ -3274,7 +3331,8 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                 "scan_id": scan_id,
                 "target": target,
                 "scan_type": scan_type,
-                "warning": "max iterations reached",
+                "warning": reason,
+                "budget": budget.summary(),
                 "phase_timings": _finalise_phase_timings(scan_context),
                 **token_tracker.summary(),
             },
