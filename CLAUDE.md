@@ -100,6 +100,7 @@ Changes to these paths require additional test coverage, must be reviewed by a h
 - Pre-commit hooks enforce local quality checks
 - **Chrome DevTools MCP**: `.mcp.json` at project root configures `@modelcontextprotocol/server-puppeteer` for browser-driven validation
 - See `docs/architecture.md` and `docs/conventions.md` for detailed guidelines
+- See `docs/AUTONOMOUS_TESTING.md` for the deep dive on the AI agent loop, the 8 autonomous testing primitives (budget, model tiers, memory, exploitation gate, payload sweeper, red-team critic, parallel hypotheses, autonomous agent flag), the 10 read-only vulnerability oracles, and the non-destructive testing policy
 
 ## PR Conventions
 
