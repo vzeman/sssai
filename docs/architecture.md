@@ -147,6 +147,31 @@ The `RUNTIME` env var (`local` or `aws`) switches all infrastructure via factory
 | Compute | Docker Compose | ECS Fargate |
 | Database | Local PostgreSQL | RDS PostgreSQL |
 
+## Autonomous Testing Primitives
+
+The worker's AI agent is more than a shell dispatcher — it embeds eight
+autonomous testing primitives (PRs #167-#174) that provide a tight
+evaluation signal, parallelism, cross-scan memory, and adversarial
+self-critique:
+
+| Primitive                       | Module                                      | Purpose                                          |
+|---------------------------------|---------------------------------------------|--------------------------------------------------|
+| Budget-based stopping           | `modules/agent/budget.py`                   | Multi-axis token/cost/duration/iteration cap    |
+| Model tiers + extended thinking | `modules/config.py`                         | Discovery/Reasoning/Critical/Light routing      |
+| Auto-recall memory              | `modules/agent/memory.py`                   | Per-tenant cross-scan experience recall         |
+| Exploitation gate               | `modules/agent/exploitation_gate.py`        | Prove-or-demote for high/critical findings      |
+| Payload sweeper                 | `modules/agent/payload_sweeper.py`          | Curated read-only payload catalog (10 classes)  |
+| Red-team critic                 | `modules/agent/critic_agent.py`             | Adversarial sub-agent challenges findings       |
+| Parallel hypothesis executor    | `modules/agent/hypothesis_executor.py`      | Fan out N focused sub-agent investigations      |
+| Autonomous agent flag           | `modules/agent/autonomous_agent.py`         | State-machine alternative (inactive, #173)      |
+
+For the full deep-dive — scan lifecycle, tool registry, the 10
+vulnerability classes tested, the non-destructive testing contract,
+finding lifecycle, and operations — see
+[**AUTONOMOUS_TESTING.md**](AUTONOMOUS_TESTING.md). For the (inactive)
+state-machine alternative see
+[AUTONOMOUS_AGENT_ARCHITECTURE.md](AUTONOMOUS_AGENT_ARCHITECTURE.md).
+
 ## Architecture Decision Records
 
 ### ADR-001: Claude as Autonomous Agent (Not Pipeline)

@@ -68,10 +68,20 @@ The worker container runs an autonomous Claude agent that plans, executes, and r
 | [Getting Started](docs/getting-started.md) | First account, first scan, understanding reports |
 | [Security Checks](docs/security-checks.md) | Deep dive into all 11 scan types and methodologies |
 | [Architecture](docs/architecture.md) | AI agent loop, sub-agents, infrastructure design |
+| [Autonomous Testing](docs/AUTONOMOUS_TESTING.md) | **Deep dive** — the agent loop, budgets, exploitation gate, red-team critic, parallel hypotheses, payload sweeper, memory, safety policy |
 | [API Reference](docs/api-reference.md) | Complete REST API documentation |
 | [Configuration](docs/configuration.md) | Environment variables, AI models, notifications, database schema |
 | [Scanning Tools](docs/scanning-tools.md) | All 69+ tools with descriptions |
 | [Deployment](docs/deployment.md) | Local and AWS production deployment |
+
+### Further reading
+
+If you want to understand **how** the AI agent actually drives a scan
+— the main loop internals, the 8 autonomous testing primitives
+(budget, model tiers, memory, exploitation gate, payload sweeper,
+red-team critic, parallel hypothesis executor, autonomous agent flag),
+the 10 read-only vulnerability oracles, and the non-destructive
+testing policy — read **[docs/AUTONOMOUS_TESTING.md](docs/AUTONOMOUS_TESTING.md)**.
 
 ## License
 
