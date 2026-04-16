@@ -3252,6 +3252,28 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                     if result == "__REPORT__":
                         _record_phase(scan_context, "reporting")
                         report = block.input
+
+                        # ── Mandatory exploitation gate (#167) ──
+                        # Runs BEFORE persistence. Attempts PoC on high/critical
+                        # findings; demotes those that cannot be proven with
+                        # read-only techniques.
+                        try:
+                            from modules.agent.exploitation_gate import enforce_exploitation_gate
+                            report = enforce_exploitation_gate(report, target, scan_id)
+                            gate = report.get("exploitation_gate", {})
+                            if gate.get("attempted", 0) > 0:
+                                _log_activity(scan_id, {
+                                    "type": "exploitation_gate",
+                                    "message": (
+                                        f"Exploitation gate: attempted={gate['attempted']} "
+                                        f"proven={gate['proven']} demoted={gate['demoted']} "
+                                        f"({gate.get('duration_seconds', 0)}s)"
+                                    ),
+                                    "timestamp": time.strftime("%H:%M:%S"),
+                                })
+                        except Exception as gate_err:
+                            log.warning("Exploitation gate failed for scan %s: %s", scan_id, gate_err)
+
                         report["scan_metadata"] = {
                             **report.get("scan_metadata", {}),
                             "duration_seconds": int(time.time() - start_time),
