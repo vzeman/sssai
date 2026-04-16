@@ -241,10 +241,13 @@ def main():
 
                 # Update security posture score after scan completes
                 try:
-                    posture_user_id = _get_scan_user_id(scan_id)
+                    posture_user_id = _user_id or _get_scan_user_id(scan_id)
                     if posture_user_id:
                         from modules.agent.posture_score import run_posture_update
-                        run_posture_update(scan_id, posture_user_id, target, raw_findings)
+                        run_posture_update(
+                            scan_id, target, posture_user_id,
+                            raw_findings, score,
+                        )
                 except Exception as posture_err:
                     log.warning("Posture score update failed for scan %s: %s", scan_id, posture_err)
 

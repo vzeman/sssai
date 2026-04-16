@@ -45,8 +45,12 @@ AI_MODEL_LIGHT = os.environ.get("AI_MODEL_LIGHT", "claude-haiku-4-5-20251001")
 # Back-compat alias
 AI_MODEL = AI_MODEL_DISCOVERY
 
-# Extended thinking budget (tokens). 0 disables. Only applied on Sonnet/Opus.
-EXTENDED_THINKING_BUDGET = int(os.environ.get("EXTENDED_THINKING_BUDGET", "8000"))
+# Extended thinking budget (tokens). Default 0 = disabled.
+# Enabling thinking on every main-loop turn with high budget triggers
+# multi-minute turn latency on Sonnet 4.6 — avoid that unless the target
+# justifies the spend. Recommended values when enabled: 2000-4000 tokens.
+# Set to 8000+ only for heavy reasoning-intensive one-off runs.
+EXTENDED_THINKING_BUDGET = int(os.environ.get("EXTENDED_THINKING_BUDGET", "0"))
 
 # Feature flag for the state-machine agent (Issue #173) — NOT yet wired into
 # the worker. Reserved for the future migration from while-loop to state
