@@ -210,6 +210,12 @@ def main():
             log.info("Starting scan %s: %s (%s)", scan_id, target, scan_type)
             _update_scan_status(scan_id, "running")
 
+            # Inject user_id into run_scan config so the agent can use it for
+            # per-tenant memory recall (#174) without re-querying the DB.
+            _user_id = _get_scan_user_id(scan_id)
+            if _user_id:
+                config = {**(config or {}), "user_id": _user_id}
+
             try:
                 report = run_scan(scan_id, target, scan_type, config)
                 raw_findings = report.get("findings", [])
@@ -241,6 +247,13 @@ def main():
                         run_posture_update(scan_id, posture_user_id, target, raw_findings)
                 except Exception as posture_err:
                     log.warning("Posture score update failed for scan %s: %s", scan_id, posture_err)
+
+                # Auto-store scan summary in cross-scan memory for future recall (#174)
+                try:
+                    from modules.agent.memory import auto_store_scan_summary
+                    auto_store_scan_summary(scan_id, _user_id, target, scan_type, report)
+                except Exception as mem_err:
+                    log.warning("auto_store_scan_summary failed for scan %s: %s", scan_id, mem_err)
             except Exception as e:
                 log.exception("Scan %s failed: %s", scan_id, e)
                 _update_scan_status(scan_id, "failed")

@@ -631,7 +631,11 @@ def _handle_credential_leak_check(input: dict, scan_context: dict | None) -> str
 # ── AI-first adaptive tool handlers ─────────────────────────────────────
 
 def _handle_adapt_plan(input: dict, scan_context: dict | None) -> str:
-    """Record a plan revision and log it for audit trail."""
+    """Record a plan revision and log it for audit trail.
+
+    Auto-recalls prior experience from cross-scan memory on the first revision
+    (Issue #174). Subsequent revisions skip recall to avoid noise.
+    """
     try:
         if not scan_context:
             scan_context = {}
@@ -674,6 +678,24 @@ def _handle_adapt_plan(input: dict, scan_context: dict | None) -> str:
         result = f"Plan revision #{revision_num} recorded ({len(input['plan_steps'])} steps). Reason: {input['reason']}"
         if available:
             result += f"\nKnowledge modules ready to load: {', '.join(available)}. Use load_knowledge to inject them."
+
+        # Auto-recall memory on first plan revision (#174) — retrieval-augmented planning.
+        # Per-tenant strict isolation enforced inside recall_for_planning.
+        if revision_num == 1:
+            try:
+                from modules.agent.memory import recall_for_planning
+                recalled = recall_for_planning(scan_context, top_k=5)
+                if recalled:
+                    result += "\n\n" + recalled
+                    if scan_id:
+                        _log_activity(scan_id, {
+                            "type": "memory_recall",
+                            "message": "Injected prior experience on similar targets",
+                            "timestamp": time.strftime("%H:%M:%S"),
+                        })
+            except Exception as mem_err:
+                log.warning("auto-recall failed for scan %s: %s", scan_id, mem_err)
+
         return result
 
     except Exception as e:
@@ -2815,6 +2837,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         "scan_id": scan_id,
         "target": target,
         "scan_type": scan_type,
+        "user_id": (config or {}).get("user_id"),
         "_token_tracker": token_tracker,
         "_budget": budget,
     }
