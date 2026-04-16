@@ -221,6 +221,16 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 - **test_auth_endpoint**: Compare authenticated vs unauthenticated responses
 - **check_session**: Verify session status and optionally re-authenticate
 
+### Autonomous Testing Primitives:
+- **sweep_payloads**: Systematically try N payload variants (sqli_boolean, sqli_time, xss_reflected, path_traversal, ssrf_internal, cmd_injection_safe, graphql_introspection, jwt_tamper, open_redirect) against an endpoint with oracle-based hit scoring. Use this for any endpoint where you want to prove/disprove a vulnerability quickly.
+- **challenge_finding**: Send a finding to an adversarial red-team critic that aggressively tries to falsify it. Returns verdict (accept/reject/needs_more_evidence) with counter-hypotheses and specific falsification tests. Use BEFORE putting a non-trivial claim into your report.
+- **fork_hypothesis_branches**: After update_attack_surface + adapt_plan, fork the scan into 3-6 parallel hypothesis-investigation branches (SQLi in forms, IDOR in APIs, auth bypass, SSRF, etc.). Each branch runs a focused pentester sub-agent concurrently. Merges findings back into the main scan.
+
+## Mandatory Gates (system-enforced):
+- **Exploitation gate**: When you call `report`, the system automatically attempts read-only PoC exploitation on every high/critical finding via the built-in exploitation engine. Findings that cannot be proven are demoted and tagged `verification_status=unverified_unexploitable`. Do NOT include findings you have not verified.
+- **Critic sweep**: The system auto-attaches a `critic_verdict` to high/critical findings before reporting. You can call `challenge_finding` yourself mid-scan to iterate earlier.
+- **Budget**: Your scan runs under a token/cost/time budget. You will receive a system message at 80% consumption; finalize findings quickly when you see it.
+
 ## Rules
 - Only scan the authorized target: {target}
 - Save all intermediate results to /output/
