@@ -28,7 +28,13 @@ from modules.agent.prompts import get_prompt
 from modules.agent.checkpoint import save_checkpoint, delete_checkpoint
 from modules.agent.session_manager import SessionManager
 from modules.agent.browser import run_browser_test, run_browser_crawl
-from modules.config import AI_MODEL, AI_MODEL_LIGHT, get_cost_per_1m
+from modules.config import (
+    AI_MODEL,
+    AI_MODEL_LIGHT,
+    AI_MODEL_REASONING,
+    get_cost_per_1m,
+    thinking_param,
+)
 from modules.infra import get_storage, get_queue
 
 log = logging.getLogger(__name__)
@@ -3066,13 +3072,20 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             pass
 
         # ── Main LLM call ──
-        response = client.messages.create(
-            model=AI_MODEL,
-            max_tokens=16000,
-            system=system_prompt,
-            tools=all_tools,
-            messages=messages,
-        )
+        # Use reasoning tier (Sonnet 4.6) with extended thinking on supported models.
+        # Falls back to discovery tier (Haiku) via AI_MODEL_REASONING env override.
+        _main_model = AI_MODEL_REASONING
+        _thinking = thinking_param(_main_model)
+        _kwargs = {
+            "model": _main_model,
+            "max_tokens": 16000,
+            "system": system_prompt,
+            "tools": all_tools,
+            "messages": messages,
+        }
+        if _thinking:
+            _kwargs["thinking"] = _thinking
+        response = client.messages.create(**_kwargs)
         token_tracker.record(response, caller="main")
 
         # Publish token usage in progress events
