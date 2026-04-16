@@ -218,3 +218,28 @@ class AuditLog(Base):
 
 # Alias for backward compatibility
 AssetInventory = Asset
+
+
+class CveAlert(Base):
+    """CVE vulnerability alerts linked to discovered assets."""
+    __tablename__ = "cve_alerts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id"), index=True)
+    cve_id: Mapped[str] = mapped_column(String, index=True)
+    technology_name: Mapped[str] = mapped_column(String)
+    technology_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    cvss_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cvss_severity: Mapped[str | None] = mapped_column(String, nullable=True)  # CRITICAL, HIGH, MEDIUM, LOW, NONE
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exploit_available: Mapped[bool] = mapped_column(Boolean, default=False)
+    affected_endpoints: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    notification_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    auto_rescan_triggered: Mapped[bool] = mapped_column(Boolean, default=False)
+    rescan_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    published_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship()
+    asset: Mapped["Asset"] = relationship()

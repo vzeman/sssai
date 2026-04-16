@@ -301,7 +301,7 @@ function ApiKeysSection({ token }) {
   useEffect(() => {
     async function load() {
       try {
-        const resp = await fetch(`${API_BASE}/api/webhooks`, {
+        const resp = await fetch(`${API_BASE}/api/webhooks/`, {
           headers: authHeaders(token),
         })
         if (!resp.ok) throw new Error('Failed to fetch API keys')
@@ -317,7 +317,7 @@ function ApiKeysSection({ token }) {
 
   async function refreshWebhooks() {
     try {
-      const resp = await fetch(`${API_BASE}/api/webhooks`, {
+      const resp = await fetch(`${API_BASE}/api/webhooks/`, {
         headers: authHeaders(token),
       })
       if (resp.ok) setWebhooks(await resp.json())
@@ -333,7 +333,7 @@ function ApiKeysSection({ token }) {
     setError('')
     setCreatedKey(null)
     try {
-      const resp = await fetch(`${API_BASE}/api/webhooks`, {
+      const resp = await fetch(`${API_BASE}/api/webhooks/`, {
         method: 'POST',
         headers: authHeaders(token),
         body: JSON.stringify({ name: newKeyName.trim() }),

@@ -155,7 +155,7 @@ function Dashboard({ token }) {
             </div>
           ) : (
             scans.map(scan => (
-              <div key={scan.id} className="bg-gray-800/30 border border-gray-700 rounded-xl p-4 hover:bg-gray-800/60 transition cursor-pointer">
+              <Link to={`/scans/${scan.id}`} key={scan.id} className="block bg-gray-800/30 border border-gray-700 rounded-xl p-4 hover:bg-gray-800/60 transition cursor-pointer">
                 <div className="font-medium text-white text-sm mb-2">{scan.target || 'Unknown'}</div>
                 <div className="flex items-center gap-2 flex-wrap text-xs">
                   <span className={`px-2 py-0.5 rounded-full font-semibold ${
@@ -181,7 +181,7 @@ function Dashboard({ token }) {
                   <span className="text-gray-500">|</span>
                   <span className="text-gray-500">{new Date(scan.created_at).toLocaleDateString()}</span>
                 </div>
-              </div>
+              </Link>
             ))
           )}
         </div>
