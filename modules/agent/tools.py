@@ -1411,4 +1411,31 @@ SUBAGENT_TOOLS = [
             "required": ["finding"],
         },
     },
+    {
+        "name": "fork_hypothesis_branches",
+        "description": (
+            "Fork the scan into N parallel hypothesis-investigation branches "
+            "based on your discovered attack surface. Each branch runs a "
+            "focused sub-agent that investigates ONE hypothesis class (SQLi "
+            "in forms, IDOR in APIs, auth bypass, SSRF, path traversal, etc.) "
+            "with a narrow context. Call this AFTER update_attack_surface and "
+            "adapt_plan to parallelize attack-path exploration. Branches run "
+            "concurrently with a configurable concurrency limit (default 3). "
+            "Returns a merged summary of each branch's findings."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "max_branches": {
+                    "type": "integer",
+                    "description": "Max hypothesis branches to fork (default 6)",
+                },
+                "concurrency": {
+                    "type": "integer",
+                    "description": "Max concurrent branches (default 3, max 6)",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
