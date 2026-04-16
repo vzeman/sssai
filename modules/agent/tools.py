@@ -1390,4 +1390,25 @@ SUBAGENT_TOOLS = [
             "required": ["url", "vulnerability_class"],
         },
     },
+    {
+        "name": "challenge_finding",
+        "description": (
+            "Send a single finding to an adversarial red-team critic sub-agent. "
+            "The critic aggressively tries to falsify the finding and returns a "
+            "structured verdict (accept / reject / needs_more_evidence) along "
+            "with counter-hypotheses, specific falsification tests, and missing "
+            "evidence. Use this for any non-trivial finding you plan to include "
+            "in the report — especially high/critical severity claims."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "finding": {
+                    "type": "object",
+                    "description": "The finding JSON to critique (title, severity, evidence, etc.)",
+                },
+            },
+            "required": ["finding"],
+        },
+    },
 ]
