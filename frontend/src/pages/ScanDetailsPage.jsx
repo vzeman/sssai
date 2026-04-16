@@ -225,6 +225,28 @@ function ScanDetailsPage({ token }) {
             <div className="text-sm text-white mt-1">{report.scan_metadata.total_tool_calls}</div>
           </div>
         )}
+        {report?.scan_metadata?.budget && (
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Budget (USD)</div>
+            <div className="text-sm text-white mt-1">
+              ${report.scan_metadata.budget.usd_cost?.used?.toFixed(3) ?? 0}
+              <span className="text-gray-500"> / ${report.scan_metadata.budget.usd_cost?.limit ?? 0}</span>
+              <span className={`ml-1.5 text-xs ${report.scan_metadata.budget.status === 'exhausted' ? 'text-red-400' : report.scan_metadata.budget.status === 'warn_80' ? 'text-yellow-400' : 'text-green-400'}`}>
+                ({report.scan_metadata.budget.status})
+              </span>
+            </div>
+          </div>
+        )}
+        {report?.exploitation_gate?.attempted > 0 && (
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Exploit Gate</div>
+            <div className="text-sm text-white mt-1">
+              <span className="text-green-400">{report.exploitation_gate.proven}</span> proven /
+              <span className="text-yellow-400"> {report.exploitation_gate.demoted}</span> demoted /
+              <span className="text-gray-500"> {report.exploitation_gate.attempted} attempted</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {report?.summary && (
@@ -277,29 +299,50 @@ function ScanDetailsPage({ token }) {
                   <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Title</th>
                   <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Severity</th>
                   <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">CVSS</th>
+                  <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Proof</th>
+                  <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Critic</th>
                   <th className="bg-gray-900/50 border-b border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedFindings.length === 0 ? (
-                  <tr><td colSpan="4" className="text-center text-gray-500 py-10">No findings in this scan</td></tr>
+                  <tr><td colSpan="6" className="text-center text-gray-500 py-10">No findings in this scan</td></tr>
                 ) : (
-                  sortedFindings.map((f, idx) => (
-                    <tr key={idx} onClick={() => setSelectedFinding(f)} className="cursor-pointer hover:bg-gray-800/50 transition">
-                      <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-white">{f.title || 'Unknown'}</td>
-                      <td className="border-b border-gray-700/50 px-4 py-3">
-                        <span className={`inline-block px-2.5 py-1 rounded text-[11px] font-semibold capitalize ${severityColor(f.severity)}`}>
-                          {f.severity || 'unknown'}
-                        </span>
-                      </td>
-                      <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-300">{f.cvss_score || 'N/A'}</td>
-                      <td className="border-b border-gray-700/50 px-4 py-3">
-                        <span className={`inline-block px-2.5 py-1 rounded text-[11px] font-semibold capitalize ${statusBadgeColor(f.status || 'open')}`}>
-                          {f.status || 'open'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  sortedFindings.map((f, idx) => {
+                    const exploit = f.exploitation_status;
+                    const critic = f.critic_verdict?.verdict;
+                    return (
+                      <tr key={idx} onClick={() => setSelectedFinding(f)} className="cursor-pointer hover:bg-gray-800/50 transition">
+                        <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-white">{f.title || 'Unknown'}</td>
+                        <td className="border-b border-gray-700/50 px-4 py-3">
+                          <span className={`inline-block px-2.5 py-1 rounded text-[11px] font-semibold capitalize ${severityColor(f.severity)}`}>
+                            {f.severity || 'unknown'}
+                          </span>
+                          {f.severity_original && f.severity_original !== f.severity && (
+                            <span className="ml-1 text-[10px] text-gray-500 line-through">{f.severity_original}</span>
+                          )}
+                        </td>
+                        <td className="border-b border-gray-700/50 px-4 py-3 text-sm text-gray-300">{f.cvss_score || 'N/A'}</td>
+                        <td className="border-b border-gray-700/50 px-4 py-3">
+                          {exploit === 'proven' && <span className="text-green-400 text-[11px] font-semibold">✓ PoC</span>}
+                          {exploit === 'attempted_failed' && <span className="text-red-400 text-[11px]">✗ no PoC</span>}
+                          {exploit === 'skipped_ineligible' && <span className="text-gray-500 text-[11px]">n/a</span>}
+                          {!exploit && <span className="text-gray-600 text-[11px]">—</span>}
+                        </td>
+                        <td className="border-b border-gray-700/50 px-4 py-3">
+                          {critic === 'accept' && <span className="text-green-400 text-[11px]">accept</span>}
+                          {critic === 'reject' && <span className="text-red-400 text-[11px]">reject</span>}
+                          {critic === 'needs_more_evidence' && <span className="text-yellow-400 text-[11px]">more evidence</span>}
+                          {!critic && <span className="text-gray-600 text-[11px]">—</span>}
+                        </td>
+                        <td className="border-b border-gray-700/50 px-4 py-3">
+                          <span className={`inline-block px-2.5 py-1 rounded text-[11px] font-semibold capitalize ${statusBadgeColor(f.status || 'open')}`}>
+                            {f.status || 'open'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
