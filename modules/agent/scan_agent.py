@@ -3204,6 +3204,31 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             })
             messages = _summarize_chain(client, messages, scan_context=scan_context)
 
+        # ── Strategy reflection prompt (autoresearch enforcement) ──
+        # Every 8 tool calls, inject a reflection prompt forcing the agent
+        # to articulate what it learned and how to adapt. Without this the
+        # agent tends to run tools linearly without varying parameters.
+        _REFLECTION_INTERVAL = 8
+        if loop_detector.total_calls > 0 and loop_detector.total_calls % _REFLECTION_INTERVAL == 0:
+            _reflection_prompt = (
+                "[STRATEGY REFLECTION — required before your next action]\n\n"
+                "Pause and think about your progress:\n"
+                "1. What have you discovered in the last few tool calls?\n"
+                "2. Have you tried MULTIPLE approaches on the same endpoints? "
+                "(e.g., different payload classes via sweep_payloads, different HTTP methods, "
+                "different parameter positions)\n"
+                "3. Should you call adapt_plan to update your strategy based on new discoveries?\n"
+                "4. Are there endpoints you tested only once that deserve deeper investigation?\n"
+                "5. Have you used sweep_payloads on every form and query parameter you found?\n\n"
+                "State your analysis briefly in text, THEN proceed with your next tool call."
+            )
+            messages.append({"role": "user", "content": _reflection_prompt})
+            _log_activity(scan_id, {
+                "type": "strategy_reflection",
+                "message": f"Injected reflection prompt at tool call #{loop_detector.total_calls}",
+                "timestamp": time.strftime("%H:%M:%S"),
+            })
+
         # ── Execution monitor ──
         if loop_detector.total_calls > 0 and loop_detector.total_calls % MONITOR_INTERVAL == 0:
             monitor_msg = _run_execution_monitor(
@@ -3326,6 +3351,21 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             reflector_attempts = 0  # reset on successful tool use
             tool_results = []
 
+            # Log agent's reasoning text blocks alongside tool calls
+            # so operators can see WHY the agent chose each action.
+            _reasoning_parts = [
+                b.text for b in response.content
+                if getattr(b, "type", "") == "text" and getattr(b, "text", "").strip()
+            ]
+            if _reasoning_parts:
+                _reasoning = " ".join(_reasoning_parts)[:1500]
+                _log_activity(scan_id, {
+                    "type": "agent_reasoning",
+                    "message": _reasoning,
+                    "timestamp": time.strftime("%H:%M:%S"),
+                })
+                _post_agent_chat(scan_id, _reasoning[:800], "thinking")
+
             for block in response.content:
                 if block.type == "tool_use":
                     # ── Loop detection ──
@@ -3351,6 +3391,7 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
                             "type": "command",
                             "tool": block.name,
                             "command": cmd,
+                            "message": cmd,
                             "index": commands_executed,
                             "timestamp": time.strftime("%H:%M:%S"),
                         })
