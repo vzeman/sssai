@@ -1438,4 +1438,39 @@ SUBAGENT_TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "queue_discovery_scan",
+        "description": (
+            "Queue a NEW scan for infrastructure you discovered during the current "
+            "scan. Call this when you find a new target worth scanning — e.g. a DB "
+            "server hostname in a response header, an internal API gateway on a "
+            "different host, a subdomain with open admin panels, a cloud metadata "
+            "endpoint, etc. The new scan runs after the current one completes. "
+            "Only call for targets DIFFERENT from the current scan target."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "URL or hostname of the discovered target",
+                },
+                "scan_type": {
+                    "type": "string",
+                    "description": "Scan type for the new target (default: security)",
+                    "enum": ["security", "pentest", "recon", "api_security", "full"],
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Why this target should be scanned (what you discovered)",
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "Priority: high (critical infra), normal, low (informational)",
+                    "enum": ["high", "normal", "low"],
+                },
+            },
+            "required": ["target", "reason"],
+        },
+    },
 ]

@@ -275,6 +275,12 @@ function ScanDetailsPage({ token }) {
         >
           Logs
         </button>
+        <button
+          className={`bg-transparent border-b-2 px-4 py-3 text-sm font-semibold cursor-pointer transition ${activeTab === 'recommendations' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+          onClick={() => setActiveTab('recommendations')}
+        >
+          Next Steps {(report?.recommended_next_scans?.length || 0) > 0 ? `(${report.recommended_next_scans.length})` : ''}
+        </button>
       </div>
 
       <div>
@@ -381,6 +387,69 @@ function ScanDetailsPage({ token }) {
         {activeTab === 'logs' && (
           <div className="p-5">
             <pre className="bg-gray-950 border border-gray-700 rounded-xl p-4 font-mono text-xs text-cyan-400 max-h-96 overflow-auto leading-relaxed">{logs || 'No logs available. Logs are available during and shortly after scan execution.'}</pre>
+          </div>
+        )}
+
+        {activeTab === 'recommendations' && (
+          <div className="p-5">
+            {(() => {
+              const recs = report?.recommended_next_scans || [];
+              const discovered = report?.discovered_targets || [];
+              const all = [...recs, ...discovered];
+              if (all.length === 0) {
+                return <p className="text-gray-500 text-center py-10">No recommendations from this scan.</p>;
+              }
+              return (
+                <div className="space-y-3">
+                  {all.map((rec, idx) => (
+                    <div key={idx} className="bg-gray-800/30 border border-gray-700 rounded-xl p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="text-sm text-white font-medium">{rec.target}</div>
+                          <div className="text-xs text-gray-400 mt-1">{rec.reason}</div>
+                          {rec.what_to_look_for && (
+                            <div className="text-xs text-gray-500 mt-1">Look for: {rec.what_to_look_for}</div>
+                          )}
+                          <div className="flex gap-2 mt-2">
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-900/40 text-cyan-300">{rec.scan_type || 'security'}</span>
+                            {rec.priority && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded ${rec.priority === 'high' ? 'bg-red-900/40 text-red-300' : rec.priority === 'low' ? 'bg-gray-700 text-gray-400' : 'bg-yellow-900/40 text-yellow-300'}`}>{rec.priority}</span>
+                            )}
+                            {rec.auto_queued && (
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-green-900/40 text-green-300">auto-queued</span>
+                            )}
+                          </div>
+                        </div>
+                        {!rec.auto_queued && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const resp = await fetch(`${API_BASE}/api/scans/${scanId}/start-recommended`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                  body: JSON.stringify({ target: rec.target, scan_type: rec.scan_type || 'security', reason: rec.reason }),
+                                });
+                                if (resp.ok) {
+                                  const data = await resp.json();
+                                  alert(`Scan queued: ${data.scan_id}`);
+                                } else {
+                                  alert('Failed to queue scan');
+                                }
+                              } catch (e) {
+                                alert('Error: ' + e.message);
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded transition ml-3 whitespace-nowrap"
+                          >
+                            Start Scan
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
