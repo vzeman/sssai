@@ -2886,6 +2886,132 @@ def _record_phase(scan_context: dict, phase_name: str):
     scan_context["_current_phase"] = phase_name
 
 
+def _extract_scan_recommendations(
+    report: dict, parent_target: str, parent_scan_type: str
+) -> list[dict]:
+    """Extract recommended follow-up scans from the report's attack surface,
+    findings, and discovered infrastructure. Runs deterministically in post-
+    processing so recommendations are generated even when the agent doesn't
+    explicitly call the recommendation tools."""
+    from urllib.parse import urlparse
+    recs: list[dict] = []
+    seen_targets: set[str] = set()
+    parent_host = urlparse(parent_target).hostname or parent_target
+
+    def _add(target: str, scan_type: str, reason: str, priority: str, look_for: str):
+        key = target.lower().rstrip("/")
+        if key in seen_targets or parent_host in key:
+            return
+        seen_targets.add(key)
+        recs.append({
+            "target": target,
+            "scan_type": scan_type,
+            "reason": reason,
+            "priority": priority,
+            "what_to_look_for": look_for,
+        })
+
+    surface = report.get("attack_surface") or {}
+
+    # Subdomains with resolvable IPs → recommend scanning
+    for sub in surface.get("subdomains") or []:
+        host = sub if isinstance(sub, str) else sub.get("hostname") or sub.get("subdomain", "")
+        if not host or host == parent_host:
+            continue
+        _add(
+            f"https://{host}",
+            "security",
+            f"Subdomain discovered during scan of {parent_host}",
+            "normal",
+            "Open ports, exposed services, admin panels, version disclosure",
+        )
+
+    # Hostnames found in findings (headers, certs, etc.)
+    for f in report.get("findings") or []:
+        title = (f.get("title") or "").lower()
+        evidence = str(f.get("evidence") or f.get("description") or "")
+
+        # Extract hostnames from certificate SANs
+        if "certificate" in title or "san" in title or "tls" in title:
+            import re
+            hosts = re.findall(r'(?:[\w-]+\.)+[\w-]+\.(?:com|net|org|io|sk|de|eu|cloud)', evidence)
+            for h in hosts[:10]:
+                if parent_host not in h:
+                    _add(
+                        f"https://{h}",
+                        "security",
+                        f"Hostname found in TLS certificate SAN: {h}",
+                        "normal",
+                        "Service identification, auth status, vulnerability scan",
+                    )
+
+        # Internal hostnames leaked in headers
+        if "header" in title and ("internal" in title or "leak" in title or "disclos" in title):
+            import re
+            hosts = re.findall(r'(?:[\w-]+\.)+[\w-]+\.(?:com|net|org|io|sk|de|eu|cloud)', evidence)
+            for h in hosts[:10]:
+                if parent_host not in h:
+                    _add(
+                        f"https://{h}",
+                        "security",
+                        f"Internal hostname leaked in response headers",
+                        "high",
+                        "Service exposure, auth bypass, internal network access",
+                    )
+
+        # Exposed admin panels on other hosts
+        if ("phpmyadmin" in title.lower() or "grafana" in title.lower()
+                or "kibana" in title.lower() or "admin" in title.lower()):
+            import re
+            urls = re.findall(r'https?://[^\s<>"\']+', evidence)
+            for u in urls[:5]:
+                parsed = urlparse(u)
+                if parsed.hostname and parent_host not in (parsed.hostname or ""):
+                    _add(
+                        f"https://{parsed.hostname}",
+                        "security",
+                        f"Admin panel ({parsed.hostname}) discovered during scan",
+                        "high",
+                        "Authentication strength, default credentials, version CVEs",
+                    )
+
+    # API endpoints on different hosts
+    for ep in surface.get("api_endpoints") or []:
+        url = ep if isinstance(ep, str) else ep.get("url", "")
+        if url:
+            parsed = urlparse(url)
+            if parsed.hostname and parent_host not in (parsed.hostname or ""):
+                _add(
+                    f"https://{parsed.hostname}",
+                    "api_security",
+                    f"API endpoint discovered on different host: {url[:80]}",
+                    "normal",
+                    "API auth, injection, rate limiting, data exposure",
+                )
+
+    # Always recommend deeper scan types if current was basic
+    if parent_scan_type in ("security", "quick", "recon"):
+        _add(
+            parent_target,
+            "pentest",
+            "Follow up with penetration testing for deeper vulnerability analysis",
+            "normal",
+            "Exploitation proof-of-concept, privilege escalation, business logic flaws",
+        )
+
+    # If auth forms found but no auth config, recommend authenticated scan
+    if surface.get("auth_mechanisms") or surface.get("login_forms"):
+        _add(
+            parent_target,
+            "security",
+            "Login forms detected — run an authenticated scan with valid credentials for deeper coverage",
+            "high",
+            "IDOR, privilege escalation, session management, authenticated-only endpoints",
+        )
+
+    return recs[:20]
+
+
 def _finalise_phase_timings(scan_context: dict) -> dict[str, float]:
     """Return a clean {phase_name: duration_seconds} dict for the report."""
     now = time.time()
@@ -3807,6 +3933,19 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
     # ── Attach discovered targets from mid-scan auto-queuing ──
     if scan_context.get("_discovered_targets"):
         report["discovered_targets"] = scan_context["_discovered_targets"]
+
+    # ── Auto-generate recommended_next_scans from attack surface ──
+    # If the agent didn't produce recommendations, extract them from
+    # discovered infrastructure (subdomains, hostnames in findings, etc.)
+    if not report.get("recommended_next_scans"):
+        report["recommended_next_scans"] = _extract_scan_recommendations(
+            report, target, scan_type
+        )
+        if report["recommended_next_scans"]:
+            log.info(
+                "Scan %s: auto-generated %d recommended next scans",
+                scan_id, len(report["recommended_next_scans"]),
+            )
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)
