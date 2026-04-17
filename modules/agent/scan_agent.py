@@ -1456,13 +1456,20 @@ def _handle_subagent(agent_type: str, input: dict, scan_context: dict | None) ->
         tracker = scan_context.get("_token_tracker") if scan_context else None
 
         for _ in range(max_iterations):
-            response = client.messages.create(
-                model=AI_MODEL,
-                max_tokens=8000,
-                system=system_prompt,
-                tools=agent_tools,
-                messages=messages,
-            )
+            for _sa_attempt in range(1, 4):
+                try:
+                    response = client.messages.create(
+                        model=AI_MODEL,
+                        max_tokens=8000,
+                        system=system_prompt,
+                        tools=agent_tools,
+                        messages=messages,
+                    )
+                    break
+                except (anthropic.APIConnectionError, anthropic.APITimeoutError):
+                    if _sa_attempt >= 3:
+                        raise
+                    time.sleep(5 * _sa_attempt)
             if tracker:
                 tracker.record(response, caller=f"subagent_{agent_type}")
 
@@ -3277,7 +3284,21 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
         }
         if _thinking:
             _kwargs["thinking"] = _thinking
-        response = client.messages.create(**_kwargs)
+        # Retry on transient network errors (Docker Desktop flakes, DNS timeouts)
+        _max_retries = 4
+        for _attempt in range(1, _max_retries + 1):
+            try:
+                response = client.messages.create(**_kwargs)
+                break
+            except (anthropic.APIConnectionError, anthropic.APITimeoutError) as _net_err:
+                if _attempt >= _max_retries:
+                    raise
+                _wait = min(30, 5 * (2 ** (_attempt - 1)))  # 5, 10, 20s
+                log.warning(
+                    "Scan %s: Anthropic API transient error (attempt %d/%d), retrying in %ds: %s",
+                    scan_id, _attempt, _max_retries, _wait, _net_err,
+                )
+                time.sleep(_wait)
         token_tracker.record(response, caller="main")
 
         # Record in scan budget (#172) for stopping decisions
