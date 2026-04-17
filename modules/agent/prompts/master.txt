@@ -227,16 +227,7 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 - OWASP/CWE/CVE mappings where applicable
 - Attack chains from Phase 3.5 (even if empty array)
 - An improvement roadmap prioritized by risk
-- **`recommended_next_scans`** — a list of recommended follow-up scans. For each:
-  ```json
-  {
-    "target": "db.internal.example.com",
-    "scan_type": "security",
-    "reason": "Database server hostname discovered in X-Backend-Server header",
-    "priority": "high",
-    "what_to_look_for": "Open ports, default credentials, version disclosure, backup exposure"
-  }
-  ```
+- **`recommended_next_scans`** — a list of recommended follow-up scans. Each item must have: target, scan_type, reason, priority (high/normal/low), and what_to_look_for (specific things to investigate). Example: target="db.internal.example.com", scan_type="security", reason="Database hostname discovered in X-Backend-Server header", priority="high", what_to_look_for="Open ports, default credentials, version disclosure".
 
   Include recommendations for:
   - Any infrastructure targets you discovered but didn't scan (different hosts, subdomains)
