@@ -31,9 +31,16 @@ Target ──►  Discovery ──► Attack Surface ──► Adaptive Plan   �
               │    Prove-or-demote: PoC on high/critical      │
               │    Unproven findings auto-demoted             │
               │                                              │
-            ──┼──► Report ───────────────────────────────────┤
+            ──┼──► Report + Recommendations ─────────────────┤
               │    Structured findings, attack chains,        │
               │    OWASP/CWE mapping, remediation roadmap    │
+              │                                              │
+              │  ┌─ Recommended Next Scans ──────────────┐   │
+              │  │ • phpmyadmin.internal.example.com      │   │
+              │  │ • grafana.monitoring.example.com       │   │
+              │  │ • db-server from X-Backend header      │   │
+              │  │          [Start Scan] one click        │   │
+              │  └───────────────────────────────────────┘   │
               │                                              │
               │  Cross-scan memory stores results for         │
               │  retrieval-augmented planning on next scan    │
@@ -47,6 +54,17 @@ Target ──►  Discovery ──► Attack Surface ──► Adaptive Plan   �
 - **80+ security tools** — nmap, nuclei (8,000+ templates), nikto, sqlmap, testssl, zap-cli, wapiti, trivy, semgrep, and many more
 - **11 scan types** — security, pentest, SEO, performance, API, compliance, privacy, cloud, recon, uptime, full
 
+### Auto-Discovery & Expanding Scan Network
+Each scan doesn't just report — it maps new infrastructure and recommends follow-up scans:
+
+- **Infrastructure discovery** — the agent watches for new targets in response headers, DNS records, TLS certificate SANs, JavaScript source, API responses, and redirect chains
+- **Auto-queue discovery scans** — the agent can queue new scans mid-test when it finds critical infrastructure (DB servers, admin panels, monitoring dashboards)
+- **Recommended next scans** — every report includes actionable follow-up recommendations extracted from discovered subdomains, internal hostnames, and exposed services
+- **One-click start** — operators can launch any recommended scan directly from the UI with a single click
+- **Expanding scan network** — scan A discovers hosts B and C → scans B and C discover hosts D and E → repeat until the full infrastructure is mapped
+
+Real example: scanning `crm.qualityunit.com` auto-generated **17 recommended follow-up scans** including phpMyAdmin instances, Kibana clusters, Grafana dashboards, Salt master, Prometheus, and database servers — all discovered from DNS enumeration and TLS certificate analysis.
+
 ### Autoresearch-Inspired Design
 Applies Karpathy's autoresearch principles to security auditing:
 
@@ -54,6 +72,8 @@ Applies Karpathy's autoresearch principles to security auditing:
 - **Proposer-critic loop** — the red-team critic adversarially challenges findings. "Is this really a vuln, or a WAF false positive?"
 - **Parallel hypothesis trees** — after discovery, the agent forks into concurrent attack branches (SQLi, IDOR, auth bypass, SSRF, etc.), each with narrow context
 - **Systematic action-space exploration** — `sweep_payloads` tries 10 vulnerability classes with oracle-scored variants against every discovered endpoint
+- **Strategy reflection** — every 8 tool calls the agent is forced to reflect: "What did I learn? Am I being too shallow? What alternatives should I try?"
+- **Visible reasoning** — the agent's thinking is logged to the activity timeline so operators can see WHY it chose each action
 - **Learning from prior runs** — cross-scan memory auto-recalls relevant experience on similar target classes for retrieval-augmented planning
 - **Budget-aware execution** — token/cost/time budgets replace hard iteration caps; the agent gets a warning at 80% and gracefully wraps up
 
