@@ -328,6 +328,9 @@ def handle_tool(name: str, input: dict, scan_context: dict | None = None) -> str
     elif name == "fork_hypothesis_branches":
         return _handle_fork_hypothesis_branches(input, scan_context)
 
+    elif name == "queue_discovery_scan":
+        return _handle_queue_discovery_scan(input, scan_context)
+
     elif name == "get_session_headers":
         return _handle_get_session_headers(scan_context)
 
@@ -827,6 +830,104 @@ def _handle_fork_hypothesis_branches(input: dict, scan_context: dict | None) -> 
         return _json.dumps(result, default=str)[:30_000]
     except Exception as e:
         return f"ERROR: fork_hypothesis_branches failed: {e}"
+
+
+def _handle_queue_discovery_scan(input: dict, scan_context: dict | None) -> str:
+    """Queue a new scan for infrastructure discovered during the current scan.
+
+    The agent calls this when it discovers a new target worth scanning — e.g.
+    a DB server hostname in a header, a subdomain with open ports, an API
+    gateway on a different host. Only queues if auto_queue_discoveries is
+    enabled in the scan config OR if the agent explicitly calls this tool.
+    """
+    try:
+        target = input.get("target", "").strip()
+        if not target:
+            return "ERROR: target is required"
+        scan_type = input.get("scan_type", "security")
+        reason = input.get("reason", "Discovered during parent scan")
+        priority = input.get("priority", "normal")
+
+        if not scan_context:
+            return "ERROR: no scan context"
+
+        parent_scan_id = scan_context.get("scan_id", "")
+        user_id = scan_context.get("user_id")
+        parent_target = scan_context.get("target", "")
+
+        # Prevent scanning the same target as the parent
+        if target.rstrip("/") == parent_target.rstrip("/"):
+            return f"Skipped: {target} is the same as the current scan target."
+
+        # Queue via Redis + DB
+        import uuid
+        from sqlalchemy import create_engine, text
+        db_url = os.environ.get("DATABASE_URL", "")
+        if not db_url or not user_id:
+            # Store as recommendation instead of queueing
+            scan_context.setdefault("_discovered_targets", []).append({
+                "target": target,
+                "scan_type": scan_type,
+                "reason": reason,
+                "priority": priority,
+                "auto_queued": False,
+            })
+            return f"Stored as recommendation (no DB/user_id to queue): {target}"
+
+        new_scan_id = str(uuid.uuid4())
+        engine = create_engine(db_url, pool_pre_ping=True)
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO scans (id, user_id, target, scan_type, status, created_at, config, findings_count)
+                VALUES (:id, :user_id, :target, :scan_type, 'queued', NOW(), :config, 0)
+            """), {
+                "id": new_scan_id,
+                "user_id": user_id,
+                "target": target,
+                "scan_type": scan_type,
+                "config": json.dumps({
+                    "parent_scan_id": parent_scan_id,
+                    "discovery_reason": reason,
+                    "auto_queued": True,
+                }),
+            })
+
+        queue = get_queue()
+        queue.send("scan-jobs", {
+            "scan_id": new_scan_id,
+            "target": target,
+            "scan_type": scan_type,
+            "config": {
+                "parent_scan_id": parent_scan_id,
+                "discovery_reason": reason,
+                "auto_queued": True,
+            },
+        })
+
+        scan_context.setdefault("_discovered_targets", []).append({
+            "target": target,
+            "scan_type": scan_type,
+            "reason": reason,
+            "priority": priority,
+            "auto_queued": True,
+            "scan_id": new_scan_id,
+        })
+
+        _log_activity(parent_scan_id, {
+            "type": "discovery_scan_queued",
+            "target": target,
+            "scan_type": scan_type,
+            "reason": reason,
+            "new_scan_id": new_scan_id,
+            "timestamp": time.strftime("%H:%M:%S"),
+        })
+        _post_agent_chat(parent_scan_id,
+            f"Queued discovery scan: {target} ({scan_type}) — {reason}",
+            "status")
+
+        return f"Queued scan {new_scan_id} for {target} ({scan_type}). Reason: {reason}"
+    except Exception as e:
+        return f"ERROR: queue_discovery_scan failed: {e}"
 
 
 def _handle_load_knowledge(input: dict, scan_context: dict | None) -> str:
@@ -3702,6 +3803,10 @@ def run_scan(scan_id: str, target: str, scan_type: str, config: dict | None = No
             )
     except Exception as gate_err:
         log.warning("Exploitation gate failed for scan %s: %s", scan_id, gate_err)
+
+    # ── Attach discovered targets from mid-scan auto-queuing ──
+    if scan_context.get("_discovered_targets"):
+        report["discovered_targets"] = scan_context["_discovered_targets"]
 
     # ── Store report ──
     storage.put_json(f"scans/{scan_id}/report.json", report)

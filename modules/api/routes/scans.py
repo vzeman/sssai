@@ -385,6 +385,58 @@ def verify_scan(
     }
 
 
+@router.post("/{scan_id}/start-recommended")
+def start_recommended_scan(
+    scan_id: str,
+    body: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Start a recommended follow-up scan from a completed scan's recommendations.
+
+    Body: {"target": "...", "scan_type": "security", "reason": "..."}
+    """
+    parent = db.query(Scan).filter(Scan.id == scan_id, Scan.user_id == user.id).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent scan not found")
+
+    target = body.get("target", "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="target is required")
+
+    scan_type = body.get("scan_type", "security")
+    reason = body.get("reason", "Recommended by parent scan")
+
+    scan = Scan(
+        user_id=user.id,
+        target=target,
+        scan_type=scan_type,
+        config={
+            "parent_scan_id": scan_id,
+            "discovery_reason": reason,
+            "recommended": True,
+        },
+    )
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+
+    get_queue().send("scan-jobs", {
+        "scan_id": scan.id,
+        "target": scan.target,
+        "scan_type": scan.scan_type,
+        "config": scan.config or {},
+    })
+
+    return {
+        "scan_id": scan.id,
+        "target": target,
+        "scan_type": scan_type,
+        "parent_scan_id": scan_id,
+        "status": "queued",
+    }
+
+
 @router.post("/{scan_id}/stop")
 def stop_scan(scan_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Stop a running scan by sending a stop signal via Redis."""

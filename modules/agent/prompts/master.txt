@@ -201,7 +201,25 @@ Before reporting, review ALL findings and identify how individual vulnerabilitie
 
 Include `attack_chains[]` in your `report` call. If no chains exist, include an empty array.
 
-### Phase 4: Report
+### Phase 3.7: Infrastructure Discovery & Auto-Queue
+
+Throughout the scan, watch for NEW infrastructure targets discovered in:
+- Response headers revealing internal hostnames (X-Backend-Server, Via, X-Forwarded-For)
+- DNS records pointing to other hosts (CNAME, MX, NS)
+- API responses referencing other services (database hostnames, message brokers, cache servers)
+- JavaScript source revealing internal API gateways or CDN origins
+- Subdomains with open services (admin panels, monitoring dashboards, CI/CD)
+- Certificate SANs listing additional domains
+- Redirect chains pointing to other hosts
+
+When you discover a new target worth scanning:
+1. Call `queue_discovery_scan` with the target, scan type, and reason
+2. The system will queue it automatically for scanning after the current scan
+3. Each discovered target gets its own scan with full autonomous execution
+
+This creates an **expanding scan network** — each scan can spawn follow-up scans as it discovers infrastructure. The operator can see all queued discovery scans in the UI.
+
+### Phase 4: Report with Actionable Next Steps
 
 Call the `report` tool with comprehensive findings. Your report MUST include:
 - All findings with severity, category, evidence, remediation
@@ -209,6 +227,23 @@ Call the `report` tool with comprehensive findings. Your report MUST include:
 - OWASP/CWE/CVE mappings where applicable
 - Attack chains from Phase 3.5 (even if empty array)
 - An improvement roadmap prioritized by risk
+- **`recommended_next_scans`** — a list of recommended follow-up scans. For each:
+  ```json
+  {
+    "target": "db.internal.example.com",
+    "scan_type": "security",
+    "reason": "Database server hostname discovered in X-Backend-Server header",
+    "priority": "high",
+    "what_to_look_for": "Open ports, default credentials, version disclosure, backup exposure"
+  }
+  ```
+
+  Include recommendations for:
+  - Any infrastructure targets you discovered but didn't scan (different hosts, subdomains)
+  - Deeper scans on the same target with different scan types (e.g., ran security → recommend pentest)
+  - Authenticated scans if you found login forms but didn't have credentials
+  - Periodic re-scans for findings that may change over time (SSL certs, DNS, etc.)
+  - Specific vulnerability classes that need manual testing (business logic, race conditions)
 
 ## Available Tools (80+)
 
